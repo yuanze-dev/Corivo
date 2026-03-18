@@ -1,0 +1,45 @@
+{
+  "name": "corivo",
+  "version": "0.10.0-mvp",
+  "description": "你的赛博伙伴 — 记忆存储与智能推送",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "corivo": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "memory",
+    "ai",
+    "knowledge-management",
+    "cli"
+  ],
+  "author": "Corivo Team",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^20.14.12",
+    "@vitest/coverage-v8": "^1.6.0",
+    "eslint": "^9.9.1",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4",
+    "vitest": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

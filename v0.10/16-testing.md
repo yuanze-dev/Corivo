@@ -507,6 +507,312 @@ describe('Authorization Security', () => {
 })
 ```
 
+### 5.3 信任状态机测试
+
+> 覆盖 `19-trust-state-machine.md` 定义的 4 级权限 × 4 种降级原因 = 16 种状态转换
+
+```typescript
+// __tests__/security/trust-state-machine.test.ts
+describe('TrustStateMachine', () => {
+  describe('state transitions', () => {
+    // 4 种正常升级路径
+    describe('upgrades', () => {
+      it('should upgrade READ_ONLY → INFORMED when conditions met', async () => {
+        const state = new TrustState({ level: 'READ_ONLY' })
+        await simulateUsage({ days: 7, adoptions: 5 })
+
+        const canUpgrade = await state.checkUpgradeConditions()
+        expect(canUpgrade).toBe(true)
+      })
+
+      it('should upgrade INFORMED → REQUESTED when conditions met', async () => {
+        const state = new TrustState({ level: 'INFORMED' })
+        await simulateUsage({ days: 30, revokeRate: 0 })
+
+        const canUpgrade = await state.checkUpgradeConditions()
+        expect(canUpgrade).toBe(true)
+      })
+    })
+
+    // 4 × 4 = 16 种降级场景
+    describe('downgrades', () => {
+      const downgradeReasons = ['USER_ERROR', 'EXEC_ERROR', 'TRUST_LOSS', 'TEMPORARY'] as const
+      const levels = ['INFORMED', 'REQUESTED'] as const
+
+      levels.forEach(level => {
+        downgradeReasons.forEach(reason => {
+          it(`should handle ${reason} at ${level} level`, async () => {
+            const state = new TrustState({ level })
+            await state.downgrade(reason)
+
+            expect(state.level).toBe('READ_ONLY')
+            expect(state.downgradeReason).toBe(reason)
+            expect(state.previousLevel).toBe(level)
+          })
+        })
+      })
+    })
+
+    // PAUSED 状态特殊处理
+    describe('pause/resume', () => {
+      it('should pause from any level and preserve state', async () => {
+        const levels = ['READ_ONLY', 'INFORMED', 'REQUESTED'] as const
+
+        for (const level of levels) {
+          const state = new TrustState({ level })
+          await state.pause()
+
+          expect(state.level).toBe('PAUSED')
+          expect(state.previousLevel).toBe(level)
+          expect(state.downgradeReason).toBe('TEMPORARY')
+        }
+      })
+
+      it('should resume to previous level', async () => {
+        const state = new TrustState({ level: 'INFORMED' })
+        await state.pause()
+        await state.resume()
+
+        expect(state.level).toBe('INFORMED')
+        expect(state.downgradeReason).toBeNull()
+      })
+    })
+  })
+
+  describe('recovery paths', () => {
+    // USER_ERROR: 快速恢复
+    describe('USER_ERROR recovery', () => {
+      it('should recover immediately without conditions', async () => {
+        const state = new TrustState({
+          level: 'READ_ONLY',
+          previousLevel: 'INFORMED',
+          downgradeReason: 'USER_ERROR'
+        })
+
+        const canRecover = await state.checkRecovery()
+        expect(canRecover).toBe(true)
+
+        await state.recover()
+        expect(state.level).toBe('INFORMED')
+      })
+    })
+
+    // EXEC_ERROR: 7 天观察期
+    describe('EXEC_ERROR recovery', () => {
+      it('should require 7 days observation with zero failures', async () => {
+        const state = new TrustState({
+          level: 'READ_ONLY',
+          previousLevel: 'INFORMED',
+          downgradeReason: 'EXEC_ERROR',
+          observation: {
+            startDate: Date.now() - 8 * 86400000, // 8 days ago
+            failures: 0,
+            revocations: 3,
+            checkDate: Date.now()
+          }
+        })
+
+        const canRecover = await state.checkRecovery()
+        expect(canRecover).toBe(true)
+      })
+
+      it('should reject recovery with failures in observation period', async () => {
+        const state = new TrustState({
+          level: 'READ_ONLY',
+          previousLevel: 'INFORMED',
+          downgradeReason: 'EXEC_ERROR',
+          observation: {
+            startDate: Date.now() - 8 * 86400000,
+            failures: 1, // Has new failure
+            revocations: 0,
+            checkDate: Date.now()
+          }
+        })
+
+        const canRecover = await state.checkRecovery()
+        expect(canRecover).toBe(false)
+      })
+
+      it('should reject recovery before 7 days', async () => {
+        const state = new TrustState({
+          level: 'READ_ONLY',
+          previousLevel: 'INFORMED',
+          downgradeReason: 'EXEC_ERROR',
+          observation: {
+            startDate: Date.now() - 5 * 86400000, // Only 5 days
+            failures: 0,
+            revocations: 0,
+            checkDate: Date.now()
+          }
+        })
+
+        const canRecover = await state.checkRecovery()
+        expect(canRecover).toBe(false)
+      })
+
+      it('should reject recovery with high revocation rate', async () => {
+        const state = new TrustState({
+          level: 'READ_ONLY',
+          previousLevel: 'INFORMED',
+          downgradeReason: 'EXEC_ERROR',
+          observation: {
+            startDate: Date.now() - 8 * 86400000,
+            failures: 0,
+            revocations: 10, // > 5%
+            checkDate: Date.now()
+          },
+          statistics: { executions: 100 } // 10% revocation rate
+        })
+
+        const canRecover = await state.checkRecovery()
+        expect(canRecover).toBe(false)
+      })
+    })
+
+    // TRUST_LOSS: 三阶段重建
+    describe('TRUST_LOSS recovery', () => {
+      it('should require phase 2 completion with high adoption rate', async () => {
+        const state = new TrustState({
+          level: 'READ_ONLY',
+          previousLevel: 'REQUESTED',
+          downgradeReason: 'TRUST_LOSS',
+          rebuildPhase: 2,
+          rebuildProgress: {
+            adoptionRate: 0.85, // > 80%
+            errorRate: 0.02,
+            lastCheck: Date.now()
+          }
+        })
+
+        const canRecover = await state.checkRecovery()
+        expect(canRecover).toBe(true)
+      })
+
+      it('should reject recovery with low adoption rate', async () => {
+        const state = new TrustState({
+          level: 'READ_ONLY',
+          previousLevel: 'REQUESTED',
+          downgradeReason: 'TRUST_LOSS',
+          rebuildPhase: 2,
+          rebuildProgress: {
+            adoptionRate: 0.75, // < 80%
+            errorRate: 0.02,
+            lastCheck: Date.now()
+          }
+        })
+
+        const canRecover = await state.checkRecovery()
+        expect(canRecover).toBe(false)
+      })
+
+      it('should progress through rebuild phases', async () => {
+        const state = new TrustState({
+          level: 'READ_ONLY',
+          previousLevel: 'REQUESTED',
+          downgradeReason: 'TRUST_LOSS',
+          rebuildPhase: 0
+        })
+
+        // Phase 0 → 1: 7 days observation
+        await simulateRebuildPhase1({ days: 7, adoptionRate: 0.9 })
+        expect(state.rebuildPhase).toBe(1)
+
+        // Phase 1 → 2: 14 days testing
+        await simulateRebuildPhase2({ days: 14, errorRate: 0.02 })
+        expect(state.rebuildPhase).toBe(2)
+
+        // Phase 2: Can recover
+        const canRecover = await state.checkRecovery()
+        expect(canRecover).toBe(true)
+      })
+    })
+
+    // TEMPORARY: 一键恢复
+    describe('TEMPORARY recovery', () => {
+      it('should recover immediately without conditions', async () => {
+        const state = new TrustState({
+          level: 'PAUSED',
+          previousLevel: 'REQUESTED',
+          downgradeReason: 'TEMPORARY'
+        })
+
+        await state.resume()
+        expect(state.level).toBe('REQUESTED')
+        expect(state.downgradeReason).toBeNull()
+      })
+    })
+  })
+
+  describe('invalid transitions', () => {
+    it('should reject direct upgrade without meeting conditions', async () => {
+      const state = new TrustState({ level: 'READ_ONLY' })
+
+      // Just initialized, no usage
+      const canUpgrade = await state.checkUpgradeConditions()
+      expect(canUpgrade).toBe(false)
+
+      await expect(state.upgrade()).rejects.toThrow('Upgrade conditions not met')
+    })
+
+    it('should reject upgrade when in observation period', async () => {
+      const state = new TrustState({
+        level: 'READ_ONLY',
+        downgradeReason: 'EXEC_ERROR',
+        observation: {
+          startDate: Date.now() - 3 * 86400000,
+          failures: 0,
+          revocations: 0,
+          checkDate: Date.now()
+        }
+      })
+
+      const canRecover = await state.checkRecovery()
+      expect(canRecover).toBe(false) // Still in observation period
+    })
+  })
+
+  describe('statistics tracking', () => {
+    it('should track executions, revocations, and rejections', async () => {
+      const state = new TrustState({ level: 'INFORMED' })
+
+      await state.recordExecution({ success: true })
+      await state.recordExecution({ success: true, revoked: false })
+      await state.recordExecution({ success: true, revoked: true })
+      await state.recordExecution({ success: false, rejected: true })
+
+      expect(state.statistics.executions).toBe(4)
+      expect(state.statistics.revocations).toBe(1)
+      expect(state.statistics.rejections).toBe(1)
+    })
+
+    it('should calculate revocation rate correctly', () => {
+      const state = new TrustState({
+        level: 'INFORMED',
+        statistics: {
+          executions: 100,
+          revocations: 3
+        }
+      })
+
+      expect(state.revocationRate).toBe(0.03) // 3%
+    })
+
+    it('should trigger downgrade on high error rate', async () => {
+      const state = new TrustState({ level: 'REQUESTED' })
+
+      // 3 failures in 24 hours
+      await state.recordExecution({ success: false })
+      await state.recordExecution({ success: false })
+      await state.recordExecution({ success: false })
+
+      const shouldDowngrade = await state.checkAutoDowngrade()
+      expect(shouldDowngrade).toBe(true)
+      expect(state.recommendedDowngradeReason).toBe('EXEC_ERROR')
+    })
+  })
+})
+```
+
 ---
 
 ## 6. LLM 测试

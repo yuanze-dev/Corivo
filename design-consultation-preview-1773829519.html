@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corivo Design System Preview</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Background Colors */
+            --bg-surface: #1a1915;
+            --bg-elevated: #25241d;
+            --bg-border: #32312a;
+
+            /* Text Colors */
+            --text-primary: #e8e4dc;
+            --text-secondary: #a8a498;
+            --text-muted: #5c5a50;
+
+            /* Accent Colors */
+            --accent-primary: #d97706;
+            --accent-secondary: #f59e0b;
+            --accent-static: #b45309;
+
+            /* Semantic Colors */
+            --color-success: #059669;
+            --color-warning: #d97706;
+            --color-error: #dc2626;
+            --color-info: #0891b2;
+
+            /* Spacing */
+            --space-2xs: 4px;
+            --space-xs: 8px;
+            --space-sm: 16px;
+            --space-md: 24px;
+            --space-lg: 32px;
+            --space-xl: 48px;
+            --space-2xl: 64px;
+            --space-3xl: 96px;
+
+            /* Border Radius */
+            --radius-sm: 6px;
+            --radius-md: 12px;
+            --radius-lg: 20px;
+            --radius-full: 9999px;
+
+            /* Typography */
+            --font-display: 'Instrument Serif', Georgia, serif;
+            --font-body: 'Instrument Sans', -apple-system, sans-serif;
+            --font-data: 'DM Sans', -apple-system, sans-serif;
+            --font-code: 'JetBrains Mono', 'SF Mono', monospace;
+
+            /* Transitions */
+            --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+            --ease-in: cubic-bezier(0.4, 0, 1, 1);
+            --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-surface);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .light-mode {
+            --bg-surface: #faf7f2;
+            --bg-elevated: #ffffff;
+            --bg-border: #e8e4dc;
+            --text-primary: #3d3222;
+            --text-secondary: #6b5c4a;
+            --text-muted: #a8a498;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: var(--space-xl);
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: var(--space-3xl) 0;
+            border-bottom: 1px solid var(--bg-border);
+            margin-bottom: var(--space-3xl);
+        }
+
+        .hero h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 400;
+            letter-spacing: -0.02em;
+            margin-bottom: var(--space-md);
+            color: var(--text-primary);
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Section Headers */
+        .section-header {
+            margin-bottom: var(--space-xl);
+        }
+
+        .section-header h2 {
+            font-family: var(--font-display);
+            font-size: 2rem;
+            font-weight: 400;
+            margin-bottom: var(--space-xs);
+            color: var(--accent-primary);
+        }
+
+        .section-header p {
+            color: var(--text-secondary);
+        }
+
+        /* Font Specimens */
+        .font-section {
+            margin-bottom: var(--space-3xl);
+        }
+
+        .font-specimen {
+            background: var(--bg-elevated);
+            border: 1px solid var(--bg-border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-lg);
+            margin-bottom: var(--space-md);
+        }
+
+        .font-specimen h3 {
+            font-family: var(--font-data);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: var(--space-sm);
+        }
+
+        .font-display .specimen {
+            font-family: var(--font-display);
+            font-size: 3rem;
+            font-weight: 400;
+            line-height: 1.2;
+        }
+
+        .font-body .specimen {
+            font-family: var(--font-body);
+            font-size: 1.125rem;
+            line-height: 1.7;
+        }
+
+        .font-data .specimen {
+            font-family: var(--font-data);
+            font-size: 1rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .font-code .specimen {
+            font-family: var(--font-code);
+            font-size: 0.875rem;
+            background: var(--bg-surface);
+            padding: var(--space-sm);
+            border-radius: var(--radius-sm);
+        }
+
+        /* Color Palette */
+        .color-section {
+            margin-bottom: var(--space-3xl);
+        }
+
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--space-md);
+        }
+
+        .color-swatch {
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            border: 1px solid var(--bg-border);
+        }
+
+        .swatch-color {
+            height: 80px;
+        }
+
+        .swatch-info {
+            background: var(--bg-elevated);
+            padding: var(--space-sm);
+        }
+
+        .swatch-info h4 {
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .swatch-info code {
+            font-family: var(--font-code);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* UI Components */
+        .components-section {
+            margin-bottom: var(--space-3xl);
+        }
+
+        .component-group {
+            background: var(--bg-elevated);
+            border: 1px solid var(--bg-border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-lg);
+            margin-bottom: var(--space-md);
+        }
+
+        .component-group h3 {
+            font-family: var(--font-data);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: var(--space-md);
+        }
+
+        .button-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-sm);
+            align-items: center;
+        }
+
+        .btn {
+            font-family: var(--font-body);
+            font-size: 0.875rem;
+            font-weight: 500;
+            padding: var(--space-xs) var(--space-md);
+            border-radius: var(--radius-md);
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s var(--ease-out-quint);
+        }
+
+        .btn-primary {
+            background: var(--accent-primary);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-secondary);
+        }
+
+        .btn-secondary {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--bg-border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+        }
+
+        .btn-ghost:hover {
+            color: var(--text-primary);
+            background: var(--bg-elevated);
+        }
+
+        /* Form Elements */
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: var(--space-md);
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-xs);
+        }
+
+        .form-group label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .form-input {
+            font-family: var(--font-body);
+            font-size: 0.875rem;
+            padding: var(--space-xs) var(--space-sm);
+            background: var(--bg-surface);
+            border: 1px solid var(--bg-border);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .form-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* Alerts */
+        .alert {
+            padding: var(--space-sm) var(--space-md);
+            border-radius: var(--radius-md);
+            border-left: 3px solid;
+            margin-bottom: var(--space-sm);
+        }
+
+        .alert-success {
+            background: rgba(5, 150, 105, 0.1);
+            border-color: var(--color-success);
+        }
+
+        .alert-warning {
+            background: rgba(217, 119, 6, 0.1);
+            border-color: var(--color-warning);
+        }
+
+        .alert-error {
+            background: rgba(220, 38, 38, 0.1);
+            border-color: var(--color-error);
+        }
+
+        .alert-info {
+            background: rgba(8, 145, 178, 0.1);
+            border-color: var(--color-info);
+        }
+
+        /* Dashboard Mockup */
+        .dashboard-mockup {
+            background: var(--bg-surface);
+            border: 1px solid var(--bg-border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            margin-bottom: var(--space-3xl);
+        }
+
+        .dashboard-header {
+            background: var(--bg-elevated);
+            border-bottom: 1px solid var(--bg-border);
+            padding: var(--space-sm) var(--space-md);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dashboard-logo {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            color: var(--accent-primary);
+        }
+
+        .dashboard-user {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-full);
+            background: var(--accent-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            color: #fff;
+        }
+
+        .dashboard-content {
+            display: grid;
+            grid-template-columns: 240px 1fr 280px;
+            min-height: 500px;
+        }
+
+        .sidebar {
+            background: var(--bg-elevated);
+            border-right: 1px solid var(--bg-border);
+            padding: var(--space-md);
+        }
+
+        .sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-xs);
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            padding: var(--space-xs) var(--space-sm);
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: all 0.15s var(--ease-out-quint);
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            color: var(--accent-primary);
+        }
+
+        .main-content {
+            padding: var(--space-lg);
+        }
+
+        .main-content h2 {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            margin-bottom: var(--space-md);
+        }
+
+        .memory-cards {
+            display: grid;
+            gap: var(--space-md);
+        }
+
+        .memory-card {
+            background: var(--bg-elevated);
+            border: 1px solid var(--bg-border);
+            border-radius: var(--radius-md);
+            padding: var(--space-md);
+        }
+
+        .memory-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-sm);
+        }
+
+        .memory-type {
+            font-family: var(--font-data);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--accent-primary);
+        }
+
+        .memory-time {
+            font-family: var(--font-data);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .memory-content {
+            color: var(--text-primary);
+            font-size: 0.9375rem;
+            line-height: 1.7;
+        }
+
+        .memory-source {
+            margin-top: var(--space-sm);
+            padding-top: var(--space-sm);
+            border-top: 1px solid var(--bg-border);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: var(--font-data);
+        }
+
+        .right-panel {
+            background: var(--bg-elevated);
+            border-left: 1px solid var(--bg-border);
+            padding: var(--space-md);
+        }
+
+        .stat-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--bg-border);
+            border-radius: var(--radius-md);
+            padding: var(--space-md);
+            margin-bottom: var(--space-md);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            font-family: var(--font-data);
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--accent-primary);
+        }
+
+        .stat-change {
+            font-size: 0.75rem;
+            color: var(--color-success);
+        }
+
+        /* Marketing Hero Mockup */
+        .marketing-hero {
+            background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-surface) 100%);
+            border: 1px solid var(--bg-border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-3xl) var(--space-xl);
+            text-align: center;
+            margin-bottom: var(--space-3xl);
+        }
+
+        .marketing-hero h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 400;
+            margin-bottom: var(--space-md);
+            color: var(--text-primary);
+        }
+
+        .marketing-hero .tagline {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            margin-bottom: var(--space-lg);
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .marketing-hero .cta-group {
+            display: flex;
+            gap: var(--space-sm);
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        /* Theme Toggle */
+        .theme-toggle {
+            position: fixed;
+            top: var(--space-md);
+            right: var(--space-md);
+            background: var(--bg-elevated);
+            border: 1px solid var(--bg-border);
+            border-radius: var(--radius-full);
+            padding: var(--space-xs) var(--space-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            cursor: pointer;
+            z-index: 100;
+        }
+
+        .theme-toggle-icon {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Data Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: var(--font-data);
+            font-size: 0.875rem;
+        }
+
+        .data-table th {
+            text-align: left;
+            padding: var(--space-sm);
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--bg-border);
+        }
+
+        .data-table td {
+            padding: var(--space-sm);
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--bg-border);
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px var(--space-xs);
+            border-radius: var(--radius-full);
+            font-size: 0.75rem;
+            font-family: var(--font-data);
+        }
+
+        .badge-amber {
+            background: rgba(217, 119, 6, 0.15);
+            color: var(--accent-secondary);
+        }
+
+        .badge-green {
+            background: rgba(5, 150, 105, 0.15);
+            color: #34d399;
+        }
+
+        .badge-gray {
+            background: rgba(168, 164, 152, 0.15);
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-content {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar, .right-panel {
+                display: none;
+            }
+
+            .container {
+                padding: var(--space-md);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" onclick="toggleTheme()">
+        <svg class="theme-toggle-icon" id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);">切换主题</span>
+    </button>
+
+    <div class="container">
+        <!-- Hero -->
+        <section class="hero">
+            <h1>Corivo</h1>
+            <p>收集无感，更新自动，用心推送</p>
+        </section>
+
+        <!-- Font Specimens -->
+        <section class="font-section">
+            <div class="section-header">
+                <h2>字体 / Typography</h2>
+                <p>Display 和 Body 使用 Instrument 家族，保持连贯性；Data 和 Code 选择功能性字体</p>
+            </div>
+
+            <div class="font-specimen font-display">
+                <h3>Display / Hero — Instrument Serif</h3>
+                <div class="specimen">记忆像植物一样生长</div>
+            </div>
+
+            <div class="font-specimen font-body">
+                <h3>Body / UI — Instrument Sans</h3>
+                <div class="specimen">
+                    Corivo 是一个融入用户已有工作流的赛博伙伴。它不是一个独立的 App，而是寄生在 Claude Code、Cursor、飞书等工具中的后台服务——自动从用户的 AI 对话和消息中采集信息，持续整理和更新，在合适的时机以 [corivo] 的名义主动提醒用户。
+                </div>
+            </div>
+
+            <div class="font-specimen font-data">
+                <h3>Data / Tables — DM Sans (tabular-nums)</h3>
+                <div class="specimen">
+                    记忆总数: 1,247 | 本周新增: +89 | 准确率: 94.2%
+                </div>
+            </div>
+
+            <div class="font-specimen font-code">
+                <h3>Code — JetBrains Mono</h3>
+                <div class="specimen">corivo init --source=claude --format=markdown</div>
+            </div>
+        </section>
+
+        <!-- Color Palette -->
+        <section class="color-section">
+            <div class="section-header">
+                <h2>配色 / Color Palette</h2>
+                <p>暖灰基底 + 琥珀强调，打破 AI 工具冷色调惯例</p>
+            </div>
+
+            <div class="color-grid">
+                <!-- Backgrounds -->
+                <div class="color-swatch">
+                    <div class="swatch-color" style="background: #1a1915;"></div>
+                    <div class="swatch-info">
+                        <h4>Surface</h4>
+                        <code>#1a1915</code>
+                    </div>
+                </div>
+                <div class="color-swatch">
+                    <div class="swatch-color" style="background: #25241d;"></div>
+                    <div class="swatch-info">
+                        <h4>Elevated</h4>
+                        <code>#25241d</code>
+                    </div>
+                </div>
+                <div class="color-swatch">
+                    <div class="swatch-color" style="background: #32312a;"></div>
+                    <div class="swatch-info">
+                        <h4>Border</h4>
+                        <code>#32312a</code>
+                    </div>
+                </div>
+
+                <!-- Text -->
+                <div class="color-swatch">
+                    <div class="swatch-color" style="background: #e8e4dc;"></div>
+                    <div class="swatch-info">
+                        <h4>Primary</h4>
+                        <code>#e8e4dc</code>
+                    </div>
+                </div>
+                <div class="color-swatch">
+                    <div class="swatch-color" style="background: #a8a498;"></div>
+                    <div class="swatch-info">
+                        <h4>Secondary</h4>
+                        <code>#a8a498</code>
+                    </div>
+                </div>
+
+                <!-- Accents -->
+                <div class="color-swatch">
+                    <div class="swatch-color" style="background: #d97706;"></div>
+                    <div class="swatch-info">
+                        <h4>Amber Primary</h4>
+                        <code>#d97706</code>
+                    </div>
+                </div>
+                <div class="color-swatch">
+                    <div class="swatch-color" style="background: #f59e0b;"></div>
+                    <div class="swatch-info">
+                        <h4>Amber Bright</h4>
+                        <code>#f59e0b</code>
+                    </div>
+                </div>
+
+                <!-- Semantic -->
+                <div class="color-swatch">
+                    <div class="swatch-color" style="background: #059669;"></div>
+                    <div class="swatch-info">
+                        <h4>Success</h4>
+                        <code>#059669</code>
+                    </div>
+                </div>
+                <div class="color-swatch">
+                    <div class="swatch-color" style="background: #dc2626;"></div>
+                    <div class="swatch-info">
+                        <h4>Error</h4>
+                        <code>#dc2626</code>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- UI Components -->
+        <section class="components-section">
+            <div class="section-header">
+                <h2>组件 / Components</h2>
+            </div>
+
+            <div class="component-group">
+                <h3>Buttons</h3>
+                <div class="button-row">
+                    <button class="btn btn-primary">创建记忆块</button>
+                    <button class="btn btn-secondary">查看详情</button>
+                    <button class="btn btn-ghost">取消</button>
+                </div>
+            </div>
+
+            <div class="component-group">
+                <h3>Form Inputs</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>记忆标题</label>
+                        <input type="text" class="form-input" placeholder="输入标题...">
+                    </div>
+                    <div class="form-group">
+                        <label>选择标签</label>
+                        <select class="form-input">
+                            <option>工作</option>
+                            <option>个人</option>
+                            <option>学习</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="component-group">
+                <h3>Alerts</h3>
+                <div class="alert alert-success">
+                    <strong>成功</strong> 记忆块已创建并同步到云端
+                </div>
+                <div class="alert alert-warning">
+                    <strong>注意</strong> 本周内存使用量已达到 80%
+                </div>
+                <div class="alert alert-error">
+                    <strong>错误</strong> 无法连接到 Claude Code，请检查配置
+                </div>
+                <div class="alert alert-info">
+                    <strong>提示</strong> 新版本 v0.10 已可用，查看更新日志
+                </div>
+            </div>
+        </section>
+
+        <!-- Dashboard Mockup -->
+        <section>
+            <div class="section-header">
+                <h2>Dashboard Mockup</h2>
+                <p>三栏布局：边栏导航 + 主内容区 + 右侧统计</p>
+            </div>
+
+            <div class="dashboard-mockup">
+                <div class="dashboard-header">
+                    <div class="dashboard-logo">corivo</div>
+                    <div class="dashboard-user">
+                        <span style="font-size: 0.875rem; color: var(--text-secondary);">晓力的记忆空间</span>
+                        <div class="user-avatar">X</div>
+                    </div>
+                </div>
+                <div class="dashboard-content">
+                    <aside class="sidebar">
+                        <nav class="sidebar-nav">
+                            <a href="#" class="nav-item active">
+                                <span>🏠</span> 记忆总览
+                            </a>
+                            <a href="#" class="nav-item">
+                                <span>💬</span> 对话记录
+                            </a>
+                            <a href="#" class="nav-item">
+                                <span>🔔</span> 推送历史
+                            </a>
+                            <a href="#" class="nav-item">
+                                <span>📊</span> 数据统计
+                            </a>
+                            <a href="#" class="nav-item">
+                                <span>⚙️</span> 设置
+                            </a>
+                        </nav>
+                    </aside>
+                    <main class="main-content">
+                        <h2>最近的记忆</h2>
+                        <div class="memory-cards">
+                            <div class="memory-card">
+                                <div class="memory-header">
+                                    <span class="memory-type">设计决策</span>
+                                    <span class="memory-time">2 小时前</span>
+                                </div>
+                                <div class="memory-content">
+                                    Corivo 设计系统采用 Organic/Natural 美学方向——暖灰基底 (#1a1915) + 琥珀强调色 (#d97706) + Instrument Serif 作为 Display 字体。这个选择传达「记忆像植物一样生长」的隐喻。
+                                </div>
+                                <div class="memory-source">
+                                    来源: Claude Code 对话 · 项目: Corivo
+                                </div>
+                            </div>
+                            <div class="memory-card">
+                                <div class="memory-header">
+                                    <span class="memory-type">待办事项</span>
+                                    <span class="memory-time">昨天</span>
+                                </div>
+                                <div class="memory-content">
+                                    v0.10 发布前需要完成：1) 团队协作功能的 CRDT 同步测试 2) 信任状态机的边界情况处理 3) API 文档完善
+                                </div>
+                                <div class="memory-source">
+                                    来源: 飞书智能纪要 · 项目: Corivo
+                                </div>
+                            </div>
+                            <div class="memory-card">
+                                <div class="memory-header">
+                                    <span class="memory-type">会议纪要</span>
+                                    <span class="memory-time">3 天前</span>
+                                </div>
+                                <div class="memory-content">
+                                    产品定位确认：Corivo 不是独立的 App，是寄生在 Claude Code、Cursor、飞书等工具中的后台服务。用户不需要下载新软件、学习新界面、改变任何习惯。
+                                </div>
+                                <div class="memory-source">
+                                    来源: 飞书智能纪要 · 项目: Corivo
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                    <aside class="right-panel">
+                        <div class="stat-card">
+                            <div class="stat-label">记忆总数</div>
+                            <div class="stat-value">1,247</div>
+                            <div class="stat-change">↑ 89 本周</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">准确率</div>
+                            <div class="stat-value">94.2%</div>
+                            <div class="stat-change">↑ 2.3%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">活跃来源</div>
+                            <div style="margin-top: var(--space-sm);">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 0.875rem;">
+                                    <span>Claude Code</span>
+                                    <span style="color: var(--text-muted);">68%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 0.875rem;">
+                                    <span>飞书</span>
+                                    <span style="color: var(--text-muted);">24%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.875rem;">
+                                    <span>Cursor</span>
+                                    <span style="color: var(--text-muted);">8%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+        </section>
+
+        <!-- Marketing Hero Mockup -->
+        <section>
+            <div class="section-header">
+                <h2>Marketing Hero Mockup</h2>
+                <p>营销落地页展示品牌故事</p>
+            </div>
+
+            <div class="marketing-hero">
+                <h1>你的赛博伙伴</h1>
+                <p class="tagline">收集无感，更新自动，用心推送</p>
+                <div class="cta-group">
+                    <button class="btn btn-primary">立即开始</button>
+                    <button class="btn btn-secondary">查看文档</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Data Table -->
+        <section>
+            <div class="section-header">
+                <h2>Data Table Mockup</h2>
+                <p>使用 DM Sans tabular-nums 确保数据对齐</p>
+            </div>
+
+            <div class="component-group">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>记忆块 ID</th>
+                            <th>类型</th>
+                            <th>来源</th>
+                            <th>创建时间</th>
+                            <th>置信度</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>blk_001247</td>
+                            <td><span class="badge badge-amber">设计决策</span></td>
+                            <td>Claude Code</td>
+                            <td>2 小时前</td>
+                            <td>98%</td>
+                        </tr>
+                        <tr>
+                            <td>blk_001246</td>
+                            <td><span class="badge badge-green">待办</span></td>
+                            <td>飞书</td>
+                            <td>昨天</td>
+                            <td>95%</td>
+                        </tr>
+                        <tr>
+                            <td>blk_001245</td>
+                            <td><span class="badge badge-gray">会议纪要</span></td>
+                            <td>飞书</td>
+                            <td>3 天前</td>
+                            <td>92%</td>
+                        </tr>
+                        <tr>
+                            <td>blk_001244</td>
+                            <td><span class="badge badge-amber">技术方案</span></td>
+                            <td>Cursor</td>
+                            <td>4 天前</td>
+                            <td>89%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Spacing System -->
+        <section style="margin-bottom: var(--space-3xl);">
+            <div class="section-header">
+                <h2>间距系统 / Spacing</h2>
+                <p>8px 基础单位，Comfortable 密度</p>
+            </div>
+
+            <div class="component-group">
+                <div style="display: flex; align-items: center; gap: var(--space-md); flex-wrap: wrap;">
+                    <div style="text-align: center;">
+                        <div style="width: 4px; height: 40px; background: var(--accent-primary); border-radius: 2px; margin: 0 auto var(--space-xs);"></div>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">2xs: 4px</span>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 8px; height: 40px; background: var(--accent-primary); border-radius: 2px; margin: 0 auto var(--space-xs);"></div>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">xs: 8px</span>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 16px; height: 40px; background: var(--accent-primary); border-radius: 2px; margin: 0 auto var(--space-xs);"></div>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">sm: 16px</span>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 24px; height: 40px; background: var(--accent-primary); border-radius: 2px; margin: 0 auto var(--space-xs);"></div>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">md: 24px</span>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 32px; height: 40px; background: var(--accent-primary); border-radius: 2px; margin: 0 auto var(--space-xs);"></div>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">lg: 32px</span>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 48px; height: 40px; background: var(--accent-primary); border-radius: 2px; margin: 0 auto var(--space-xs);"></div>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">xl: 48px</span>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 64px; height: 40px; background: var(--accent-primary); border-radius: 2px; margin: 0 auto var(--space-xs);"></div>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">2xl: 64px</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="component-group">
+                <h3>Border Radius</h3>
+                <div style="display: flex; gap: var(--space-md); align-items: center;">
+                    <div style="text-align: center;">
+                        <div style="width: 48px; height: 48px; background: var(--bg-elevated); border: 1px solid var(--bg-border); border-radius: 6px; margin: 0 auto var(--space-xs);"></div>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">sm: 6px</span>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 48px; height: 48px; background: var(--bg-elevated); border: 1px solid var(--bg-border); border-radius: 12px; margin: 0 auto var(--space-xs);"></div>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">md: 12px</span>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 48px; height: 48px; background: var(--bg-elevated); border: 1px solid var(--bg-border); border-radius: 20px; margin: 0 auto var(--space-xs);"></div>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">lg: 20px</span>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 48px; height: 48px; background: var(--accent-primary); border-radius: 9999px; margin: 0 auto var(--space-xs);"></div>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">full</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
+            const icon = document.getElementById('theme-icon');
+            const isLight = document.body.classList.contains('light-mode');
+
+            if (isLight) {
+                icon.innerHTML = `
+                    <circle cx="12" cy="12" r="5"/>
+                    <line x1="12" y1="1" x2="12" y2="3"/>
+                    <line x1="12" y1="21" x2="12" y2="23"/>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                    <line x1="1" y1="12" x2="3" y2="12"/>
+                    <line x1="21" y1="12" x2="23" y2="12"/>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                `;
+            } else {
+                icon.innerHTML = `
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                `;
+            }
+        }
+
+        // Initialize with moon icon
+        document.getElementById('theme-icon').innerHTML = `
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        `;
+    </script>
+</body>
+</html>

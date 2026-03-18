@@ -205,6 +205,8 @@ curl -X PATCH http://localhost:3000/pdp/v1/blocks/blk_a3f29x \
 
 ### 同步流程
 
+> 底层 E2EE 实现详见 [03-storage.md](./03-storage.md#多设备同步e2ee-中继)。
+
 ```bash
 # 推送本地变更
 curl -X POST http://localhost:3000/pdp/v1/sync \

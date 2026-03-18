@@ -4,11 +4,11 @@
  * 后台运行，自动处理 pending block 和执行衰减
  */
 import fs from 'node:fs/promises';
-import { CorivoDatabase, getConfigDir } from '../storage/database';
-import { KeyManager } from '../crypto/keys';
-import { RuleEngine } from './rules';
-import { TechChoiceRule } from './rules/tech-choice';
-import { DatabaseError } from '../errors';
+import { CorivoDatabase, getConfigDir } from '../storage/database.js';
+import { KeyManager } from '../crypto/keys.js';
+import { RuleEngine } from './rules/index.js';
+import { TechChoiceRule } from './rules/tech-choice.js';
+import { DatabaseError } from '../errors/index.js';
 const HEARTBEAT_INTERVAL = 5000; // 5 秒
 const PENDING_BATCH_SIZE = 10; // 每次处理的 pending 数量
 /**
@@ -19,7 +19,11 @@ export class Heartbeat {
     db = null;
     ruleEngine;
     timeoutRef = null;
-    constructor() {
+    constructor(config) {
+        // 如果传入了 db，直接使用（用于测试）
+        if (config?.db) {
+            this.db = config.db;
+        }
         // 初始化规则引擎
         this.ruleEngine = new RuleEngine();
         this.ruleEngine.register(new TechChoiceRule());
@@ -32,30 +36,39 @@ export class Heartbeat {
             console.log('心跳已在运行');
             return;
         }
-        // 从环境变量获取密钥（由 CLI 进程传入）
-        const encryptedDbKey = process.env.CORIVO_ENCRYPTED_KEY;
-        const dbPath = process.env.CORIVO_DB_PATH;
-        const configDir = process.env.CORIVO_CONFIG_DIR || getConfigDir();
-        if (!encryptedDbKey || !dbPath) {
-            throw new Error('缺少环境变量：CORIVO_ENCRYPTED_KEY 或 CORIVO_DB_PATH');
+        // 如果已经设置了 db（测试模式），跳过初始化
+        if (!this.db) {
+            // 从环境变量获取密钥（由 CLI 进程传入）
+            const encryptedDbKey = process.env.CORIVO_ENCRYPTED_KEY;
+            const dbPath = process.env.CORIVO_DB_PATH;
+            const configDir = process.env.CORIVO_CONFIG_DIR || getConfigDir();
+            if (!encryptedDbKey || !dbPath) {
+                throw new Error('缺少环境变量：CORIVO_ENCRYPTED_KEY 或 CORIVO_DB_PATH');
+            }
+            // 读取配置获取 salt
+            const configPath = `${configDir}/config.json`;
+            let config;
+            try {
+                const content = await fs.readFile(configPath, 'utf-8');
+                config = JSON.parse(content);
+            }
+            catch {
+                throw new Error('无法读取配置文件');
+            }
+            // 派生主密钥并解密数据库密钥
+            const salt = Buffer.from(config.salt, 'base64');
+            // 安全警告：守护进程模式需要用户通过环境变量传递主密码
+            const daemonPassword = process.env.CORIVO_DAEMON_PASSWORD;
+            if (!daemonPassword) {
+                throw new Error('守护进程需要主密码才能启动。请设置 CORIVO_DAEMON_PASSWORD 环境变量。\n' +
+                    '示例: CORIVO_DAEMON_PASSWORD="your-password" corivo start');
+            }
+            const masterKey = KeyManager.deriveMasterKey(daemonPassword, salt);
+            const dbKey = KeyManager.decryptDatabaseKey(encryptedDbKey, masterKey);
+            // 打开数据库
+            this.db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
+            console.log(`心跳守护进程启动中... (规则: ${this.ruleEngine.ruleCount})`);
         }
-        // 读取配置获取 salt
-        const configPath = `${configDir}/config.json`;
-        let config;
-        try {
-            const content = await fs.readFile(configPath, 'utf-8');
-            config = JSON.parse(content);
-        }
-        catch {
-            throw new Error('无法读取配置文件');
-        }
-        // 派生主密钥并解密数据库密钥
-        const salt = Buffer.from(config.salt, 'base64');
-        const masterKey = KeyManager.deriveMasterKey('', salt); // 守护进程不需要密码，直接用空字符串派生（实际应用需要更安全的方案）
-        const dbKey = KeyManager.decryptDatabaseKey(encryptedDbKey, masterKey);
-        // 打开数据库
-        this.db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
-        console.log(`心跳守护进程启动中... (规则: ${this.ruleEngine.ruleCount})`);
         this.running = true;
         this.run();
     }
@@ -103,6 +116,15 @@ export class Heartbeat {
         }
     }
     /**
+     * 运行一次心跳（用于测试）
+     *
+     * 执行一次完整的 pending 处理和衰减检查
+     */
+    async runOnce() {
+        await this.processPendingBlocks();
+        await this.processVitalityDecay();
+    }
+    /**
      * 处理 pending block
      */
     async processPendingBlocks() {
@@ -118,9 +140,22 @@ export class Heartbeat {
         console.log(`[心跳] 处理 ${pending.length} 个待标注 block`);
         for (const block of pending) {
             try {
+                // 跳过空内容
+                if (!block.content || block.content.trim().length === 0) {
+                    console.log(`  ${block.id}: 跳过空内容`);
+                    this.db.updateBlock(block.id, {
+                        annotation: '知识 · knowledge · 空',
+                    });
+                    continue;
+                }
                 const annotation = this.annotateBlock(block.content);
-                this.db.updateBlock(block.id, { annotation });
-                console.log(`  ${block.id}: ${annotation}`);
+                const pattern = this.extractPattern(block.content);
+                // 更新标注和模式
+                this.db.updateBlock(block.id, {
+                    annotation,
+                    ...(pattern && { pattern }),
+                });
+                console.log(`  ${block.id}: ${annotation}${pattern ? ` (${pattern.type})` : ''}`);
             }
             catch (error) {
                 console.error(`  ${block.id}: 标注失败`, error);
@@ -161,6 +196,32 @@ export class Heartbeat {
         return '知识 · knowledge · 通用';
     }
     /**
+     * 提取决策模式
+     */
+    extractPattern(content) {
+        // 先尝试规则引擎
+        const pattern = this.ruleEngine.extract(content);
+        if (pattern) {
+            return pattern;
+        }
+        // 对于没有匹配规则的决策内容，构造简单的模式
+        const lower = content.toLowerCase();
+        if (/选择|决定|选型|采用|使用/.test(content)) {
+            // 尝试提取被选中的事物
+            const match = content.match(/(?:选择|决定|选型|采用|使用)\s+([^\u3000-\u303f\uff00-\uffef\s,。,，.]+?)(?:\s|$|，|。)/);
+            if (match && match[1]) {
+                return {
+                    type: '技术选型',
+                    decision: match[1].trim(),
+                    dimensions: [],
+                    context_tags: [], // 必需字段
+                    confidence: 0.6,
+                };
+            }
+        }
+        return null;
+    }
+    /**
      * 处理衰减
      */
     async processVitalityDecay() {
@@ -175,7 +236,8 @@ export class Heartbeat {
             if (block.status === 'archived')
                 continue;
             // 计算距离上次访问的天数
-            const lastAccessed = block.last_accessed || block.created_at * 1000;
+            // 优先使用 last_accessed，其次 updated_at，最后 created_at
+            const lastAccessed = block.last_accessed || (block.updated_at * 1000) || (block.created_at * 1000);
             const daysSinceAccess = (now - lastAccessed) / 86400000;
             if (daysSinceAccess < 1) {
                 // 24 小时内不衰减
@@ -240,14 +302,25 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         console.error('启动失败:', error);
         process.exit(1);
     });
-    // 优雅退出
-    process.on('SIGTERM', () => {
-        console.log('\n收到 SIGTERM 信号，正在停止...');
-        heartbeat.stop();
-    });
-    process.on('SIGINT', () => {
-        console.log('\n收到 SIGINT 信号，正在停止...');
-        heartbeat.stop();
-    });
+    /**
+     * 优雅退出处理器
+     *
+     * Node.js 信号处理器不支持 async，使用包装函数确保清理完成
+     */
+    const gracefulShutdown = async (signal) => {
+        console.log(`\n收到 ${signal} 信号，正在停止...`);
+        try {
+            await heartbeat.stop();
+            console.log('清理完成，退出中...');
+            process.exit(0);
+        }
+        catch (error) {
+            console.error('清理失败:', error);
+            process.exit(1);
+        }
+    };
+    // 注册信号处理器（不支持 async，使用包装函数处理）
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 //# sourceMappingURL=heartbeat.js.map

@@ -5,8 +5,8 @@
  */
 
 import fs from 'node:fs/promises';
-import { getPidFilePath } from '../../storage/database';
-import { ProcessError } from '../../errors';
+import { getPidFilePath } from '../../storage/database.js';
+import { ProcessError } from '../../errors/index.js';
 
 export async function stopCommand(): Promise<void> {
   const pidPath = getPidFilePath();
@@ -33,6 +33,9 @@ export async function stopCommand(): Promise<void> {
   } catch (error) {
     // 进程可能已经退出
   }
+
+  // 等待进程优雅关闭，避免新进程启动时遇到 WAL 锁
+  await new Promise(resolve => setTimeout(resolve, 100));
 
   // 删除 PID 文件
   await fs.unlink(pidPath);

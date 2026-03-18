@@ -5,10 +5,12 @@
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database';
-import { KeyManager } from '../../crypto/keys';
-import { ConfigError } from '../../errors';
-import { readPassword } from './save';
+import chalk from 'chalk';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
+import { KeyManager } from '../../crypto/keys.js';
+import { ConfigError } from '../../errors/index.js';
+import { readPassword } from '../utils/password.js';
+import { ContextPusher } from '../../push/context.js';
 export async function statusCommand() {
     // 读取配置
     const configDir = getConfigDir();
@@ -45,30 +47,50 @@ export async function statusCommand() {
     // 获取统计信息
     const stats = db.getStats();
     const health = db.checkHealth();
-    console.log('\n═══════════════════════════════════════════════════════');
-    console.log('                      Corivo 状态');
-    console.log('═══════════════════════════════════════════════════════\n');
-    console.log('📊 记忆统计:');
-    console.log(`  总数: ${stats.total}`);
-    console.log(`  活跃: ${stats.byStatus.active || 0}`);
-    console.log(`  冷却: ${stats.byStatus.cooling || 0}`);
-    console.log(`  冷冻: ${stats.byStatus.cold || 0}`);
-    console.log(`  归档: ${stats.byStatus.archived || 0}`);
-    console.log('\n🏷️  标注分布:');
-    for (const [annotation, count] of Object.entries(stats.byAnnotation)) {
-        console.log(`  ${annotation}: ${count}`);
+    // 显示状态
+    console.log('');
+    console.log(chalk.cyan('═══════════════════════════════════════════════════════'));
+    console.log(chalk.cyan('                      Corivo 状态'));
+    console.log(chalk.cyan('═══════════════════════════════════════════════════════\n'));
+    // 记忆统计
+    console.log(chalk.cyan('📊 记忆统计'));
+    console.log(chalk.gray('  总数:   ') + chalk.white(stats.total.toString()));
+    console.log(chalk.gray('  活跃:   ') + chalk.green((stats.byStatus.active || 0).toString()));
+    console.log(chalk.gray('  冷却:   ') + chalk.yellow((stats.byStatus.cooling || 0).toString()));
+    console.log(chalk.gray('  冷冻:   ') + chalk.hex('#FF9500')((stats.byStatus.cold || 0).toString()));
+    console.log(chalk.gray('  归档:   ') + chalk.gray((stats.byStatus.archived || 0).toString()));
+    // 标注分布
+    const annotations = Object.entries(stats.byAnnotation);
+    if (annotations.length > 0) {
+        console.log(chalk.cyan('\n🏷️  标注分布'));
+        for (const [annotation, count] of annotations) {
+            console.log(chalk.gray(`  ${annotation}: `) + chalk.white(count.toString()));
+        }
     }
-    console.log('\n💾 数据库:');
-    console.log(`  路径: ${dbPath}`);
-    console.log(`  状态: ${health.ok ? '✅ 正常' : '❌ 异常'}`);
+    // 数据库状态
+    console.log(chalk.cyan('\n💾 数据库'));
+    console.log(chalk.gray('  路径:   ') + chalk.white(dbPath));
+    console.log(chalk.gray('  状态:   ') +
+        (health.ok ? chalk.green('✅ 正常') : chalk.red('❌ 异常')));
     if (health.size) {
-        console.log(`  大小: ${(health.size / 1024 / 1024).toFixed(2)} MB`);
+        console.log(chalk.gray('  大小:   ') + chalk.white(`${(health.size / 1024 / 1024).toFixed(2)} MB`));
     }
-    console.log('\n⚡ 心跳守护进程:');
-    console.log(`  状态: ${heartbeatRunning ? '🟢 运行中' : '⚪ 未启动'}`);
-    console.log('\n下一步：');
-    console.log('  corivo save --content "..." --annotation "..."');
-    console.log('  corivo query "..."');
-    console.log('  corivo start | stop');
+    // 心跳守护进程
+    console.log(chalk.cyan('\n⚡ 心跳守护进程'));
+    console.log(chalk.gray('  状态:   ') +
+        (heartbeatRunning ? chalk.green('🟢 运行中') : chalk.gray('⚪ 未启动')));
+    // 附加上下文推送
+    const pusher = new ContextPusher(db);
+    const needsAttention = await pusher.pushNeedsAttention();
+    if (needsAttention) {
+        console.log(needsAttention);
+    }
+    // 下一步提示
+    console.log(chalk.cyan('\n🚀 下一步：'));
+    console.log(chalk.gray('  corivo save --content "..." --annotation "..."'));
+    console.log(chalk.gray('  corivo save --pending --content "..."'));
+    console.log(chalk.gray('  corivo query "..."'));
+    console.log(chalk.gray('  corivo start | stop'));
+    console.log('');
 }
 //# sourceMappingURL=status.js.map

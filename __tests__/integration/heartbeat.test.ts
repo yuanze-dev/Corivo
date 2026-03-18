@@ -1,0 +1,186 @@
+/**
+ * 心跳引擎集成测试
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import fs from 'node:fs/promises';
+import Database from 'better-sqlite3';
+import { CorivoDatabase } from '../../src/storage/database';
+import { KeyManager } from '../../src/crypto/keys';
+import { Heartbeat } from '../../src/engine/heartbeat';
+import { RuleEngine } from '../../src/engine/rules';
+import { TechChoiceRule } from '../../src/engine/rules/tech-choice';
+
+describe('Heartbeat Integration', () => {
+  let db: CorivoDatabase;
+  let dbPath: string;
+  let heartbeat: Heartbeat;
+
+  beforeEach(async () => {
+    // 创建临时数据库
+    dbPath = `/tmp/corivo-test-${Date.now()}.db`;
+    const dbKey = KeyManager.generateDatabaseKey();
+
+    // 初始化数据库（不使用 FTS5）
+    const sqliteDb = new Database(dbPath);
+    sqliteDb.exec(`
+      CREATE TABLE IF NOT EXISTS blocks (
+        id TEXT PRIMARY KEY,
+        content TEXT NOT NULL,
+        annotation TEXT DEFAULT 'pending',
+        refs TEXT DEFAULT '[]',
+        source TEXT DEFAULT 'manual',
+        status TEXT DEFAULT 'active',
+        vitality INTEGER DEFAULT 100,
+        access_count INTEGER DEFAULT 0,
+        last_accessed INTEGER,
+        pattern TEXT,
+        created_at INTEGER DEFAULT (strftime('%s', 'now')),
+        updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_blocks_annotation ON blocks(annotation);
+      CREATE INDEX IF NOT EXISTS idx_blocks_status ON blocks(status);
+      CREATE INDEX IF NOT EXISTS idx_blocks_vitality ON blocks(vitality);
+    `);
+    sqliteDb.close();
+
+    // 创建 CorivoDatabase 实例
+    db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
+
+    // 创建心跳引擎
+    heartbeat = new Heartbeat({ db });
+  });
+
+  afterEach(async () => {
+    // 清理
+    await fs.unlink(dbPath).catch(() => {});
+  });
+
+  describe('pending block processing', () => {
+    it('should process pending blocks and annotate them', async () => {
+      // 创建一个包含决策内容的 pending block
+      const block = db.createBlock({
+        content: '选择使用 React 作为前端框架',
+        annotation: 'pending',
+        source: 'test'
+      });
+
+      expect(block.annotation).toBe('pending');
+
+      // 运行心跳一次
+      await heartbeat.runOnce();
+
+      // 验证 block 已被标注
+      const updated = db.queryBlocks({ limit: 100 }).find(b => b.id === block.id);
+      expect(updated?.annotation).not.toBe('pending');
+      expect(updated?.annotation).toContain('决策');
+    });
+
+    it('should extract pattern from decision content', async () => {
+      const block = db.createBlock({
+        content: '决定使用 PostgreSQL，因为需要 ACID 事务支持',
+        annotation: 'pending',
+        source: 'test'
+      });
+
+      await heartbeat.runOnce();
+
+      const updated = db.queryBlocks({ limit: 100 }).find(b => b.id === block.id);
+      expect(updated?.pattern).toBeDefined();
+      expect(updated?.pattern?.type).toBe('技术选型');
+      expect(updated?.pattern?.decision).toBe('PostgreSQL');
+    });
+
+    it('should handle multiple pending blocks', async () => {
+      const blocks = [
+        db.createBlock({ content: '选择使用 TypeScript', annotation: 'pending' }),
+        db.createBlock({ content: '决定采用微服务架构', annotation: 'pending' }),
+        db.createBlock({ content: '使用 Redis 作为缓存', annotation: 'pending' })
+      ];
+
+      await heartbeat.runOnce();
+
+      const allBlocks = db.queryBlocks({ limit: 100 });
+      const pendingBlocks = allBlocks.filter(b => b.annotation === 'pending');
+
+      expect(pendingBlocks.length).toBe(0);
+    });
+  });
+
+  describe('vitality decay', () => {
+    it('should decay vitality for old blocks', async () => {
+      // 创建一个 10 天前的 block
+      const oldTimestamp = Date.now() - 10 * 24 * 60 * 60 * 1000;
+      const block = db.createBlock({
+        content: '临时笔记',
+        annotation: '知识 · knowledge · 临时笔记'
+      });
+
+      // 手动更新时间戳（模拟）
+      db.updateBlock(block.id, {
+        updated_at: Math.floor(oldTimestamp / 1000)
+      });
+
+      // 运行心跳衰减
+      await heartbeat.processVitalityDecay();
+
+      // 验证生命力已衰减
+      const updated = db.queryBlocks({ limit: 100 }).find(b => b.id === block.id);
+      expect(updated?.vitality).toBeLessThan(100);
+    });
+  });
+
+  describe('rule engine integration', () => {
+    it('should use rule engine for pattern extraction', () => {
+      const ruleEngine = new RuleEngine();
+      ruleEngine.register(new TechChoiceRule());
+
+      const result = ruleEngine.extract('选择使用 Vue.js 作为前端框架');
+
+      expect(result).toBeDefined();
+      expect(result?.type).toBe('技术选型');
+      expect(result?.decision).toBe('Vue.js');
+    });
+
+    it('should return null for non-decision content', () => {
+      const ruleEngine = new RuleEngine();
+      ruleEngine.register(new TechChoiceRule());
+
+      const result = ruleEngine.extract('今天天气不错');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('error handling', () => {
+    it('should handle short content gracefully', async () => {
+      // 测试心跳能优雅处理内容极短的 block
+      const block = db.createBlock({
+        content: 'a', // 极短内容
+        annotation: 'pending'
+      });
+
+      // 不应抛出错误
+      await expect(heartbeat.runOnce()).resolves.not.toThrow();
+
+      // 验证 block 被标注
+      const updated = db.queryBlocks({ limit: 100 }).find(b => b.id === block.id);
+      expect(updated?.annotation).not.toBe('pending');
+    });
+
+    it('should continue processing after one block fails', async () => {
+      // 创建多个 block，其中一个可能失败
+      db.createBlock({ content: '正常内容1', annotation: 'pending' });
+      db.createBlock({ content: '选择使用 React', annotation: 'pending' });
+      db.createBlock({ content: '正常内容2', annotation: 'pending' });
+
+      // 应该处理所有 block，即使某个失败
+      await expect(heartbeat.runOnce()).resolves.not.toThrow();
+
+      const allBlocks = db.queryBlocks({ limit: 100 });
+      const pendingBlocks = allBlocks.filter(b => b.annotation === 'pending');
+      expect(pendingBlocks.length).toBeLessThan(3);
+    });
+  });
+});

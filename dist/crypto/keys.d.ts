@@ -46,17 +46,22 @@ export declare class KeyManager {
      */
     static decryptDatabaseKey(encrypted: string, masterKey: Buffer): Buffer;
     /**
-     * 生成恢复密钥（16 词 BIP39 风格）
+     * 生成恢复密钥（24 词 BIP39 风格）
      *
-     * @param masterKey - 主密钥
-     * @returns 16 个空格分隔的单词
+     * 使用标准 BIP39 方法：每个词代表 11 位，24 词 = 264 位
+     * 其中 256 位是密钥，8 位是校验和
+     *
+     * @param masterKey - 主密钥（32 字节）
+     * @returns 24 个空格分隔的单词
      */
     static generateRecoveryKey(masterKey: Buffer): string;
     /**
      * 从恢复密钥派生主密钥
      *
-     * @param recoveryKey - 16 个空格分隔的单词
-     * @returns 派生的主密钥
+     * 从 24 个单词解码还原主密钥
+     *
+     * @param recoveryKey - 24 个空格分隔的单词
+     * @returns 派生的主密钥（32 字节）
      */
     static deriveFromRecoveryKey(recoveryKey: string): Buffer;
     /**

@@ -7,11 +7,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database';
-import { KeyManager } from '../../crypto/keys';
-import { ConfigError } from '../../errors';
-import { ContextPusher } from '../../push/context';
-import { readPassword } from './save';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
+import { KeyManager } from '../../crypto/keys.js';
+import { ConfigError } from '../../errors/index.js';
+import { ContextPusher } from '../../push/context.js';
+import { readPassword } from '../utils/password.js';
 
 interface QueryOptions {
   limit?: string;
@@ -44,7 +44,10 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
   const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
 
   // 搜索
-  const limit = options.limit ? parseInt(options.limit) : 10;
+  const limit = options.limit ? parseInt(options.limit, 10) : 10;
+  if (options.limit && isNaN(limit)) {
+    throw new Error('--limit 参数必须是有效数字');
+  }
   const results = db.searchBlocks(query, limit);
 
   if (results.length === 0) {

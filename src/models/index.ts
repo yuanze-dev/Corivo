@@ -2,5 +2,5 @@
  * Models 模块导出
  */
 
-export * from './block';
-export * from './pattern';
+export * from './block.js';
+export * from './pattern.js';

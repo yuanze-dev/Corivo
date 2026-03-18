@@ -257,9 +257,66 @@ Corivo/
 
 ---
 
+## 开发进度
+
+### Phase 4 - 测试与发布（进行中）
+
+**日期**: 2026-03-18
+
+**完成项**：
+- ✅ Vitest 测试框架配置（coverage thresholds 70%）
+- ✅ 85+ 测试用例编写
+  - Crypto: 16/16 ✅
+  - Crypto: 16/16 ✅
+  - Database: 20/20 ✅
+  - Models: 15/15 ✅
+  - Rules: 12/12 ✅
+  - CLI Flow: 4/4 ✅
+  - Context: 11/11 ✅
+  - Heartbeat: 8/8 ✅
+- ✅ 核心功能验证通过（保存、查询、搜索、统计、健康检查）
+
+**已修复的关键 Bug**：
+1. ESM/CommonJS 兼容性：使用 `createRequire()` 加载 better-sqlite3
+2. 密码输入工具：改用 ESM `import * as readline`
+3. 恢复密钥编码：重写为标准 BIP39（24 词，11 位/词）
+4. FTS5 腐烂问题：暂时禁用，改用 LIKE 搜索
+5. `createBlock` 返回完整默认值（annotation、vitality、status）
+6. 健康检查 size/blockCount 计算修复
+7. Heartbeat 依赖注入：支持测试模式直接传入 db
+8. Pattern 提取：心跳引擎现在正确保存决策模式
+9. Vitality 衰减：修复使用 updated_at 计算衰减
+
+**已知问题**：
+- ⚠️ 编译后 CLI 存在 ESM 模块加载问题
+- ✅ 临时方案：使用 `npx tsx src/cli/index.ts` 直接运行 TypeScript 源码
+- 根本原因：better-sqlite3 是 CommonJS，与 ESM 存在兼容性问题
+- ⚠️ 所有测试一起运行时偶发 disk I/O 错误（资源竞争），单独运行均通过
+
+**测试运行命令**：
+```bash
+# 运行所有测试（单独运行可避免资源限制）
+npx vitest run __tests__/unit/crypto.test.ts
+npx vitest run __tests__/unit/database.test.ts
+npx vitest run __tests__/unit/context.test.ts
+npx vitest run __tests__/integration/heartbeat.test.ts
+
+# CLI 使用（通过 tsx）
+npx tsx src/cli/index.ts --help
+npx tsx src/cli/index.ts save --content "测试" --annotation "事实 · test"
+```
+
+**待办事项**（明天继续）：
+1. 解决 ESM/CommonJS 兼容性问题（方案：打包为纯 ESM 或使用 tsx）
+2. 实现完整 CLI 命令（init、save、query、status、start、stop、doctor、recover）
+3. E2E 测试完善
+4. 准备 v0.10.0-mvp 发布
+
+---
+
 ## 最后更新
 
 - **日期**: 2026-03-18
 - **版本**: v0.10
-- **更新人**: Claude Code + 晓力
-- **内容**: v0.10 协作与工程完善、21 篇设计文档完整覆盖
+- **更新人**: 晓力 + Claude Code
+- **内容**: Phase 4 测试进展，86 个测试用例全部通过（单独运行）

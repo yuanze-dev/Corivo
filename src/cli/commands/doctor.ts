@@ -6,9 +6,9 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database';
-import { KeyManager } from '../../crypto/keys';
-import { readPassword } from './save';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
+import { KeyManager } from '../../crypto/keys.js';
+import { readPassword } from '../utils/password.js';
 
 export async function doctorCommand(): Promise<void> {
   console.log('\n正在运行 Corivo 健康检查...\n');

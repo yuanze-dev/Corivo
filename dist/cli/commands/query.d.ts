@@ -5,6 +5,8 @@
  */
 interface QueryOptions {
     limit?: string;
+    verbose?: boolean;
+    pattern?: boolean;
 }
 export declare function queryCommand(query: string, options: QueryOptions): Promise<void>;
 export {};

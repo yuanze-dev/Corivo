@@ -7,10 +7,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database';
-import { KeyManager } from '../../crypto/keys';
-import { ConfigError, ValidationError } from '../../errors';
-import { validateAnnotation } from '../../models';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
+import { KeyManager } from '../../crypto/keys.js';
+import { ConfigError, ValidationError } from '../../errors/index.js';
+import { validateAnnotation } from '../../models/index.js';
+import { readPassword } from '../utils/password.js';
 
 interface SaveOptions {
   content?: string;
@@ -76,19 +77,4 @@ export async function saveCommand(options: SaveOptions): Promise<void> {
   console.log(chalk.gray('标注:     ') + chalk.cyan(block.annotation));
   console.log(chalk.gray('生命力:   ') + chalk.yellow('100 (活跃)'));
   console.log();
-}
-
-export async function readPassword(prompt: string): Promise<string> {
-  const readline = require('node:readline');
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) => {
-    rl.question(prompt, (password: string) => {
-      rl.close();
-      resolve(password);
-    });
-  });
 }

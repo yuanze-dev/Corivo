@@ -6,8 +6,9 @@
 import fs from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
-import { getDefaultDatabasePath, getConfigDir, getPidFilePath } from '../../storage/database';
-import { ProcessError, ConfigError } from '../../errors';
+import { getDefaultDatabasePath, getConfigDir, getPidFilePath } from '../../storage/database.js';
+import { ProcessError, ConfigError } from '../../errors/index.js';
+import { readPassword } from '../utils/password.js';
 export async function startCommand() {
     // 读取配置
     const configDir = getConfigDir();
@@ -35,9 +36,12 @@ export async function startCommand() {
         }
     }
     catch { }
+    // 获取主密码
+    console.log('启动心跳守护进程需要主密码\n');
+    const password = await readPassword('请输入主密码: ');
     console.log('正在启动心跳守护进程...');
     // 启动守护进程
-    const pid = spawn(process.execPath, ['node', '--experimental-loader', 'ts-node/esm', './dist/engine/heartbeat.js'], {
+    const pid = spawn(process.execPath, ['./dist/engine/heartbeat.js'], {
         cwd: process.cwd(),
         detached: true,
         stdio: 'ignore',
@@ -46,6 +50,7 @@ export async function startCommand() {
             CORIVO_DB_PATH: getDefaultDatabasePath(),
             CORIVO_CONFIG_DIR: configDir,
             CORIVO_ENCRYPTED_KEY: config.encrypted_db_key,
+            CORIVO_DAEMON_PASSWORD: password,
             NODE_ENV: 'production',
         },
     });

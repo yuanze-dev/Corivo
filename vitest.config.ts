@@ -6,14 +6,22 @@ export default defineConfig({
     environment: 'node',
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text', 'json', 'html', 'lcov'],
       exclude: [
         'dist/**',
         '**/*.test.ts',
         '**/*.spec.ts',
         '**/node_modules/**',
-        'src/cli/commands/**'
-      ]
+        '__tests__/**',
+        'src/cli/commands/**' // CLI commands mainly handle I/O
+      ],
+      // MVP 覆盖率目标
+      thresholds: {
+        lines: 70,
+        functions: 70,
+        branches: 60,
+        statements: 70
+      }
     }
   }
 })

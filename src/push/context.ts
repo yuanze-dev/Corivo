@@ -4,8 +4,8 @@
  * 在查询时自动推送相关记忆
  */
 
-import type { CorivoDatabase } from '../storage/database';
-import type { Block } from '../models';
+import type { CorivoDatabase } from '../storage/database.js';
+import type { Block } from '../models/index.js';
 
 /**
  * 推送配置
@@ -55,6 +55,8 @@ export class ContextPusher {
     }
 
     // 更新访问计数
+    // TODO: 优化为批量 UPDATE ... CASE 语句，避免 N+1 问题
+    // MVP 阶段记录量小，当前实现可接受
     for (const block of related) {
       this.db.updateBlock(block.id, {
         access_count: block.access_count + 1,
@@ -121,26 +123,13 @@ export class ContextPusher {
 
   /**
    * 统计信息推送
+   *
+   * 使用 SQL GROUP BY 在数据库层面聚合，避免读取全部数据到内存
    */
   async pushStats(): Promise<string> {
-    const blocks = this.db.queryBlocks({ limit: 10000 });
+    const stats = this.db.getStatusBreakdown();
 
-    const total = blocks.length;
-    const byStatus = {
-      active: blocks.filter((b) => b.status === 'active').length,
-      cooling: blocks.filter((b) => b.status === 'cooling').length,
-      cold: blocks.filter((b) => b.status === 'cold').length,
-      archived: blocks.filter((b) => b.status === 'archived').length,
-    };
-
-    // 按标注统计（取前5）
-    const annotationCounts: Record<string, number> = {};
-    for (const block of blocks) {
-      const ann = block.annotation || 'pending';
-      annotationCounts[ann] = (annotationCounts[ann] || 0) + 1;
-    }
-
-    return `\n\n---\n📊 [corivo] 记忆统计\n总计: ${total} | 活跃: ${byStatus.active} | 冷却: ${byStatus.cooling} | 冷冻: ${byStatus.cold} | 归档: ${byStatus.archived}\n`;
+    return `\n\n---\n📊 [corivo] 记忆统计\n总计: ${stats.total} | 活跃: ${stats.active} | 冷却: ${stats.cooling} | 冷冻: ${stats.cold} | 归档: ${stats.archived}\n`;
   }
 
   /**

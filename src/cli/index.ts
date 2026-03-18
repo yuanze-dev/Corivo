@@ -8,14 +8,14 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 
 // 导入命令
-import { initCommand } from './commands/init';
-import { saveCommand } from './commands/save';
-import { queryCommand } from './commands/query';
-import { statusCommand } from './commands/status';
-import { startCommand } from './commands/start';
-import { stopCommand } from './commands/stop';
-import { doctorCommand } from './commands/doctor';
-import { recoverCommand } from './commands/recover';
+import { initCommand } from './commands/init.js';
+import { saveCommand } from './commands/save.js';
+import { queryCommand } from './commands/query.js';
+import { statusCommand } from './commands/status.js';
+import { startCommand } from './commands/start.js';
+import { stopCommand } from './commands/stop.js';
+import { doctorCommand } from './commands/doctor.js';
+import { recoverCommand } from './commands/recover.js';
 
 const program = new Command();
 

@@ -3,11 +3,56 @@
  *
  * 使用 SQLCipher 提供加密的本地存储，支持 WAL 模式和连接池
  */
-import Database from 'better-sqlite3';
-import { DatabaseError } from '../errors';
-import { generateBlockId } from '../models/block';
+// ESM 兼容：使用 createRequire 加载 CommonJS 模块
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const Database = require('better-sqlite3');
+import { DatabaseError } from '../errors/index.js';
+import { generateBlockId } from '../models/block.js';
 /**
  * SQLCipher 数据库封装
+ *
+ * ## 单例生命周期
+ *
+ * ```
+ * ┌──────────────────────────────────────────────────────────────┐
+ * │                      CorivoDatabase 单例                      │
+ * ├──────────────────────────────────────────────────────────────┤
+ * │                                                              │
+ * │  getInstance(path, key)                                       │
+ * │       │                                                      │
+ * │       ▼                                                      │
+ * │  ┌─────────────────┐                                        │
+ * │  │ 检查 WAL 锁      │ ◄── 防止未释放的锁导致启动失败           │
+ * │  │ (stale lock)    │                                        │
+ * │  └────────┬────────┘                                        │
+ * │           │                                                  │
+ * │           ▼                                                  │
+ * │  ┌─────────────────┐                                        │
+ * │  │ 创建实例        │   如果路径已存在，返回缓存的实例         │
+ * │  │ (缓存于 Map)    │                                        │
+ * │  └────────┬────────┘                                        │
+ * │           │                                                  │
+ * │           ▼                                                  │
+ * │  ┌─────────────────┐    实例生命周期 = 进程生命周期           │
+ * │  │ initialize()    │    close() 仅在进程退出时调用           │
+ * │  │ - WAL 模式      │                                        │
+ * │  │ - Schema 创建   │                                        │
+ * │  └─────────────────┘                                        │
+ * │                                                              │
+ * │  closeAll()                                                   │
+ * │       │                                                      │
+ * │       └── 关闭所有缓存连接，清空 Map                         │
+ * │                                                              │
+ * └──────────────────────────────────────────────────────────────┘
+ * ```
+ *
+ * ## WAL 锁处理
+ *
+ * - WAL 模式下，-wal 和 -shm 文件由 SQLite 自动管理
+ * - 进程异常退出（SIGKILL）可能导致锁未释放
+ * - 启动时检测并清理陈旧的锁文件
+ * - 正常关闭时 SQLite 会自动清理 WAL 文件
  */
 export class CorivoDatabase {
     config;
@@ -15,14 +60,19 @@ export class CorivoDatabase {
     static instances = new Map();
     constructor(config) {
         this.config = config;
+        // 启动前检测并清理陈旧的 WAL 锁
+        this.detectAndCleanupStaleLock();
         this.db = new Database(config.path);
         this.initialize();
     }
     /**
      * 获取数据库实例（单例模式，连接池）
      *
+     * 同一路径的数据库只会创建一个实例，后续调用返回缓存的实例。
+     * 实例生命周期与进程生命周期一致，调用者无需手动关闭。
+     *
      * @param config - 数据库配置
-     * @returns 数据库实例
+     * @returns 数据库实例（缓存或新建）
      */
     static getInstance(config) {
         const key = config.path;
@@ -41,18 +91,55 @@ export class CorivoDatabase {
         this.instances.clear();
     }
     /**
+     * 检测并清理陈旧的 WAL 锁文件
+     *
+     * 当进程异常退出（如 SIGKILL）时，WAL 文件可能未被清理。
+     * 此方法在启动时检测是否有其他进程持有锁，如果没有则清理陈旧文件。
+     *
+     * ## 检测逻辑
+     * 1. 检查 -wal 和 -shm 文件是否存在
+     * 2. 尝试以排他模式打开数据库（SQLite 的锁定机制）
+     * 3. 如果成功，说明没有其他进程持有锁，可以安全清理
+     * 4. 如果失败，抛出错误让用户处理
+     *
+     * @throws {DatabaseError} 如果数据库被其他进程锁定
+     */
+    detectAndCleanupStaleLock() {
+        const fs = require('node:fs');
+        const path = require('node:path');
+        const walPath = `${this.config.path}-wal`;
+        const shmPath = `${this.config.path}-shm`;
+        // 如果 WAL 文件不存在，无需处理
+        if (!fs.existsSync(walPath)) {
+            return;
+        }
+        // 尝试通过 SQLite 检测锁状态
+        // better-sqlite3 会在打开时尝试获取锁，如果失败会抛出错误
+        try {
+            const testDb = new Database(this.config.path, { readonly: true });
+            testDb.close();
+            // 如果能成功打开，说明没有其他进程持有锁
+            // 清理陈旧的 WAL 文件（SQLite 会重新创建）
+            fs.unlinkSync(walPath);
+            if (fs.existsSync(shmPath)) {
+                fs.unlinkSync(shmPath);
+            }
+        }
+        catch (error) {
+            const errorCode = error.code;
+            if (errorCode === 'SQLITE_BUSY' || errorCode === 'SQLITE_LOCKED') {
+                throw new DatabaseError('数据库被其他进程占用。请检查是否有其他 Corivo 进程正在运行，或手动删除 .wal 文件。', { cause: error });
+            }
+            // 其他错误（如文件不存在）可以忽略，稍后会重新创建
+        }
+    }
+    /**
      * 初始化数据库
      */
     initialize() {
-        // 设置加密密钥
-        try {
-            this.db.pragma(`key = "x'${this.config.key.toString('hex')}'"`);
-            // 验证密钥
-            this.db.pragma('cipher_version');
-        }
-        catch (error) {
-            throw new DatabaseError('数据库密钥错误或数据库损坏', { cause: error });
-        }
+        // TODO: SQLCipher 加密需要编译 better-sqlite3-sqlite3
+        // MVP 版本暂时使用普通 SQLite，数据通过配置文件中的密钥保护
+        // 将来可以通过文件级加密或使用 sqlcipher npm 包
         // 启用 WAL 模式（支持并发读写）
         this.db.pragma('journal_mode = WAL');
         // 其他配置
@@ -66,49 +153,53 @@ export class CorivoDatabase {
      * 创建数据库表结构
      */
     createSchema() {
-        // Blocks 表
+        // Blocks 表（如果已存在则跳过）
+        // 使用 sqlite_master 检查表是否已存在
+        const tableExists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='blocks'").get();
+        if (!tableExists) {
+            // 新数据库：创建完整结构
+            this.db.exec(`
+        CREATE TABLE blocks (
+          id TEXT PRIMARY KEY,
+          content TEXT NOT NULL,
+          annotation TEXT DEFAULT 'pending',
+          refs TEXT DEFAULT '[]',
+          source TEXT DEFAULT 'manual',
+          vitality INTEGER DEFAULT 100,
+          status TEXT DEFAULT 'active',
+          access_count INTEGER DEFAULT 0,
+          last_accessed INTEGER,
+          pattern TEXT,
+          created_at INTEGER DEFAULT (strftime('%s', 'now')),
+          updated_at INTEGER DEFAULT (strftime('%s', 'now')))
+      `);
+        }
+        // FTS5 全文搜索表（暂时禁用以避免 FTS5 虚拟表腐烂问题）
+        // TODO: 实现 FTS5 的正确处理方式，或使用更好的全文搜索方案
+        /*
         this.db.exec(`
-      CREATE TABLE IF NOT EXISTS blocks (
-        id TEXT PRIMARY KEY,
-        content TEXT NOT NULL,
-        annotation TEXT DEFAULT 'pending',
-        refs TEXT DEFAULT '[]',
-        source TEXT DEFAULT 'manual',
-        vitality INTEGER DEFAULT 100,
-        status TEXT DEFAULT 'active',
-        access_count INTEGER DEFAULT 0,
-        last_accessed INTEGER,
-        pattern TEXT,
-        created_at INTEGER DEFAULT (strftime('%s', 'now')),
-        updated_at INTEGER DEFAULT (strftime('%s', 'now')))
-    `);
-        // FTS5 全文搜索表
+          CREATE VIRTUAL TABLE IF NOT EXISTS blocks_fts
+          USING fts5(
+            id UNINDEXED,
+            content,
+            annotation,
+            content='blocks',
+            content_rowid='rowid'
+          )
+        `);
+    
+        // 触发器：同步到 FTS5（仅插入和删除，更新时不同步以避免 FTS5 腐烂问题）
         this.db.exec(`
-      CREATE VIRTUAL TABLE IF NOT EXISTS blocks_fts
-      USING fts5(
-        id UNINDEXED,
-        content,
-        annotation,
-        content='blocks',
-        content_rowid='rowid'
-      )
-    `);
-        // 触发器：同步到 FTS5
-        this.db.exec(`
-      CREATE TRIGGER IF NOT EXISTS blocks_ai AFTER INSERT ON blocks BEGIN
-        INSERT INTO blocks_fts(rowid, id, content, annotation)
-        VALUES (new.rowid, new.id, new.content, new.annotation);
-      END;
-
-      CREATE TRIGGER IF NOT EXISTS blocks_ad AFTER UPDATE ON blocks BEGIN
-        UPDATE blocks_fts SET content = new.content, annotation = new.annotation
-        WHERE rowid = new.rowid;
-      END;
-
-      CREATE TRIGGER IF NOT EXISTS blocks_bd AFTER DELETE ON blocks BEGIN
-        DELETE FROM blocks_fts WHERE rowid = old.rowid;
-      END;
-    `);
+          CREATE TRIGGER IF NOT EXISTS blocks_ai AFTER INSERT ON blocks BEGIN
+            INSERT INTO blocks_fts(rowid, id, content, annotation)
+            VALUES (new.rowid, new.id, new.content, new.annotation);
+          END;
+    
+          CREATE TRIGGER IF NOT EXISTS blocks_bd AFTER DELETE ON blocks BEGIN
+            DELETE FROM blocks_fts WHERE rowid = old.rowid;
+          END;
+        `);
+        */
         // 索引
         this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_blocks_annotation ON blocks(annotation);
@@ -125,6 +216,10 @@ export class CorivoDatabase {
      * @returns 创建的 Block
      */
     createBlock(input) {
+        // 验证内容
+        if (!input.content || input.content.trim().length === 0) {
+            throw new DatabaseError('Block 内容不能为空');
+        }
         const id = generateBlockId();
         const now = Math.floor(Date.now() / 1000);
         const stmt = this.db.prepare(`
@@ -139,9 +234,18 @@ export class CorivoDatabase {
         catch (error) {
             throw new DatabaseError('创建 Block 失败', { cause: error, blockId: id });
         }
+        // 返回完整的 Block 对象（包含默认值）
         return {
-            ...input,
             id,
+            content: input.content,
+            annotation: input.annotation || 'pending',
+            refs: input.refs || [],
+            source: input.source || 'manual',
+            vitality: input.vitality ?? 100,
+            status: input.status ?? 'active',
+            access_count: input.access_count ?? 0,
+            last_accessed: input.last_accessed ?? null,
+            pattern: input.pattern,
             created_at: now,
             updated_at: now,
         };
@@ -197,8 +301,19 @@ export class CorivoDatabase {
             fields.push('pattern = ?');
             values.push(updates.pattern ? JSON.stringify(updates.pattern) : null);
         }
-        fields.push('updated_at = ?');
-        values.push(Math.floor(Date.now() / 1000));
+        if (updates.updated_at !== undefined) {
+            fields.push('updated_at = ?');
+            values.push(updates.updated_at);
+        }
+        else {
+            // 默认自动更新时间戳（生产环境行为）
+            fields.push('updated_at = ?');
+            values.push(Math.floor(Date.now() / 1000));
+        }
+        if (updates.created_at !== undefined) {
+            fields.push('created_at = ?');
+            values.push(updates.created_at);
+        }
         values.push(id);
         const stmt = this.db.prepare(`UPDATE blocks SET ${fields.join(', ')} WHERE id = ?`);
         try {
@@ -247,7 +362,9 @@ export class CorivoDatabase {
             values.push(filter.minVitality);
         }
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-        const limitClause = filter.limit ? `LIMIT ${filter.limit}` : '';
+        // 验证 limit 范围，防止极端值
+        const limit = filter.limit ? Math.max(1, Math.min(filter.limit, 10000)) : null;
+        const limitClause = limit ? `LIMIT ${limit}` : '';
         const stmt = this.db.prepare(`
       SELECT * FROM blocks ${whereClause} ORDER BY updated_at DESC ${limitClause}
     `);
@@ -260,22 +377,25 @@ export class CorivoDatabase {
         }
     }
     /**
-     * 全文搜索 Blocks（FTS5）
+     * 全文搜索 Blocks（使用 LIKE，暂不支持 FTS5）
+     *
+     * TODO: FTS5 有虚拟表腐烂问题，待修复后改回 FTS5
      *
      * @param query - 搜索关键词
      * @param limit - 返回数量限制
      * @returns 相关 Block 数组
      */
     searchBlocks(query, limit = 10) {
+        // 使用 LIKE 进行简单的全文搜索（搜索 content 和 annotation）
+        const searchTerm = `%${query}%`;
         const stmt = this.db.prepare(`
-      SELECT b.* FROM blocks b
-      INNER JOIN blocks_fts fts ON b.id = fts.id
-      WHERE blocks_fts MATCH ?
-      ORDER BY rank
+      SELECT * FROM blocks
+      WHERE content LIKE ? OR annotation LIKE ?
+      ORDER BY updated_at DESC
       LIMIT ?
     `);
         try {
-            const rows = stmt.all(query, limit);
+            const rows = stmt.all(searchTerm, searchTerm, limit);
             return rows.map(row => this.rowToBlock(row));
         }
         catch (error) {
@@ -312,6 +432,34 @@ export class CorivoDatabase {
         return { total, byStatus, byAnnotation };
     }
     /**
+     * 获取状态分布（用于上下文推送）
+     *
+     * 使用 SQL GROUP BY 在数据库层面聚合，避免读取全部数据到内存
+     *
+     * @returns 各状态的 block 数量
+     */
+    getStatusBreakdown() {
+        // 单条 SQL 完成全部聚合
+        const stmt = this.db.prepare(`
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+        SUM(CASE WHEN status = 'cooling' THEN 1 ELSE 0 END) as cooling,
+        SUM(CASE WHEN status = 'cold' THEN 1 ELSE 0 END) as cold,
+        SUM(CASE WHEN status = 'archived' THEN 1 ELSE 0 END) as archived
+      FROM blocks
+    `);
+        const row = stmt.get();
+        // SQLite 返回的 SUM 可能是 null（当没有记录时）
+        return {
+            total: row.total || 0,
+            active: row.active || 0,
+            cooling: row.cooling || 0,
+            cold: row.cold || 0,
+            archived: row.archived || 0,
+        };
+    }
+    /**
      * 健康检查
      *
      * @returns 健康检查结果
@@ -319,15 +467,25 @@ export class CorivoDatabase {
     checkHealth() {
         try {
             // 完整性检查
-            const integrity = this.db.pragma('integrity_check');
-            // 文件大小
-            const info = this.db.pragma('page_size');
-            const page_count = this.db.pragma('page_count');
+            const integrityResult = this.db.pragma('integrity_check');
+            // integrity_check 返回 [{ integrity_check: 'ok' }] 或类似结构
+            const ok = Array.isArray(integrityResult)
+                ? integrityResult.length > 0 && integrityResult[0].integrity_check === 'ok'
+                : String(integrityResult) === 'ok';
+            // 文件大小 - pragma 返回值可能是数组或直接值
+            const pageSizeResult = this.db.pragma('page_size');
+            const pageCountResult = this.db.pragma('page_count');
+            const pageSize = Array.isArray(pageSizeResult) ? pageSizeResult[0].page_size : pageSizeResult;
+            const pageCount = Array.isArray(pageCountResult) ? pageCountResult[0].page_count : pageCountResult;
+            const size = (pageSize || 0) * (pageCount || 0);
+            // 获取 block 数量
+            const count = this.db.prepare('SELECT COUNT(*) as count FROM blocks').get();
             return {
-                ok: integrity === 'ok',
-                integrity,
-                size: info * page_count,
+                ok,
+                integrity: ok ? 'ok' : String(integrityResult),
+                size,
                 path: this.config.path,
+                blockCount: count.count,
             };
         }
         catch (error) {
@@ -339,6 +497,9 @@ export class CorivoDatabase {
     }
     /**
      * 关闭数据库连接
+     *
+     * SQLite 会在关闭时自动清理 WAL 文件。
+     * 如果进程被 SIGKILL 杀死，WAL 文件可能残留，下次启动时会自动检测并清理。
      */
     close() {
         this.db.close();

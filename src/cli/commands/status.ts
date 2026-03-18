@@ -7,11 +7,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database';
-import { KeyManager } from '../../crypto/keys';
-import { ConfigError } from '../../errors';
-import { readPassword } from './save';
-import { ContextPusher } from '../../push/context';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
+import { KeyManager } from '../../crypto/keys.js';
+import { ConfigError } from '../../errors/index.js';
+import { readPassword } from '../utils/password.js';
+import { ContextPusher } from '../../push/context.js';
 
 export async function statusCommand(): Promise<void> {
   // 读取配置

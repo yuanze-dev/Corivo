@@ -4,8 +4,8 @@
  * 从自然语言中提取技术选型决策
  */
 
-import type { Pattern } from '../../models/pattern';
-import type { Rule } from './index';
+import type { Pattern } from '../../models/pattern.js';
+import type { Rule } from './index.js';
 
 /**
  * 技术选型决策维度

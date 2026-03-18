@@ -6,23 +6,10 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import readline from 'node:readline';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database';
-import { KeyManager } from '../../crypto/keys';
-import { ConfigError, ValidationError } from '../../errors';
-
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-
-function readPassword(prompt: string): Promise<string> {
-  return new Promise((resolve) => {
-    rl.question(prompt, (password: string) => {
-      resolve(password);
-    });
-  });
-}
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
+import { KeyManager } from '../../crypto/keys.js';
+import { ConfigError, ValidationError } from '../../errors/index.js';
+import { readPassword } from '../utils/password.js';
 
 export async function recoverCommand(): Promise<void> {
   console.log('\n═══════════════════════════════════════════════════════');
@@ -42,26 +29,24 @@ export async function recoverCommand(): Promise<void> {
   }
 
   console.log('请选择恢复方式:\n');
-  console.log('  [1] 使用恢复密钥（16 个单词）');
+  console.log('  [1] 使用恢复密钥（24 个单词，BIP39 标准）');
   console.log('  [2] 退出\n');
 
   const choice = await readPassword('请选择 [1-2]: ');
 
   if (choice !== '1') {
     console.log('已取消');
-    rl.close();
     return;
   }
 
   // 输入恢复密钥
-  console.log('\n请输入您的恢复密钥（16 个单词，用空格分隔）:\n');
+  console.log('\n请输入您的恢复密钥（24 个单词，用空格分隔）:\n');
 
   const recoveryKey = await readPassword('恢复密钥: ');
   const inputWords = recoveryKey.trim().split(/\s+/);
 
-  if (inputWords.length !== 16) {
-    console.log('❌ 恢复密钥必须是 16 个单词');
-    rl.close();
+  if (inputWords.length !== 24) {
+    console.log('❌ 恢复密钥必须是 24 个单词');
     return;
   }
 
@@ -76,7 +61,6 @@ export async function recoverCommand(): Promise<void> {
     } else {
       console.log('❌ 恢复密钥验证失败');
     }
-    rl.close();
     return;
   }
 
@@ -88,14 +72,12 @@ export async function recoverCommand(): Promise<void> {
   const password1 = await readPassword('新密码: ');
   if (!KeyManager.validatePasswordStrength(password1)) {
     console.log('❌ 密码强度不足');
-    rl.close();
     return;
   }
 
   const password2 = await readPassword('确认新密码: ');
   if (password1 !== password2) {
     console.log('❌ 两次输入的密码不一致');
-    rl.close();
     return;
   }
 
@@ -141,17 +123,15 @@ export async function recoverCommand(): Promise<void> {
   const recoveryWords = newRecoveryKey.split(' ');
 
   console.log('\n密钥链已更新！');
-  console.log('\n⚠️  重要：您的新恢复密钥已生成\n');
+  console.log('\n⚠️  重要：您的新恢复密钥已生成（24 个单词）\n');
 
-  console.log(`  ${recoveryWords.slice(0, 4).join('  ')}`);
-  console.log(`  ${recoveryWords.slice(4, 8).join('  ')}`);
-  console.log(`  ${recoveryWords.slice(8, 12).join('  ')}`);
-  console.log(`  ${recoveryWords.slice(12, 16).join('  ')}`);
+  console.log(`  ${recoveryWords.slice(0, 6).join('  ')}`);
+  console.log(`  ${recoveryWords.slice(6, 12).join('  ')}`);
+  console.log(`  ${recoveryWords.slice(12, 18).join('  ')}`);
+  console.log(`  ${recoveryWords.slice(18, 24).join('  ')}`);
 
   console.log('\n⚠️  旧恢复密钥已失效，请保存新的恢复密钥');
 
   console.log('\n下一步：');
   console.log('  在其他设备上重新授权（设备列表已重置）');
-
-  rl.close();
 }

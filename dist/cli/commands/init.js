@@ -6,29 +6,14 @@
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
-import readline from 'node:readline';
-import { KeyManager } from '../../crypto/keys';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database';
-import { FileSystemError } from '../../errors';
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-});
-/**
- * 从用户输入读取密码（隐藏显示）
- */
-function readPassword(prompt) {
-    return new Promise((resolve) => {
-        rl.question(prompt, (password) => {
-            resolve(password);
-        });
-    });
-}
+import { KeyManager } from '../../crypto/keys.js';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
+import { FileSystemError } from '../../errors/index.js';
+import { readPassword } from '../utils/password.js';
 /**
  * 退出并清理
  */
 function exit(code = 0) {
-    rl.close();
     process.exit(code);
 }
 /**
@@ -103,14 +88,14 @@ export async function initCommand() {
     console.log('\n═══════════════════════════════════════════════════════');
     console.log('           ⚠️  重要：请妥善保管恢复密钥 ⚠️');
     console.log('═══════════════════════════════════════════════════════\n');
-    console.log('您的恢复密钥（16 个单词，请手抄保存）：\n');
+    console.log('您的恢复密钥（24 个单词，BIP39 标准，请手抄保存）：\n');
     const recoveryWords = recoveryKey.split(' ');
-    console.log(`  ${recoveryWords.slice(0, 4).join('  ')}`);
-    console.log(`  ${recoveryWords.slice(4, 8).join('  ')}`);
-    console.log(`  ${recoveryWords.slice(8, 12).join('  ')}`);
-    console.log(`  ${recoveryWords.slice(12, 16).join('  ')}`);
+    console.log(`  ${recoveryWords.slice(0, 6).join('  ')}`);
+    console.log(`  ${recoveryWords.slice(6, 12).join('  ')}`);
+    console.log(`  ${recoveryWords.slice(12, 18).join('  ')}`);
+    console.log(`  ${recoveryWords.slice(18, 24).join('  ')}`);
     console.log('\n⚠️  重要提示：');
-    console.log('  1. 请将这 16 个单词手抄在纸上，存放在安全的地方');
+    console.log('  1. 请将这 24 个单词手抄在纸上，存放在安全的地方');
     console.log('  2. 不要拍照、截图或存储在任何联网设备上');
     console.log('  3. 任何人获得此密钥都可以访问您的 Corivo 数据');
     console.log('  4. Corivo 团队也无法帮您恢复此密钥\n');

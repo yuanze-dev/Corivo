@@ -3,7 +3,7 @@
  *
  * 从自然语言内容中提取结构化决策模式
  */
-import type { Pattern } from '../../models/pattern';
+import type { Pattern } from '../../models/pattern.js';
 /**
  * 规则接口
  */

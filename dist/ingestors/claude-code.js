@@ -5,7 +5,7 @@
  */
 import fs from 'node:fs/promises';
 import path from 'path';
-import { FileSystemError } from '../errors';
+import { FileSystemError } from '../errors/index.js';
 export class ClaudeCodeIngestor {
     /**
      * 注入规则到 CLAUDE.md

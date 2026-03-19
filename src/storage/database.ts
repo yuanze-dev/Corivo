@@ -241,6 +241,20 @@ export class CorivoDatabase {
     // FTS5 全文搜索表
     // 使用独立的 FTS5 表（而非 external content）避免虚拟表腐烂问题
     // 数据通过触发器自动同步
+    //
+    // 迁移逻辑：检测并修复旧版本的外部内容表
+    const ftsTable = this.db.prepare(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='blocks_fts'"
+    ).get() as { sql: string } | undefined;
+
+    if (ftsTable && ftsTable.sql.includes("content='blocks'")) {
+      // 旧版本：外部内容表模式，需要重建
+      this.db.exec(`DROP TABLE IF EXISTS blocks_fts`);
+      this.db.exec(`DROP TRIGGER IF EXISTS blocks_ai`);
+      this.db.exec(`DROP TRIGGER IF EXISTS blocks_au`);
+      this.db.exec(`DROP TRIGGER IF EXISTS blocks_ad`);
+    }
+
     const ftsExists = this.db.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='blocks_fts'"
     ).get() as { name: string } | undefined;
@@ -276,6 +290,12 @@ export class CorivoDatabase {
         CREATE TRIGGER blocks_ad AFTER DELETE ON blocks BEGIN
           DELETE FROM blocks_fts WHERE id = old.id;
         END
+      `);
+
+      // 重建索引：从现有 blocks 表同步数据
+      this.db.exec(`
+        INSERT INTO blocks_fts(id, content, annotation)
+        SELECT id, content, annotation FROM blocks
       `);
     }
 
@@ -574,8 +594,13 @@ export class CorivoDatabase {
    * @returns 相关 Block 数组
    */
   searchBlocks(query: string, limit = 10): Block[] {
-    // 使用 FTS5 全文搜索
-    const stmt = this.db.prepare(`
+    // 空查询返回所有结果
+    if (!query || query.trim() === '') {
+      return this.queryBlocks({ limit });
+    }
+
+    // 先尝试 FTS5 全文搜索
+    const ftsStmt = this.db.prepare(`
       SELECT b.* FROM blocks b
       INNER JOIN blocks_fts fts ON b.id = fts.id
       WHERE blocks_fts MATCH ?
@@ -586,15 +611,28 @@ export class CorivoDatabase {
     try {
       // 转义查询字符串中的特殊字符
       const escapedQuery = query.replace(/["']/g, '');
-      const rows = stmt.all(escapedQuery, limit) as any[];
-      return rows.map(row => this.rowToBlock(row));
-    } catch (error) {
-      // FTS5 查询失败时（如空查询），返回空数组
-      if ((error as any).message?.includes('syntax')) {
-        return [];
+      const rows = ftsStmt.all(escapedQuery, limit) as any[];
+
+      // FTS5 返回结果，直接返回
+      if (rows.length > 0) {
+        return rows.map(row => this.rowToBlock(row));
       }
-      throw new DatabaseError('全文搜索失败', { cause: error });
+    } catch (error) {
+      // FTS5 查询失败，忽略错误，继续使用备用搜索
     }
+
+    // FTS5 无结果或失败时，使用 LIKE 备用搜索
+    // 这对中文搜索特别有用，因为 FTS5 对中文分词支持不佳
+    const likeStmt = this.db.prepare(`
+      SELECT * FROM blocks
+      WHERE content LIKE ? OR annotation LIKE ?
+      ORDER BY updated_at DESC
+      LIMIT ?
+    `);
+
+    const likePattern = `%${query}%`;
+    const rows = likeStmt.all(likePattern, likePattern, limit) as any[];
+    return rows.map(row => this.rowToBlock(row));
   }
 
   /**

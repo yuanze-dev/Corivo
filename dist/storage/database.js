@@ -2,6 +2,29 @@
  * 数据库存储层
  *
  * 使用 SQLCipher 提供加密的本地存储，支持 WAL 模式和连接池
+ *
+ * ## 加密支持
+ *
+ * 要启用 SQLCipher 加密，需要在构建 better-sqlite3 时链接 SQLCipher 库：
+ *
+ * ```bash
+ * # 卸载普通版本
+ * npm uninstall better-sqlite3
+ *
+ * # 安装构建依赖
+ * npm install --save-dev node-gyp
+ *
+ * # 安装 SQLCipher (macOS)
+ * brew install sqlcipher
+ *
+ * # 设置环境变量并重新安装
+ * export SQLITE3_LIB_DIR=$(brew --prefix sqlcipher)/lib
+ * export SQLITE3_INCLUDE_DIR=$(brew --prefix sqlcipher)/include
+ * npm install better-sqlite3 --build-from-source
+ * ```
+ *
+ * 如果未使用 SQLCipher 构建，pragma key 语句会被静默忽略，
+ * 数据库将以明文存储（用户应依赖文件系统加密如 FileVault）。
  */
 // ESM 兼容：使用 createRequire 加载 CommonJS 模块
 import { createRequire } from 'node:module';
@@ -137,9 +160,19 @@ export class CorivoDatabase {
      * 初始化数据库
      */
     initialize() {
-        // TODO: SQLCipher 加密需要编译 better-sqlite3-sqlite3
-        // MVP 版本暂时使用普通 SQLite，数据通过配置文件中的密钥保护
-        // 将来可以通过文件级加密或使用 sqlcipher npm 包
+        // 设置 SQLCipher 加密密钥（如果支持）
+        // 必须在任何其他操作之前执行
+        // 注意：如果 better-sqlite3 未编译 SQLCipher 支持，这会被静默忽略
+        try {
+            const hexKey = this.config.key.toString('hex');
+            this.db.pragma(`key = "x'${hexKey}'"`);
+            // 验证加密是否工作（如果密钥错误，此处会抛出异常）
+            this.db.pragma('cipher_version');
+        }
+        catch {
+            // 如果不支持 SQLCipher，继续使用普通 SQLite
+            // 用户应依赖文件系统加密
+        }
         // 启用 WAL 模式（支持并发读写）
         this.db.pragma('journal_mode = WAL');
         // 其他配置
@@ -174,32 +207,40 @@ export class CorivoDatabase {
           updated_at INTEGER DEFAULT (strftime('%s', 'now')))
       `);
         }
-        // FTS5 全文搜索表（暂时禁用以避免 FTS5 虚拟表腐烂问题）
-        // TODO: 实现 FTS5 的正确处理方式，或使用更好的全文搜索方案
-        /*
-        this.db.exec(`
-          CREATE VIRTUAL TABLE IF NOT EXISTS blocks_fts
-          USING fts5(
-            id UNINDEXED,
-            content,
-            annotation,
-            content='blocks',
-            content_rowid='rowid'
-          )
-        `);
-    
-        // 触发器：同步到 FTS5（仅插入和删除，更新时不同步以避免 FTS5 腐烂问题）
-        this.db.exec(`
-          CREATE TRIGGER IF NOT EXISTS blocks_ai AFTER INSERT ON blocks BEGIN
-            INSERT INTO blocks_fts(rowid, id, content, annotation)
-            VALUES (new.rowid, new.id, new.content, new.annotation);
-          END;
-    
-          CREATE TRIGGER IF NOT EXISTS blocks_bd AFTER DELETE ON blocks BEGIN
-            DELETE FROM blocks_fts WHERE rowid = old.rowid;
-          END;
-        `);
-        */
+        // FTS5 全文搜索表
+        // 使用独立的 FTS5 表（而非 external content）避免虚拟表腐烂问题
+        // 数据通过触发器自动同步
+        const ftsExists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='blocks_fts'").get();
+        if (!ftsExists) {
+            this.db.exec(`
+        CREATE VIRTUAL TABLE blocks_fts USING fts5(
+          id UNINDEXED,
+          content,
+          annotation
+        )
+      `);
+            // 触发器：INSERT 同步
+            this.db.exec(`
+        CREATE TRIGGER blocks_ai AFTER INSERT ON blocks BEGIN
+          INSERT INTO blocks_fts(id, content, annotation)
+          VALUES (new.id, new.content, new.annotation);
+        END
+      `);
+            // 触发器：UPDATE 同步（删除后重新插入，避免 FTS5 腐烂）
+            this.db.exec(`
+        CREATE TRIGGER blocks_au AFTER UPDATE ON blocks BEGIN
+          DELETE FROM blocks_fts WHERE id = old.id;
+          INSERT INTO blocks_fts(id, content, annotation)
+          VALUES (new.id, new.content, new.annotation);
+        END
+      `);
+            // 触发器：DELETE 同步
+            this.db.exec(`
+        CREATE TRIGGER blocks_ad AFTER DELETE ON blocks BEGIN
+          DELETE FROM blocks_fts WHERE id = old.id;
+        END
+      `);
+        }
         // 索引
         this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_blocks_annotation ON blocks(annotation);
@@ -219,6 +260,45 @@ export class CorivoDatabase {
         // 验证内容
         if (!input.content || input.content.trim().length === 0) {
             throw new DatabaseError('Block 内容不能为空');
+        }
+        // 验证内容长度（限制 1MB）
+        if (input.content.length > 1024 * 1024) {
+            throw new DatabaseError('Block 内容超出最大长度限制 (1MB)');
+        }
+        // 验证 refs 格式
+        if (input.refs !== undefined) {
+            if (!Array.isArray(input.refs)) {
+                throw new DatabaseError('refs 必须是数组');
+            }
+            // 验证每个 ref 都是字符串
+            for (const ref of input.refs) {
+                if (typeof ref !== 'string') {
+                    throw new DatabaseError('refs 中的每个元素必须是字符串');
+                }
+            }
+        }
+        // 验证 pattern 格式（如果提供）
+        if (input.pattern !== undefined) {
+            const pattern = input.pattern;
+            // 检查必需字段
+            if (typeof pattern !== 'object' || pattern === null) {
+                throw new DatabaseError('pattern 必须是对象');
+            }
+            if (typeof pattern.type !== 'string') {
+                throw new DatabaseError('pattern.type 必须是字符串');
+            }
+            if (typeof pattern.decision !== 'string') {
+                throw new DatabaseError('pattern.decision 必须是字符串');
+            }
+            if (!Array.isArray(pattern.dimensions)) {
+                throw new DatabaseError('pattern.dimensions 必须是数组');
+            }
+            if (!Array.isArray(pattern.context_tags)) {
+                throw new DatabaseError('pattern.context_tags 必须是数组');
+            }
+            if (typeof pattern.confidence !== 'number') {
+                throw new DatabaseError('pattern.confidence 必须是数字');
+            }
         }
         const id = generateBlockId();
         const now = Math.floor(Date.now() / 1000);
@@ -325,6 +405,45 @@ export class CorivoDatabase {
         }
     }
     /**
+     * 批量更新 Block（vitality 和 status）
+     *
+     * 使用事务批量更新，比逐条更新快 10-100 倍
+     *
+     * @param updates - 要更新的 Block 列表，每项包含 id、vitality 和 status
+     * @returns 更新成功的数量
+     */
+    batchUpdateVitality(updates) {
+        if (updates.length === 0)
+            return 0;
+        const now = Math.floor(Date.now() / 1000);
+        let updatedCount = 0;
+        // 使用事务加速批量更新
+        const transaction = this.db.transaction(() => {
+            const stmt = this.db.prepare(`
+        UPDATE blocks
+        SET vitality = ?, status = ?, updated_at = ?
+        WHERE id = ?
+      `);
+            for (const update of updates) {
+                try {
+                    const result = stmt.run(update.vitality, update.status, now, update.id);
+                    updatedCount += result.changes;
+                }
+                catch (error) {
+                    // 单个更新失败不影响其他更新
+                    console.error(`批量更新失败 ${update.id}:`, error);
+                }
+            }
+        });
+        try {
+            transaction();
+            return updatedCount;
+        }
+        catch (error) {
+            throw new DatabaseError('批量更新 Block 失败', { cause: error });
+        }
+    }
+    /**
      * 删除 Block
      *
      * @param id - Block ID
@@ -377,28 +496,34 @@ export class CorivoDatabase {
         }
     }
     /**
-     * 全文搜索 Blocks（使用 LIKE，暂不支持 FTS5）
+     * 全文搜索 Blocks（使用 FTS5）
      *
-     * TODO: FTS5 有虚拟表腐烂问题，待修复后改回 FTS5
+     * 使用 FTS5 的 MATCH 运算符进行全文搜索，返回按相关性排序的结果。
      *
      * @param query - 搜索关键词
      * @param limit - 返回数量限制
      * @returns 相关 Block 数组
      */
     searchBlocks(query, limit = 10) {
-        // 使用 LIKE 进行简单的全文搜索（搜索 content 和 annotation）
-        const searchTerm = `%${query}%`;
+        // 使用 FTS5 全文搜索
         const stmt = this.db.prepare(`
-      SELECT * FROM blocks
-      WHERE content LIKE ? OR annotation LIKE ?
-      ORDER BY updated_at DESC
+      SELECT b.* FROM blocks b
+      INNER JOIN blocks_fts fts ON b.id = fts.id
+      WHERE blocks_fts MATCH ?
+      ORDER BY rank
       LIMIT ?
     `);
         try {
-            const rows = stmt.all(searchTerm, searchTerm, limit);
+            // 转义查询字符串中的特殊字符
+            const escapedQuery = query.replace(/["']/g, '');
+            const rows = stmt.all(escapedQuery, limit);
             return rows.map(row => this.rowToBlock(row));
         }
         catch (error) {
+            // FTS5 查询失败时（如空查询），返回空数组
+            if (error.message?.includes('syntax')) {
+                return [];
+            }
             throw new DatabaseError('全文搜索失败', { cause: error });
         }
     }

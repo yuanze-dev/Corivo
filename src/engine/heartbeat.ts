@@ -11,9 +11,12 @@ import { RuleEngine } from './rules/index.js';
 import { TechChoiceRule } from './rules/tech-choice.js';
 import { DatabaseError } from '../errors/index.js';
 import type { BlockStatus, Pattern } from '../models/index.js';
+import { vitalityToStatus } from '../models/block.js';
 
 const HEARTBEAT_INTERVAL = 5000; // 5 秒
 const PENDING_BATCH_SIZE = 10; // 每次处理的 pending 数量
+const HEALTH_CHECK_FILE = '.heartbeat-health'; // 健康检查文件
+const HEALTH_CHECK_INTERVAL = 30000; // 30 秒写入一次健康状态
 
 /**
  * 心跳引擎配置
@@ -31,6 +34,9 @@ export class Heartbeat {
   private db: CorivoDatabase | null = null;
   private ruleEngine: RuleEngine;
   private timeoutRef: NodeJS.Timeout | null = null;
+  private lastHealthCheck = 0;
+  private cycleCount = 0;
+  private healthFilePath: string;
 
   constructor(config?: HeartbeatConfig) {
     // 如果传入了 db，直接使用（用于测试）
@@ -41,6 +47,10 @@ export class Heartbeat {
     // 初始化规则引擎
     this.ruleEngine = new RuleEngine();
     this.ruleEngine.register(new TechChoiceRule());
+
+    // 健康文件路径
+    const configDir = process.env.CORIVO_CONFIG_DIR || getConfigDir();
+    this.healthFilePath = `${configDir}/${HEALTH_CHECK_FILE}`;
   }
 
   /**
@@ -111,6 +121,12 @@ export class Heartbeat {
 
         // 处理衰减
         await this.processVitalityDecay();
+
+        // 更新健康状态（每 6 个周期更新一次）
+        this.cycleCount++;
+        if (this.cycleCount % (HEALTH_CHECK_INTERVAL / HEARTBEAT_INTERVAL) === 0) {
+          await this.updateHealthCheck();
+        }
       } catch (error) {
         if (error instanceof DatabaseError) {
           console.error('[心跳] 数据库错误:', error.message);
@@ -129,6 +145,8 @@ export class Heartbeat {
     }
 
     console.log('心跳进程已停止');
+    // 清理健康文件
+    await this.cleanupHealthCheck();
   }
 
   /**
@@ -145,6 +163,73 @@ export class Heartbeat {
     if (this.db) {
       CorivoDatabase.closeAll();
       this.db = null;
+    }
+
+    // 清理健康文件
+    await this.cleanupHealthCheck();
+  }
+
+  /**
+   * 更新健康检查文件
+   *
+   * 写入当前时间戳和进程状态，供监控进程检查
+   */
+  private async updateHealthCheck(): Promise<void> {
+    try {
+      const healthData = {
+        pid: process.pid,
+        timestamp: Date.now(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        cycleCount: this.cycleCount,
+      };
+      await fs.writeFile(this.healthFilePath, JSON.stringify(healthData));
+      this.lastHealthCheck = Date.now();
+    } catch (error) {
+      console.error('[心跳] 更新健康状态失败:', error);
+    }
+  }
+
+  /**
+   * 清理健康检查文件
+   */
+  private async cleanupHealthCheck(): Promise<void> {
+    try {
+      await fs.unlink(this.healthFilePath);
+    } catch {
+      // 文件不存在或其他错误，忽略
+    }
+  }
+
+  /**
+   * 获取健康状态（用于外部查询）
+   */
+  static async getHealthStatus(configDir?: string): Promise<{
+    healthy: boolean;
+    lastCheck: number | null;
+    age: number | null;
+  }> {
+    try {
+      const dir = configDir || getConfigDir();
+      const healthPath = `${dir}/${HEALTH_CHECK_FILE}`;
+      const content = await fs.readFile(healthPath, 'utf-8');
+      const health = JSON.parse(content);
+
+      const now = Date.now();
+      const age = now - health.timestamp;
+      const healthy = age < HEALTH_CHECK_INTERVAL * 2; // 允许 2 倍间隔的延迟
+
+      return {
+        healthy,
+        lastCheck: health.timestamp,
+        age,
+      };
+    } catch {
+      return {
+        healthy: false,
+        lastCheck: null,
+        age: null,
+      };
     }
   }
 
@@ -270,7 +355,7 @@ export class Heartbeat {
   }
 
   /**
-   * 处理衰减
+   * 处理衰减（批量更新版本）
    */
   private async processVitalityDecay(): Promise<void> {
     if (!this.db) return;
@@ -278,7 +363,10 @@ export class Heartbeat {
     // 获取所有活跃 block
     const blocks = this.db.queryBlocks({ limit: 100 });
     const now = Date.now();
-    const decayCount = { decayed: 0, unchanged: 0 };
+
+    // 收集需要更新的 block
+    const updates: Array<{ id: string; vitality: number; status: string }> = [];
+    let unchangedCount = 0;
 
     for (const block of blocks) {
       // 跳过已归档的
@@ -291,7 +379,7 @@ export class Heartbeat {
 
       if (daysSinceAccess < 1) {
         // 24 小时内不衰减
-        decayCount.unchanged++;
+        unchangedCount++;
         continue;
       }
 
@@ -312,35 +400,26 @@ export class Heartbeat {
 
       // 如果生命力没变，跳过
       if (newVitality === block.vitality) {
-        decayCount.unchanged++;
+        unchangedCount++;
         continue;
       }
 
       // 计算新状态
-      const newStatus = this.vitalityToStatus(newVitality);
+      const newStatus = vitalityToStatus(newVitality);
 
-      // 更新
-      this.db.updateBlock(block.id, {
+      // 添加到批量更新列表
+      updates.push({
+        id: block.id,
         vitality: newVitality,
         status: newStatus,
       });
-
-      decayCount.decayed++;
     }
 
-    if (decayCount.decayed > 0) {
-      console.log(`[心跳] 衰减处理: ${decayCount.decayed} 个更新, ${decayCount.unchanged} 个不变`);
+    // 批量更新
+    if (updates.length > 0) {
+      const updatedCount = this.db.batchUpdateVitality(updates);
+      console.log(`[心跳] 衰减处理: ${updatedCount} 个更新, ${unchangedCount} 个不变`);
     }
-  }
-
-  /**
-   * 生命力转状态
-   */
-  private vitalityToStatus(vitality: number): BlockStatus {
-    if (vitality === 0) return 'archived';
-    if (vitality < 30) return 'cold';
-    if (vitality < 60) return 'cooling';
-    return 'active';
   }
 
   /**

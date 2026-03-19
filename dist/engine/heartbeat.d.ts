@@ -19,6 +19,9 @@ export declare class Heartbeat {
     private db;
     private ruleEngine;
     private timeoutRef;
+    private lastHealthCheck;
+    private cycleCount;
+    private healthFilePath;
     constructor(config?: HeartbeatConfig);
     /**
      * 启动心跳循环
@@ -32,6 +35,24 @@ export declare class Heartbeat {
      * 停止心跳
      */
     stop(): Promise<void>;
+    /**
+     * 更新健康检查文件
+     *
+     * 写入当前时间戳和进程状态，供监控进程检查
+     */
+    private updateHealthCheck;
+    /**
+     * 清理健康检查文件
+     */
+    private cleanupHealthCheck;
+    /**
+     * 获取健康状态（用于外部查询）
+     */
+    static getHealthStatus(configDir?: string): Promise<{
+        healthy: boolean;
+        lastCheck: number | null;
+        age: number | null;
+    }>;
     /**
      * 运行一次心跳（用于测试）
      *
@@ -51,13 +72,9 @@ export declare class Heartbeat {
      */
     private extractPattern;
     /**
-     * 处理衰减
+     * 处理衰减（批量更新版本）
      */
     private processVitalityDecay;
-    /**
-     * 生命力转状态
-     */
-    private vitalityToStatus;
     /**
      * 延迟函数
      */

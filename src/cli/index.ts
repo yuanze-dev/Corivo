@@ -12,7 +12,7 @@ import { initCommand } from './commands/init.js';
 import { saveCommand } from './commands/save.js';
 import { queryCommand } from './commands/query.js';
 import { statusCommand } from './commands/status.js';
-import { startCommand } from './commands/start.js';
+import { startCommand, startWatchCommand } from './commands/start.js';
 import { stopCommand } from './commands/stop.js';
 import { doctorCommand } from './commands/doctor.js';
 import { recoverCommand } from './commands/recover.js';
@@ -56,7 +56,14 @@ program
 program
   .command('start')
   .description('启动守护进程')
-  .action(startCommand);
+  .option('-w, --watch', '监控模式：自动重启崩溃的进程')
+  .action(async (options) => {
+    if (options.watch) {
+      await startWatchCommand();
+    } else {
+      await startCommand();
+    }
+  });
 
 program
   .command('stop')

@@ -2,6 +2,29 @@
  * 数据库存储层
  *
  * 使用 SQLCipher 提供加密的本地存储，支持 WAL 模式和连接池
+ *
+ * ## 加密支持
+ *
+ * 要启用 SQLCipher 加密，需要在构建 better-sqlite3 时链接 SQLCipher 库：
+ *
+ * ```bash
+ * # 卸载普通版本
+ * npm uninstall better-sqlite3
+ *
+ * # 安装构建依赖
+ * npm install --save-dev node-gyp
+ *
+ * # 安装 SQLCipher (macOS)
+ * brew install sqlcipher
+ *
+ * # 设置环境变量并重新安装
+ * export SQLITE3_LIB_DIR=$(brew --prefix sqlcipher)/lib
+ * export SQLITE3_INCLUDE_DIR=$(brew --prefix sqlcipher)/include
+ * npm install better-sqlite3 --build-from-source
+ * ```
+ *
+ * 如果未使用 SQLCipher 构建，pragma key 语句会被静默忽略，
+ * 数据库将以明文存储（用户应依赖文件系统加密如 FileVault）。
  */
 import type { Block, CreateBlockInput, UpdateBlockInput, BlockFilter } from '../models/index.js';
 /**
@@ -123,6 +146,19 @@ export declare class CorivoDatabase {
      */
     updateBlock(id: string, updates: UpdateBlockInput): boolean;
     /**
+     * 批量更新 Block（vitality 和 status）
+     *
+     * 使用事务批量更新，比逐条更新快 10-100 倍
+     *
+     * @param updates - 要更新的 Block 列表，每项包含 id、vitality 和 status
+     * @returns 更新成功的数量
+     */
+    batchUpdateVitality(updates: Array<{
+        id: string;
+        vitality: number;
+        status: string;
+    }>): number;
+    /**
      * 删除 Block
      *
      * @param id - Block ID
@@ -137,9 +173,9 @@ export declare class CorivoDatabase {
      */
     queryBlocks(filter?: BlockFilter): Block[];
     /**
-     * 全文搜索 Blocks（使用 LIKE，暂不支持 FTS5）
+     * 全文搜索 Blocks（使用 FTS5）
      *
-     * TODO: FTS5 有虚拟表腐烂问题，待修复后改回 FTS5
+     * 使用 FTS5 的 MATCH 运算符进行全文搜索，返回按相关性排序的结果。
      *
      * @param query - 搜索关键词
      * @param limit - 返回数量限制

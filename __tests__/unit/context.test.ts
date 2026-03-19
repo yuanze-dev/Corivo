@@ -19,7 +19,7 @@ describe('ContextPusher', () => {
     dbPath = `/tmp/corivo-test-${Date.now()}.db`;
     const dbKey = KeyManager.generateDatabaseKey();
 
-    // 初始化数据库（不使用 FTS5）
+    // 初始化数据库（包括 FTS5）
     const sqliteDb = new Database(dbPath);
     sqliteDb.exec(`
       CREATE TABLE IF NOT EXISTS blocks (
@@ -39,7 +39,36 @@ describe('ContextPusher', () => {
 
       CREATE INDEX IF NOT EXISTS idx_blocks_annotation ON blocks(annotation);
       CREATE INDEX IF NOT EXISTS idx_blocks_status ON blocks(status);
+      CREATE INDEX IF NOT EXISTS idx_blocks_vitality ON blocks(vitality);
     `);
+
+    // 创建 FTS5 全文搜索表
+    sqliteDb.exec(`
+      CREATE VIRTUAL TABLE blocks_fts USING fts5(
+        id UNINDEXED,
+        content,
+        annotation
+      )
+    `);
+
+    // 创建触发器同步数据到 FTS5
+    sqliteDb.exec(`
+      CREATE TRIGGER blocks_ai AFTER INSERT ON blocks BEGIN
+        INSERT INTO blocks_fts(id, content, annotation)
+        VALUES (new.id, new.content, new.annotation);
+      END;
+
+      CREATE TRIGGER blocks_au AFTER UPDATE ON blocks BEGIN
+        DELETE FROM blocks_fts WHERE id = old.id;
+        INSERT INTO blocks_fts(id, content, annotation)
+        VALUES (new.id, new.content, new.annotation);
+      END;
+
+      CREATE TRIGGER blocks_ad AFTER DELETE ON blocks BEGIN
+        DELETE FROM blocks_fts WHERE id = old.id;
+      END;
+    `);
+
     sqliteDb.close();
 
     db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });

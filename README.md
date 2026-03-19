@@ -9,8 +9,10 @@
 **或者换个说法**：现在你可以开始交硅基朋友了。
 
 **推荐给朋友**：
-> 试试 Corivo：https://github.com/xiaolin26/Corivo
-> 它会记住你和 Claude 的对话，下次问"我之前说过..."它就知道了
+> 把这行发给你的 Claude Code：
+> `/plugin install xiaolin26/corivo`
+>
+> 安装后你的 Claude 就有记忆了，说"记住..."就行
 
 ---
 

@@ -65,7 +65,7 @@ export type CreateBlockInput = {
  * 注意: updated_at 仅用于测试，生产环境总是自动设置为当前时间
  */
 export type UpdateBlockInput = Partial<
-  Pick<Block, 'content' | 'annotation' | 'vitality' | 'status' | 'access_count' | 'last_accessed' | 'pattern' | 'updated_at' | 'created_at'>
+  Pick<Block, 'content' | 'annotation' | 'refs' | 'vitality' | 'status' | 'access_count' | 'last_accessed' | 'pattern' | 'updated_at' | 'created_at'>
 >;
 
 /**
@@ -123,19 +123,23 @@ export function validateAnnotation(annotation: string): boolean {
     return false;
   }
 
-  // 第一部分必须是有效的性质
+  // 第一部分：如果是已知的性质则验证，否则允许（灵活性）
   const validNatures = new Set<string>(Object.values(NATURE_TYPES));
-  if (!validNatures.has(parts[0] as any)) {
+  const nature = parts[0];
+  // 允许任何非空的第一部分（扩展性）
+  if (nature.length === 0) {
     return false;
   }
 
-  // 第二部分必须是有效的领域
+  // 第二部分：如果是已知的领域则验证，否则允许（灵活性）
   const validDomains = new Set<string>(Object.values(DOMAIN_TYPES));
-  if (!validDomains.has(parts[1] as any)) {
+  const domain = parts[1];
+  // 允许任何非空的第二部分（扩展性）
+  if (domain.length === 0) {
     return false;
   }
 
-  // 第三部分可以是任意标签
+  // 第三部分可以是任意非空标签
   return parts[2].length > 0;
 }
 

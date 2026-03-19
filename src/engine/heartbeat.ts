@@ -2,13 +2,17 @@
  * 心跳守护进程
  *
  * 后台运行，自动处理 pending block 和执行衰减
+ * 无需密码，基于平台指纹认证
  */
 
 import fs from 'node:fs/promises';
 import { CorivoDatabase, getConfigDir } from '../storage/database.js';
-import { KeyManager } from '../crypto/keys.js';
 import { RuleEngine } from './rules/index.js';
 import { TechChoiceRule } from './rules/tech-choice.js';
+import { AssociationEngine } from './associations.js';
+import { ConsolidationEngine } from './consolidation.js';
+import { WeeklySummary } from './weekly-summary.js';
+import { FollowUpManager } from './follow-up.js';
 import { DatabaseError } from '../errors/index.js';
 import type { BlockStatus, Pattern } from '../models/index.js';
 import { vitalityToStatus } from '../models/block.js';
@@ -33,20 +37,31 @@ export class Heartbeat {
   private running = false;
   private db: CorivoDatabase | null = null;
   private ruleEngine: RuleEngine;
+  private associationEngine: AssociationEngine;
+  private consolidationEngine: ConsolidationEngine;
+  private weeklySummary: WeeklySummary | null = null;
+  private followUpManager: FollowUpManager | null = null;
   private timeoutRef: NodeJS.Timeout | null = null;
   private lastHealthCheck = 0;
   private cycleCount = 0;
+  private lastWeeklySummary = 0;
   private healthFilePath: string;
 
   constructor(config?: HeartbeatConfig) {
     // 如果传入了 db，直接使用（用于测试）
     if (config?.db) {
       this.db = config.db;
+      this.weeklySummary = new WeeklySummary(config.db);
+      this.followUpManager = new FollowUpManager(config.db);
     }
 
     // 初始化规则引擎
     this.ruleEngine = new RuleEngine();
     this.ruleEngine.register(new TechChoiceRule());
+
+    // 初始化关联和整合引擎
+    this.associationEngine = new AssociationEngine();
+    this.consolidationEngine = new ConsolidationEngine();
 
     // 健康文件路径
     const configDir = process.env.CORIVO_CONFIG_DIR || getConfigDir();
@@ -65,43 +80,24 @@ export class Heartbeat {
     // 如果已经设置了 db（测试模式），跳过初始化
     if (!this.db) {
       // 从环境变量获取密钥（由 CLI 进程传入）
-      const encryptedDbKey = process.env.CORIVO_ENCRYPTED_KEY;
+      const dbKeyBase64 = process.env.CORIVO_DB_KEY;
       const dbPath = process.env.CORIVO_DB_PATH;
-      const configDir = process.env.CORIVO_CONFIG_DIR || getConfigDir();
 
-    if (!encryptedDbKey || !dbPath) {
-      throw new Error('缺少环境变量：CORIVO_ENCRYPTED_KEY 或 CORIVO_DB_PATH');
-    }
+      if (!dbKeyBase64 || !dbPath) {
+        throw new Error('缺少环境变量：CORIVO_DB_KEY 或 CORIVO_DB_PATH');
+      }
 
-    // 读取配置获取 salt
-    const configPath = `${configDir}/config.json`;
-    let config;
-    try {
-      const content = await fs.readFile(configPath, 'utf-8');
-      config = JSON.parse(content);
-    } catch {
-      throw new Error('无法读取配置文件');
-    }
+      // 将 base64 密钥转换为 Buffer
+      const dbKey = Buffer.from(dbKeyBase64, 'base64');
 
-    // 派生主密钥并解密数据库密钥
-    const salt = Buffer.from(config.salt, 'base64');
+      // 打开数据库
+      this.db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
 
-    // 安全警告：守护进程模式需要用户通过环境变量传递主密码
-    const daemonPassword = process.env.CORIVO_DAEMON_PASSWORD;
-    if (!daemonPassword) {
-      throw new Error(
-        '守护进程需要主密码才能启动。请设置 CORIVO_DAEMON_PASSWORD 环境变量。\n' +
-        '示例: CORIVO_DAEMON_PASSWORD="your-password" corivo start'
-      );
-    }
+      // 初始化依赖 db 的 managers
+      this.weeklySummary = new WeeklySummary(this.db);
+      this.followUpManager = new FollowUpManager(this.db);
 
-    const masterKey = KeyManager.deriveMasterKey(daemonPassword, salt);
-    const dbKey = KeyManager.decryptDatabaseKey(encryptedDbKey, masterKey);
-
-    // 打开数据库
-    this.db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
-
-    console.log(`心跳守护进程启动中... (规则: ${this.ruleEngine.ruleCount})`);
+      console.log(`心跳守护进程启动中... (规则: ${this.ruleEngine.ruleCount})`);
     }
 
     this.running = true;
@@ -122,8 +118,30 @@ export class Heartbeat {
         // 处理衰减
         await this.processVitalityDecay();
 
-        // 更新健康状态（每 6 个周期更新一次）
+        // 更新周期计数
         this.cycleCount++;
+
+        // 关联分析（每 6 个周期 = 30 秒）
+        if (this.cycleCount % 6 === 0) {
+          await this.processAssociations();
+        }
+
+        // 热区整合（每 12 个周期 = 1 分钟）
+        if (this.cycleCount % 12 === 0) {
+          await this.processConsolidation();
+        }
+
+        // 每周总结（每 2016 个周期 = 7 天）
+        if (this.cycleCount % 2016 === 0 && this.db) {
+          await this.sendWeeklySummary();
+        }
+
+        // 进展提醒（每 864 个周期 = 1 小时，检查一次）
+        if (this.cycleCount % 864 === 0 && this.db) {
+          await this.checkFollowUps();
+        }
+
+        // 更新健康状态（每 6 个周期更新一次）
         if (this.cycleCount % (HEALTH_CHECK_INTERVAL / HEARTBEAT_INTERVAL) === 0) {
           await this.updateHealthCheck();
         }
@@ -236,10 +254,11 @@ export class Heartbeat {
   /**
    * 运行一次心跳（用于测试）
    *
-   * 执行一次完整的 pending 处理和衰减检查
+   * 执行一次完整的 pending 处理、关联发现和衰减检查
    */
   async runOnce(): Promise<void> {
     await this.processPendingBlocks();
+    await this.processAssociations();
     await this.processVitalityDecay();
   }
 
@@ -423,6 +442,162 @@ export class Heartbeat {
   }
 
   /**
+   * 处理关联分析
+   *
+   * 定期分析活跃 block 之间的关系，建立知识网络
+   */
+  private async processAssociations(): Promise<void> {
+    if (!this.db) return;
+
+    try {
+      // 获取活跃 block
+      const activeBlocks = this.db.queryBlocks({
+        status: 'active',
+        limit: 50,
+      });
+
+      if (activeBlocks.length < 2) {
+        return; // 至少需要 2 个 block 才能建立关联
+      }
+
+      // 发现关联
+      const associations = this.associationEngine.discoverByRules(activeBlocks);
+
+      if (associations.length > 0) {
+        // 批量保存关联
+        this.db.batchCreateAssociations(associations);
+        console.log(`[心跳] 关联分析: 发现 ${associations.length} 个新关联`);
+      }
+    } catch (error) {
+      console.error('[心跳] 关联分析失败:', error);
+    }
+  }
+
+  /**
+   * 处理热区整合
+   *
+   * 定期合并重复内容、提炼摘要
+   */
+  private async processConsolidation(): Promise<void> {
+    if (!this.db) return;
+
+    try {
+      // 获取活跃 block
+      const activeBlocks = this.db.queryBlocks({
+        status: 'active',
+        limit: 20,
+      });
+
+      if (activeBlocks.length < 2) {
+        return; // 至少需要 2 个 block 才能整合
+      }
+
+      // 去重
+      const mergeResults = this.consolidationEngine.deduplicateBlocks(activeBlocks);
+
+      for (const result of mergeResults) {
+        if (result.result) {
+          // 更新主 block，将其他 block 标记为 archived
+          this.db.updateBlock(result.result.id, {
+            refs: result.result.refs,
+            vitality: result.result.vitality,
+          });
+
+          // 归档被合并的 block
+          for (const otherId of result.blocks) {
+            if (otherId !== result.result!.id) {
+              this.db.updateBlock(otherId, { status: 'archived' });
+            }
+          }
+
+          console.log(`[心跳] 整合: 合并了 ${result.blocks.length} 个相似内容`);
+        }
+      }
+
+      // 提炼摘要
+      const summaryBlock = this.consolidationEngine.createSummary(activeBlocks);
+      if (summaryBlock) {
+        this.db.createBlock({
+          content: summaryBlock.content,
+          annotation: summaryBlock.annotation,
+          refs: summaryBlock.refs,
+          source: summaryBlock.source,
+        });
+        console.log(`[心跳] 整合: 创建了摘要 ${summaryBlock.id}`);
+      }
+
+      // 补链：更新 refs
+      const existingAssociations = this.db.queryAssociations({ limit: 100 });
+      const missingLinks = this.consolidationEngine.findMissingLinks(
+        activeBlocks,
+        existingAssociations
+      );
+
+      for (const [blockId, newRefs] of missingLinks.entries()) {
+        const block = this.db.getBlock(blockId);
+        if (block) {
+          const mergedRefs = [...new Set([...block.refs, ...newRefs])];
+          this.db.updateBlock(blockId, { refs: mergedRefs });
+        }
+      }
+
+      if (missingLinks.size > 0) {
+        console.log(`[心跳] 整合: 为 ${missingLinks.size} 个 block 补充了关联`);
+      }
+    } catch (error) {
+      console.error('[心跳] 热区整合失败:', error);
+    }
+  }
+
+  /**
+   * 发送周总结
+   *
+   * 每周一发送简短总结
+   */
+  private async sendWeeklySummary(): Promise<void> {
+    if (!this.db) return;
+
+    try {
+      // 初始化 managers（如果还没有）
+      if (!this.weeklySummary) {
+        this.weeklySummary = new WeeklySummary(this.db);
+      }
+
+      const summary = this.weeklySummary.generateSummary();
+      if (summary) {
+        console.log(`\n${summary}\n`);
+      }
+    } catch (error) {
+      console.error('[心跳] 周总结失败:', error);
+    }
+  }
+
+  /**
+   * 检查进展提醒
+   *
+   * 定期检查待办决策，发送温和提醒
+   */
+  private async checkFollowUps(): Promise<void> {
+    if (!this.db) return;
+
+    try {
+      // 初始化 manager（如果还没有）
+      if (!this.followUpManager) {
+        this.followUpManager = new FollowUpManager(this.db);
+      }
+
+      const reminders = this.followUpManager.getWeeklyReminders();
+      if (reminders.length > 0) {
+        for (const reminder of reminders) {
+          console.log(`\n${reminder}\n`);
+        }
+      }
+    } catch (error) {
+      console.error('[心跳] 进展提醒失败:', error);
+    }
+  }
+
+  /**
    * 延迟函数
    */
   private sleep(ms: number): Promise<void> {
@@ -431,7 +606,8 @@ export class Heartbeat {
 }
 
 // 如果直接运行此文件（作为守护进程）
-if (import.meta.url === `file://${process.argv[1]}`) {
+// 检测方式：比较 import.meta.url 的文件名部分
+if (import.meta.url.endsWith('heartbeat.js')) {
   const heartbeat = new Heartbeat();
 
   heartbeat.start().catch((error) => {

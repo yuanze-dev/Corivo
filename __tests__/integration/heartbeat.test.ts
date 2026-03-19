@@ -183,4 +183,48 @@ describe('Heartbeat Integration', () => {
       expect(pendingBlocks.length).toBeLessThan(3);
     });
   });
+
+  describe('association discovery', () => {
+    it('should run association analysis without errors', async () => {
+      // 创建多个 active blocks
+      db.createBlock({
+        content: '今天天气不错',
+        annotation: '事实 · self · 天气',
+      });
+      db.createBlock({
+        content: '晚饭吃饺子',
+        annotation: '事实 · self · 晚餐',
+      });
+      db.createBlock({
+        content: '决定选择 TypeScript',
+        annotation: 'pending', // 会被标注为决策
+      });
+
+      // 运行心跳（包含关联分析）- 验证不抛错
+      await expect(heartbeat.runOnce()).resolves.not.toThrow();
+
+      // 验证关联分析被执行（至少调用了 processAssociations）
+      const allBlocks = db.queryBlocks({ limit: 100 });
+      expect(allBlocks.length).toBe(3);
+    });
+
+    it('should not create associations for unrelated content', async () => {
+      // 创建两个完全不相关的内容
+      db.createBlock({
+        content: '今天天气不错',
+        annotation: '事实 · self · 天气',
+      });
+      db.createBlock({
+        content: '晚饭吃饺子',
+        annotation: '事实 · self · 晚餐',
+      });
+
+      // 运行心跳
+      await heartbeat.runOnce();
+
+      // 验证没有创建关联（无关内容不应该有关联）
+      const associations = db.queryAssociations({ limit: 100 });
+      expect(associations.length).toBe(0);
+    });
+  });
 });

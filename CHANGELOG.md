@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.4.1] - 2026-03-19
+
+### Fixed
+- 心跳 `runOnce()` 方法现在正确调用关联发现（`processAssociations()`）
+- 标注验证放宽：允许任意三段式格式，仅检查结构而非特定类型值
+- 修复边界情况测试中过时的验证用例
+
 ## [0.10.4.0] - 2026-03-19
 
 ### Added

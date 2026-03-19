@@ -52,4 +52,4 @@ In QA mode, flag any code that doesn't match DESIGN.md.
 
 ---
 
-最后更新：2025-03-18
+最后更新：2026-03-19

@@ -34,6 +34,19 @@ corivo start
 
 # 停止心跳
 corivo stop
+
+# 注入规则到项目的 CLAUDE.md（Claude Code 集成）
+corivo inject
+```
+
+## Claude Code 集成
+
+Corivo 支持 `--no-password` 选项用于非交互式环境（如 Claude Code）：
+
+```bash
+corivo save "内容" --annotation "决策 · project" --no-password
+corivo query "关键词" --no-password
+corivo status --no-password
 ```
 
 ## 开发

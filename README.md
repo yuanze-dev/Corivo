@@ -9,10 +9,9 @@
 **或者换个说法**：现在你可以开始交硅基朋友了。
 
 **推荐给朋友**：
-> 把这行发给你的 Claude Code：
-> `/plugin install xiaolin26/corivo`
+> 你的 Claude 也能有记忆：https://github.com/xiaolin26/Corivo
 >
-> 安装后你的 Claude 就有记忆了，说"记住..."就行
+> 安装后说"记住..."就行，它会记住你和 AI 的所有对话
 
 ---
 

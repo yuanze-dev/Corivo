@@ -1,6 +1,6 @@
 {
   "name": "corivo",
-  "version": "0.10.4",
+  "version": "0.10.4.1",
   "description": "你的赛博伙伴 — 记忆存储与智能推送",
   "type": "module",
   "main": "dist/index.js",

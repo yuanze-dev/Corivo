@@ -30,3 +30,6 @@ prebuilds/
 .idea/
 *.swp
 *.swo
+
+# Worktrees
+.worktrees/

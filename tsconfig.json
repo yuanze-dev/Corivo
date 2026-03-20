@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/cli" },
-    { "path": "./packages/plugins" }
+    { "path": "./packages/plugins" },
+    { "path": "./packages/solver" }
   ]
 }

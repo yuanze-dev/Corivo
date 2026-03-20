@@ -42,7 +42,7 @@ export function generateFirstPush(
 
   if (isFull && profile.blockCount >= minBlocks) {
     // 完整版：展示扫描到的信息
-    lines.push('我刚花了几秒钟看了看你的工作环境，已经记住了一些关于你的事：\n');
+    lines.push('我刚花一点时间看了看你的工作环境，已经记住了一些关于你的事：\n');
     lines.push(formatProfile(profile));
     lines.push('');
     lines.push('这些对吗？你可以随时纠正我，说「记住，...」就行。');

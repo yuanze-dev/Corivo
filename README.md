@@ -143,11 +143,77 @@ corivo status
 
 ---
 
+## 平台支持
+
+Corivo 支持多个 AI 编码工具：
+
+| 平台 | 状态 | 安装方式 |
+|-----|------|---------|
+| **Claude Code** | ✅ 完整支持 | `/plugin install xiaolin26/Corivo` |
+| **Cursor** | ✅ 兼容 | 同 Claude Code（支持 `.cursorrules`） |
+| **OpenAI Codex** | ✅ 支持 | `$skill-installer corivo` |
+| **VS Code** | 🚧 开发中 | `code --install-extension corivo.vsix` |
+
+### Claude Code 插件
+
+```bash
+# 安装 Corivo CLI
+npm install -g corivo
+corivo init
+
+# 安装插件
+/plugin install xiaolin26/Corivo
+```
+
+插件功能：
+- **保存记忆** - 说"记住..."自动保存
+- **查询记忆** - 问"我之前说过..."自动检索
+- **状态显示** - 会话启动时显示记忆统计
+
+详细说明：[packages/plugins/README.md](./packages/plugins/README.md)
+
+### Codex Skills
+
+```bash
+# 安装 Corivo CLI
+npm install -g corivo
+corivo init
+
+# 安装 Skills（从 packages/codex/）
+$skill-installer corivo
+```
+
+配置 `~/.codex/config.toml`：
+```toml
+[[skills.config]]
+path = "~/.codex/skills/corivo/SKILL.md"
+enabled = true
+```
+
+详细说明：[packages/codex/README.md](./packages/codex/README.md)
+
+### VS Code 扩展
+
+```bash
+# 安装 Corivo CLI
+npm install -g corivo
+corivo init
+
+# 安装扩展（从 packages/vscode/）
+code --install-extension corivo-0.11.0.vsix
+```
+
+详细说明：[packages/vscode/README.md](./packages/vscode/README.md)
+
+---
+
 ## 文档
 
-- [完整设计文档](./v0.10/README.md) - 了解它是如何工作的
-- [插件说明](./corivo-plugin/README.md) - Claude Code 集成详情
-- [使用示例](./corivo-plugin/EXAMPLES.md) - 更多对话场景
+- [完整设计文档](./docs/rfc/v0.10/README.md) - 了解它是如何工作的
+- [Claude Code 插件](./packages/plugins/README.md) - Claude Code 集成详情
+- [Codex Skills](./packages/codex/README.md) - Codex 集成说明
+- [VS Code 扩展](./packages/vscode/README.md) - VS Code 集成说明
+- [使用示例](./packages/plugins/EXAMPLES.md) - 更多对话场景
 - [内测说明](./BETA.md) - 内测邀请和反馈渠道
 
 ---

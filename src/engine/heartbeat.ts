@@ -31,6 +31,20 @@ export interface HeartbeatConfig {
 }
 
 /**
+ * 首次运行配置
+ */
+export interface FirstRunConfig {
+  /** 最大 pending blocks 数量（默认 50） */
+  maxPendingBlocks?: number;
+  /** 时间限制（毫秒，默认 8000） */
+  timeLimit?: number;
+  /** 是否跳过衰减 */
+  skipDecay?: boolean;
+  /** 是否跳过冷区整合 */
+  skipColdZone?: boolean;
+}
+
+/**
  * 心跳引擎
  */
 export class Heartbeat {
@@ -185,6 +199,96 @@ export class Heartbeat {
 
     // 清理健康文件
     await this.cleanupHealthCheck();
+  }
+
+  /**
+   * 首次运行 - 加速模式
+   *
+   * 用于安装后立即执行一轮心跳，快速处理 Cold Scan 的结果
+   */
+  async runFirstRun(config: FirstRunConfig = {}): Promise<{
+    processedBlocks: number;
+    elapsedTime: number;
+  }> {
+    const {
+      maxPendingBlocks = 50,
+      timeLimit = 8000,
+      skipDecay = true,
+      skipColdZone = true,
+    } = config;
+
+    console.log('[corivo] 正在认识你...');
+
+    const startTime = Date.now();
+    let processedBlocks = 0;
+
+    try {
+      // 初始化数据库（如果还没有）
+      if (!this.db) {
+        const dbKeyBase64 = process.env.CORIVO_DB_KEY;
+        const dbPath = process.env.CORIVO_DB_PATH;
+
+        if (!dbKeyBase64 || !dbPath) {
+          throw new Error('缺少环境变量：CORIVO_DB_KEY 或 CORIVO_DB_PATH');
+        }
+
+        const dbKey = Buffer.from(dbKeyBase64, 'base64');
+        this.db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
+      }
+
+      // 处理 pending blocks（放宽数量限制）
+      const pending = this.db.queryBlocks({
+        annotation: 'pending',
+        limit: maxPendingBlocks,
+      });
+
+      for (const block of pending) {
+        // 检查时间限制
+        if (Date.now() - startTime > timeLimit) {
+          console.log(`[corivo] 首次运行超时，已处理 ${processedBlocks}/${pending.length} 条`);
+          break;
+        }
+
+        // 应用规则引擎标注
+        const pattern = this.ruleEngine.extract(block.content);
+        const annotation = pattern
+          ? `决策 · ${pattern.type} · ${pattern.decision}`
+          : '知识 · 未分类 · 一般';
+
+        // 更新 block
+        this.db.updateBlock(block.id, {
+          annotation,
+          status: vitalityToStatus(100), // 首次运行给予高生命力
+        });
+
+        processedBlocks++;
+      }
+
+      // 创建关联（快速模式）
+      if (!skipColdZone && this.db) {
+        const blocks = this.db.queryBlocks({ limit: 100 });
+        const associations = this.associationEngine.discoverByRules(blocks);
+
+        for (const assoc of associations) {
+          try {
+            this.db.createAssociation(assoc);
+          } catch {
+            // 忽略重复关联错误
+          }
+        }
+      }
+
+      // 跳过衰减（首次运行没有历史数据）
+
+    } catch (error) {
+      console.error('[corivo] 首次运行出错:', error);
+    }
+
+    const elapsedTime = Date.now() - startTime;
+
+    console.log(`[corivo] 首次运行完成，处理了 ${processedBlocks} 条信息`);
+
+    return { processedBlocks, elapsedTime };
   }
 
   /**

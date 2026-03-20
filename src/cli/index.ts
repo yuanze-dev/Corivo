@@ -33,6 +33,8 @@ import { setupPasswordCommand } from './commands/setup-password.js';
 import { unlockCommand } from './commands/unlock.js';
 import { verifyIdentityCommand } from './commands/verify-identity.js';
 import { coldScanCommand } from './commands/cold-scan.js';
+import { pushCommand } from './commands/push.js';
+import { firstRunCommand } from './commands/heartbeat-first-run.js';
 
 const program = new Command();
 
@@ -134,6 +136,8 @@ program
   .action((options) => verifyIdentityCommand(options));
 
 program.addCommand(coldScanCommand);
+program.addCommand(pushCommand);
+program.addCommand(firstRunCommand);
 
 // 错误处理
 program.configureOutput({

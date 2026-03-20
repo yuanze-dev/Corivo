@@ -99,13 +99,16 @@ corivo inject --eject
 ```bash
 corivo update check
 ```
-- [ ] 显示当前版本
-- [ ] 显示最新版本（如果有网络）
+- [x] 显示当前版本 (0.11.0)
+- [ ] 显示最新版本（corivo.ai 未配置，预期失败）
 
 ```bash
 corivo update status
 ```
-- [ ] 显示更新记录（如果有）
+- [x] 显示更新记录（有记录时正确显示）
+- [x] 无记录时显示"暂无更新记录"
+
+**注意**: 更新服务器功能正常，域名 corivo.ai 尚未配置，为预期行为
 
 ## Phase 7: 卸载测试
 

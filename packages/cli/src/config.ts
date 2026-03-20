@@ -103,6 +103,48 @@ export async function isInitialized(configDir?: string): Promise<boolean> {
   return config !== null;
 }
 
+/**
+ * Solver 同步配置（存于 ~/.corivo/solver.json）
+ */
+export interface SolverConfig {
+  server_url: string;
+  shared_secret: string;
+  site_id: string;
+  last_push_version: number;
+  last_pull_version: number;
+}
+
+/**
+ * 加载 solver 配置
+ */
+export async function loadSolverConfig(configDir?: string): Promise<SolverConfig | null> {
+  const dir = configDir || getConfigDir();
+  const solverPath = path.join(dir, 'solver.json');
+  try {
+    const content = await fs.readFile(solverPath, 'utf-8');
+    const config = JSON.parse(content) as SolverConfig;
+    if (!config.server_url || !config.shared_secret || !config.site_id) {
+      return null;
+    }
+    return config;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 保存 solver 配置
+ */
+export async function saveSolverConfig(
+  config: SolverConfig,
+  configDir?: string
+): Promise<void> {
+  const dir = configDir || getConfigDir();
+  await fs.mkdir(dir, { recursive: true });
+  const solverPath = path.join(dir, 'solver.json');
+  await fs.writeFile(solverPath, JSON.stringify(config, null, 2));
+}
+
 export default {
   loadConfig,
   saveConfig,

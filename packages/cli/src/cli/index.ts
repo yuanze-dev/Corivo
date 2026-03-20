@@ -37,6 +37,7 @@ import { pushCommand } from './commands/push.js';
 import { firstRunCommand } from './commands/heartbeat-first-run.js';
 import { daemonCommand } from './commands/daemon.js';
 import { updateCommand } from './commands/update.js';
+import { createSyncCommand } from './commands/sync.js';
 
 const program = new Command();
 
@@ -144,6 +145,7 @@ program.addCommand(pushCommand);
 program.addCommand(firstRunCommand);
 program.addCommand(daemonCommand);
 program.addCommand(updateCommand);
+program.addCommand(createSyncCommand());
 
 // 错误处理
 program.configureOutput({

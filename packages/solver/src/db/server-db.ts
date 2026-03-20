@@ -30,7 +30,7 @@ function createSchema(db: SQLiteDatabase): void {
     CREATE TABLE IF NOT EXISTS accounts (
       identity_id TEXT PRIMARY KEY,
       fingerprints TEXT NOT NULL,
-      shared_secret_hash TEXT NOT NULL,
+      shared_secret TEXT NOT NULL,
       salt TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       last_seen_at INTEGER NOT NULL

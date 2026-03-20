@@ -1,19 +1,13 @@
 import tseslint from 'typescript-eslint'
-import tsEslint from '@typescript-eslint/eslint-plugin'
 
-export default [
+export default tseslint.config(
   {
     ignores: ['dist/**', '**/*.test.ts', 'node_modules/**']
   },
   {
     files: ['packages/**/*.ts'],
-    languageOptions: {
-      ecmaVersion: 2022,
-      sourceType: 'module'
-    },
-    plugins: ['@typescript-eslint'],
+    extends: [...tseslint.configs.recommended],
     rules: {
-      ...tseslint.configs.recommended.rules,
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/explicit-function-return-type': 'off',
@@ -21,4 +15,4 @@ export default [
       '@typescript-eslint/no-non-null-assertion': 'off'
     }
   }
-]
+)

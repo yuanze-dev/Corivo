@@ -15,8 +15,9 @@ describe('ContextPusher', () => {
   let pusher: ContextPusher;
 
   beforeEach(async () => {
-    // 创建临时数据库
-    dbPath = `/tmp/corivo-test-${Date.now()}.db`;
+    // 创建临时数据库（使用随机数避免冲突）
+    const randomId = Math.random().toString(36).slice(2, 10);
+    dbPath = `/tmp/corivo-test-${randomId}.db`;
     const dbKey = KeyManager.generateDatabaseKey();
 
     // 初始化数据库（包括 FTS5）
@@ -80,8 +81,16 @@ describe('ContextPusher', () => {
   });
 
   afterEach(async () => {
+    // 关闭当前数据库实例
     db.close();
-    CorivoDatabase.closeAll();
+
+    // 清理单例缓存中当前路径的实例
+    const instances = (CorivoDatabase as any).instances;
+    if (instances && instances.has(dbPath)) {
+      instances.delete(dbPath);
+    }
+
+    // 删除文件
     await fs.unlink(dbPath).catch(() => {});
   });
 

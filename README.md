@@ -152,7 +152,6 @@ Corivo 支持多个 AI 编码工具：
 | **Claude Code** | ✅ 完整支持 | `/plugin install xiaolin26/Corivo` |
 | **Cursor** | ✅ 兼容 | 同 Claude Code（支持 `.cursorrules`） |
 | **OpenAI Codex** | ✅ 支持 | `$skill-installer corivo` |
-| **VS Code** | 🚧 开发中 | `code --install-extension corivo.vsix` |
 
 ### Claude Code 插件
 
@@ -191,19 +190,6 @@ enabled = true
 ```
 
 详细说明：[packages/codex/README.md](./packages/codex/README.md)
-
-### VS Code 扩展
-
-```bash
-# 安装 Corivo CLI
-npm install -g corivo
-corivo init
-
-# 安装扩展（从 packages/vscode/）
-code --install-extension corivo-0.11.0.vsix
-```
-
-详细说明：[packages/vscode/README.md](./packages/vscode/README.md)
 
 ---
 

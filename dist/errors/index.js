@@ -119,6 +119,30 @@ export class ProcessError extends CorivoError {
     }
 }
 /**
+ * 身份错误
+ */
+export class IdentityError extends CorivoError {
+    constructor(message, context = {}) {
+        super('IDENTITY_ERROR', message, context);
+        this.name = 'IdentityError';
+    }
+    getUserMessage() {
+        return `身份错误：${this.message}`;
+    }
+}
+/**
+ * 指纹错误
+ */
+export class FingerprintError extends CorivoError {
+    constructor(message, context = {}) {
+        super('FINGERPRINT_ERROR', message, context);
+        this.name = 'FingerprintError';
+    }
+    getUserMessage() {
+        return `指纹错误：${this.message}`;
+    }
+}
+/**
  * 错误码枚举
  */
 export const ERROR_CODES = {

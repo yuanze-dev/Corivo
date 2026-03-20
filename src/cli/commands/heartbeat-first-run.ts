@@ -10,7 +10,7 @@ import { Heartbeat } from '../../engine/heartbeat.js';
 export const firstRunCommand = new Command('first-run');
 
 firstRunCommand
-  .description('首次运行 - 加速处理 Cold Scan 结果')
+  .description('首次运行 - 整理记住的事')
   .option('-m, --max-pending <number>', '最大 pending 数量', '50')
   .option('-t, --time-limit <number>', '时间限制（毫秒）', '8000')
   .option('--no-decay', '跳过衰减')
@@ -21,7 +21,7 @@ firstRunCommand
       console.log(
         chalk.cyan('══════════════════════════════════════════')
       );
-      console.log(chalk.cyan('     Corivo 首次运行                   '));
+      console.log(chalk.cyan('     正在整理记忆...                    '));
       console.log(
         chalk.cyan('══════════════════════════════════════════')
       );
@@ -38,11 +38,11 @@ firstRunCommand
 
       console.log('');
       console.log(chalk.green('══════════════════════════════════════════'));
-      console.log(chalk.green('     首次运行完成                        '));
+      console.log(chalk.green('     整理完成！                          '));
       console.log(chalk.green('══════════════════════════════════════════'));
       console.log('');
-      console.log(`处理数量: ${result.processedBlocks}`);
-      console.log(`耗时: ${result.elapsedTime}ms`);
+      console.log(`处理了 ${result.processedBlocks} 条记忆`);
+      console.log(`用时: ${result.elapsedTime}ms`);
       console.log('');
     } catch (error) {
       console.error(chalk.red('错误:'), error);

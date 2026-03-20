@@ -1,7 +1,7 @@
 {
   "name": "corivo",
-  "version": "0.10.5",
-  "description": "你的赛博伙伴 — 记忆存储与智能推送",
+  "version": "0.11.0",
+  "description": "你的硅基同事 — 它只为你活着",
   "type": "module",
   "main": "dist/index.js",
   "bin": {

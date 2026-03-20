@@ -26,7 +26,7 @@
  * 如果未使用 SQLCipher 构建，pragma key 语句会被静默忽略，
  * 数据库将以明文存储（用户应依赖文件系统加密如 FileVault）。
  */
-import type { Block, CreateBlockInput, UpdateBlockInput, BlockFilter } from '../models/index.js';
+import type { Block, CreateBlockInput, UpdateBlockInput, BlockFilter, Association, CreateAssociationInput, AssociationFilter, AssociationStats } from '../models/index.js';
 /**
  * 数据库配置
  */
@@ -35,6 +35,8 @@ interface DatabaseConfig {
     path: string;
     /** 数据库密钥 */
     key: Buffer;
+    /** 是否启用加密（默认 false） */
+    enableEncryption?: boolean;
 }
 /**
  * SQLCipher 数据库封装
@@ -85,6 +87,8 @@ export declare class CorivoDatabase {
     private config;
     private db;
     private static instances;
+    private enableEncryption;
+    private useSQLCipher;
     private constructor();
     /**
      * 获取数据库实例（单例模式，连接池）
@@ -119,6 +123,12 @@ export declare class CorivoDatabase {
      * 初始化数据库
      */
     private initialize;
+    /**
+     * 尝试设置 SQLCipher 加密
+     *
+     * @returns 是否成功设置 SQLCipher
+     */
+    private trySetupSQLCipher;
     /**
      * 创建数据库表结构
      */
@@ -165,6 +175,55 @@ export declare class CorivoDatabase {
      * @returns 是否删除成功
      */
     deleteBlock(id: string): boolean;
+    /**
+     * 创建关联
+     *
+     * @param input - 关联创建参数
+     * @returns 创建的关联
+     */
+    createAssociation(input: CreateAssociationInput): Association;
+    /**
+     * 批量创建关联
+     *
+     * @param associations - 关联列表
+     * @returns 创建成功的数量
+     */
+    batchCreateAssociations(associations: CreateAssociationInput[]): number;
+    /**
+     * 查询关联
+     *
+     * @param filter - 查询过滤器
+     * @returns 关联列表
+     */
+    queryAssociations(filter?: AssociationFilter): Association[];
+    /**
+     * 获取 block 的所有关联（双向）
+     *
+     * @param blockId - Block ID
+     * @param minConfidence - 最低置信度
+     * @returns 关联列表
+     */
+    getBlockAssociations(blockId: string, minConfidence?: number): Association[];
+    /**
+     * 删除关联
+     *
+     * @param id - 关联 ID
+     * @returns 是否删除成功
+     */
+    deleteAssociation(id: string): boolean;
+    /**
+     * 删除 block 的所有关联
+     *
+     * @param blockId - Block ID
+     * @returns 删除的关联数量
+     */
+    deleteBlockAssociations(blockId: string): number;
+    /**
+     * 获取关联统计
+     *
+     * @returns 统计数据
+     */
+    getAssociationStats(): AssociationStats;
     /**
      * 查询 Blocks
      *
@@ -229,6 +288,17 @@ export declare class CorivoDatabase {
      * 将数据库行转换为 Block 对象
      */
     private rowToBlock;
+    /**
+     * 将数据库行转换为 Association 对象
+     */
+    private rowToAssociation;
+    /**
+     * 获取加密信息（用于状态显示）
+     */
+    getEncryptionInfo(): {
+        enabled: boolean;
+        method: 'sqlcipher' | 'application' | 'none';
+    };
 }
 /**
  * 数据库工具函数

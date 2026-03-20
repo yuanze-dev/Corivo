@@ -23,7 +23,7 @@ corivo init
 
 ### curl | sh 安装方式（推荐）
 ```bash
-curl -fsSL https://get.corivo.dev | sh
+curl -fsSL https://corivo.ai | sh
 ```
 - [ ] 脚本下载成功
 - [ ] 自动检测运行时（Bun/Node）

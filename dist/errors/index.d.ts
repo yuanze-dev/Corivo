@@ -66,6 +66,20 @@ export declare class ProcessError extends CorivoError {
     getUserMessage(): string;
 }
 /**
+ * 身份错误
+ */
+export declare class IdentityError extends CorivoError {
+    constructor(message: string, context?: Record<string, unknown>);
+    getUserMessage(): string;
+}
+/**
+ * 指纹错误
+ */
+export declare class FingerprintError extends CorivoError {
+    constructor(message: string, context?: Record<string, unknown>);
+    getUserMessage(): string;
+}
+/**
  * 错误码枚举
  */
 export declare const ERROR_CODES: {

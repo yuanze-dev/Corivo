@@ -1,7 +1,13 @@
 /**
  * CLI 命令 - init
  *
- * 初始化 Corivo，设置密码并创建数据库
+ * 初始化 Corivo，基于平台指纹创建身份
+ *
+ * v0.10+ 更新：
+ * - 基于平台指纹的用户身份识别（无需密码）
+ * - 跨设备身份关联
+ * - 数据库密钥明文存储（依赖文件系统权限）
+ * - init 后自动启动心跳守护进程
  */
 
 import fs from 'node:fs/promises';
@@ -10,7 +16,12 @@ import path from 'node:path';
 import { KeyManager } from '../../crypto/keys.js';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
 import { FileSystemError } from '../../errors/index.js';
-import { readPassword } from '../utils/password.js';
+import {
+  initializeIdentity,
+  getIdentityId,
+  type Fingerprint,
+} from '../../identity/index.js';
+import { startCommand } from './start.js';
 
 /**
  * 退出并清理
@@ -24,7 +35,7 @@ function exit(code = 0): never {
  */
 export async function initCommand(): Promise<void> {
   console.log('\n═══════════════════════════════════════════════════════');
-  console.log('           欢迎使用 Corivo — 你的赛博伙伴');
+  console.log('           Corivo — 一个为你而活着的数字伙伴');
   console.log('═══════════════════════════════════════════════════════\n');
 
   // 检查是否已初始化
@@ -46,35 +57,48 @@ export async function initCommand(): Promise<void> {
     throw new FileSystemError(`无法创建配置目录: ${configDir}`, { cause: error });
   }
 
-  // 输入密码
-  console.log('请设置主密码（用于加密数据库）\n');
-  console.log('⚠️  密码要求：至少 8 位，包含字母和数字\n');
+  // ========== 身份识别 (v0.10 新增) ==========
+  console.log('正在识别您的身份...\n');
 
-  const password1 = await readPassword('输入密码: ');
-  if (!password1) {
-    console.log('❌ 密码不能为空');
-    exit(1);
+  const identityResult = await initializeIdentity(configDir);
+
+  if (identityResult.isNew) {
+    console.log('✓ 创建新身份');
+    console.log(`  身份 ID: ${identityResult.identity.identity_id}`);
+  } else {
+    console.log('✓ 识别到现有身份');
+    console.log(`  身份 ID: ${identityResult.identity.identity_id}`);
   }
 
-  if (!KeyManager.validatePasswordStrength(password1)) {
-    console.log('❌ 密码强度不足：至少 8 位，包含字母和数字');
-    exit(1);
+  // 显示检测到的平台指纹
+  if (identityResult.fingerprints.length > 0) {
+    console.log('\n检测到的平台：');
+    for (const fp of identityResult.fingerprints) {
+      const platformNames: Record<string, string> = {
+        claude_code: 'Claude Code',
+        feishu: '飞书',
+        device: '设备',
+      };
+      const confidenceIcons: Record<string, string> = {
+        high: '🟢',
+        medium: '🟡',
+        low: '⚪',
+      };
+      console.log(
+        `  ${confidenceIcons[fp.confidence]} ${platformNames[fp.platform] || fp.platform}: ${fp.value.substring(0, 8)}...`
+      );
+    }
   }
 
-  const password2 = await readPassword('确认密码: ');
-  if (password1 !== password2) {
-    console.log('❌ 两次输入的密码不一致');
-    exit(1);
-  }
+  console.log('');
+  // ========== 身份识别结束 ==========
 
-  // 生成密钥
-  console.log('\n正在生成密钥...');
+  // 生成密钥（无需密码）
+  console.log('正在生成密钥...');
 
-  const salt = KeyManager.generateSalt();
-  const masterKey = KeyManager.deriveMasterKey(password1, salt);
   const dbKey = KeyManager.generateDatabaseKey();
-  const encryptedDbKey = KeyManager.encryptDatabaseKey(dbKey, masterKey);
-  const recoveryKey = KeyManager.generateRecoveryKey(masterKey);
+  // 将密钥转换为 base64 存储（明文）
+  const dbKeyBase64 = dbKey.toString('base64');
 
   // 创建数据库
   console.log('正在创建加密数据库...');
@@ -93,38 +117,41 @@ export async function initCommand(): Promise<void> {
   const config = {
     version: '0.10.0-mvp',
     created_at: new Date().toISOString(),
-    salt: salt.toString('base64'),
-    encrypted_db_key: encryptedDbKey,
+    identity_id: identityResult.identity.identity_id, // 身份 ID
+    db_key: dbKeyBase64, // 明文数据库密钥
   };
 
   await fs.writeFile(configPath, JSON.stringify(config, null, 2));
 
-  // 显示恢复密钥
   console.log('\n═══════════════════════════════════════════════════════');
-  console.log('           ⚠️  重要：请妥善保管恢复密钥 ⚠️');
+  console.log('                  ✅ 初始化完成！');
   console.log('═══════════════════════════════════════════════════════\n');
-  console.log('您的恢复密钥（24 个单词，BIP39 标准，请手抄保存）：\n');
 
-  const recoveryWords = recoveryKey.split(' ');
-  console.log(`  ${recoveryWords.slice(0, 6).join('  ')}`);
-  console.log(`  ${recoveryWords.slice(6, 12).join('  ')}`);
-  console.log(`  ${recoveryWords.slice(12, 18).join('  ')}`);
-  console.log(`  ${recoveryWords.slice(18, 24).join('  ')}`);
+  console.log('🎯 Corivo 已准备就绪');
+  console.log('   身份 ID: ' + identityResult.identity.identity_id);
+  console.log('   数据库:   ' + dbPath);
+  console.log('\n💡 提示：');
+  console.log('   数据库密钥明文存储在本地，依赖文件系统权限保护');
+  console.log('   请确保你的用户目录安全（不与他人共享）\n');
 
-  console.log('\n⚠️  重要提示：');
-  console.log('  1. 请将这 24 个单词手抄在纸上，存放在安全的地方');
-  console.log('  2. 不要拍照、截图或存储在任何联网设备上');
-  console.log('  3. 任何人获得此密钥都可以访问您的 Corivo 数据');
-  console.log('  4. Corivo 团队也无法帮您恢复此密钥\n');
+  // ========== 自动启动心跳 ==========
+  console.log('🫀 正在启动心跳...');
 
-  await readPassword('\n按回车键确认已手抄恢复密钥...');
-  console.log('\n初始化完成！\n');
+  try {
+    // 启动心跳（无需用户交互）
+    await startCommand();
+    console.log('\n✨ Corivo 已苏醒！心跳将持续跳动，自动整理你的记忆。');
+  } catch (error) {
+    console.log('\n⚠️  心跳启动失败，你可以稍后手动启动：');
+    console.log('  corivo start\n');
+  }
 
   // 下一步提示
   console.log('下一步：');
   console.log('  corivo save --content "..." --annotation "性质 · 领域 · 标签"');
   console.log('  corivo query "..."');
   console.log('  corivo status');
+  console.log('  corivo stop    # 停止心跳（如需要）\n');
 
   exit(0);
 }

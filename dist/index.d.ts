@@ -1,7 +1,7 @@
 /**
- * Corivo - 你的赛博伙伴
+ * Corivo - 你的硅基同事
  *
- * 记忆存储与智能推送
+ * 它只为你活着
  */
 export * from './models';
 export * from './errors';

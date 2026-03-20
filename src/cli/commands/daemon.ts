@@ -13,7 +13,7 @@ import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '../../stor
 export const daemonCommand = new Command('daemon');
 
 daemonCommand
-  .description('守护进程管理（仅支持 macOS）')
+  .description('后台心跳管理（仅支持 macOS）')
   .command('start')
   .description('启动并注册守护进程')
   .action(async () => {
@@ -21,7 +21,7 @@ daemonCommand
 
     if (!manager) {
       console.log('');
-      console.log(chalk.yellow('守护进程功能仅支持 macOS'));
+      console.log(chalk.yellow('后台心跳功能仅支持 macOS'));
       console.log('');
       console.log('你可以使用以下命令手动启动心跳：');
       console.log('  corivo start');
@@ -31,7 +31,7 @@ daemonCommand
 
     console.log('');
     console.log(chalk.cyan('══════════════════════════════════════════'));
-    console.log(chalk.cyan('     Corivo 守护进程                     '));
+    console.log(chalk.cyan('     Corivo 后台心跳                     '));
     console.log(chalk.cyan('══════════════════════════════════════════'));
     console.log('');
 
@@ -70,7 +70,7 @@ daemonCommand
       );
 
       // 安装服务
-      console.log('正在注册守护进程...');
+      console.log('正在启动后台心跳...');
       const result = await manager.install({
         corivoBin: actualBin,
         dbKey,
@@ -78,12 +78,12 @@ daemonCommand
       });
 
       if (result.success) {
-        console.log(chalk.green('✔ 守护进程已启动'));
+        console.log(chalk.green('✔ 后台心跳已启动'));
         console.log('');
-        console.log('心跳将在后台持续运行。');
+        console.log('我会一直在后台默默工作。');
         console.log('');
         console.log('查看状态:  corivo daemon status');
-        console.log('停止进程:  corivo daemon stop');
+        console.log('停止心跳:  corivo daemon stop');
         console.log('');
       } else {
         console.log(chalk.red('✖ 启动失败:'), result.error);
@@ -100,24 +100,26 @@ daemonCommand
 
 daemonCommand
   .command('stop')
-  .description('停止守护进程')
+  .description('停止后台心跳')
   .action(async () => {
     const manager = await getDaemonManager();
 
     if (!manager) {
       console.log('');
-      console.log(chalk.yellow('守护进程功能仅支持 macOS'));
+      console.log(chalk.yellow('后台心跳功能仅支持 macOS'));
       console.log('');
       return;
     }
 
     console.log('');
-    console.log('正在停止守护进程...');
+    console.log('正在停止后台心跳...');
 
     const result = await manager.uninstall();
 
     if (result.success) {
-      console.log(chalk.green('✔ 守护进程已停止'));
+      console.log(chalk.green('✔ 后台心跳已停止'));
+      console.log('');
+      console.log('期待下次与你一起工作！');
       console.log('');
     } else {
       console.log(chalk.red('✖ 停止失败:'), result.error);
@@ -127,13 +129,13 @@ daemonCommand
 
 daemonCommand
   .command('status')
-  .description('查看守护进程状态')
+  .description('查看后台心跳状态')
   .action(async () => {
     const manager = await getDaemonManager();
 
     if (!manager) {
       console.log('');
-      console.log(chalk.yellow('守护进程功能仅支持 macOS'));
+      console.log(chalk.yellow('后台心跳功能仅支持 macOS'));
       console.log('');
       return;
     }
@@ -141,42 +143,43 @@ daemonCommand
     const status = await manager.getStatus();
 
     console.log('');
-    console.log(chalk.cyan('Corivo 守护进程状态'));
+    console.log(chalk.cyan('Corivo 后台心跳状态'));
     console.log('');
 
     if (status.loaded) {
-      console.log(`状态: ${status.running ? chalk.green('运行中') : chalk.yellow('已加载但未运行')}`);
+      console.log(`状态: ${status.running ? chalk.green('正在工作') : chalk.yellow('已就绪但未运行')}`);
       if (status.pid) {
         console.log(`PID: ${status.pid}`);
       }
     } else {
-      console.log(`状态: ${chalk.gray('未安装')}`);
+      console.log(`状态: ${chalk.gray('未启动')}`);
     }
 
     console.log('');
 
     if (!status.loaded) {
-      console.log('安装守护进程:  corivo daemon start');
+      console.log('启动后台心跳:  corivo daemon start');
       console.log('');
     } else if (!status.running) {
-      console.log('启动守护进程:  launchctl start com.corivo.daemon');
+      console.log('启动心跳:  launchctl start com.corivo.daemon');
       console.log('');
     }
   });
 
 daemonCommand
   .command('run')
-  .description('运行心跳循环（由 launchd 调用，不应手动执行）')
+  .description('运行心跳循环（由系统调用，不应手动执行）')
   .action(async () => {
     try {
       const { Heartbeat } = await import('../../engine/heartbeat.js');
       const heartbeat = new Heartbeat();
 
-      console.log('[corivo] 守护进程启动中...');
+      console.log('[corivo] 后台心跳启动中...');
+      console.log('[corivo] 我会一直在后台默默工作。');
 
       await heartbeat.start();
     } catch (error) {
-      console.error('[corivo] 守护进程启动失败:', error);
+      console.error('[corivo] 后台心跳启动失败:', error);
       process.exit(1);
     }
   });

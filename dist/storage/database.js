@@ -32,6 +32,8 @@ const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
 import { DatabaseError } from '../errors/index.js';
 import { generateBlockId } from '../models/block.js';
+import { generateAssociationId, AssociationType } from '../models/association.js';
+import { KeyManager } from '../crypto/keys.js';
 /**
  * SQLCipher 数据库封装
  *
@@ -81,8 +83,12 @@ export class CorivoDatabase {
     config;
     db;
     static instances = new Map();
+    enableEncryption;
+    useSQLCipher = false;
     constructor(config) {
         this.config = config;
+        // 保存加密配置
+        this.enableEncryption = config.enableEncryption ?? false;
         // 启动前检测并清理陈旧的 WAL 锁
         this.detectAndCleanupStaleLock();
         this.db = new Database(config.path);
@@ -160,18 +166,9 @@ export class CorivoDatabase {
      * 初始化数据库
      */
     initialize() {
-        // 设置 SQLCipher 加密密钥（如果支持）
-        // 必须在任何其他操作之前执行
-        // 注意：如果 better-sqlite3 未编译 SQLCipher 支持，这会被静默忽略
-        try {
-            const hexKey = this.config.key.toString('hex');
-            this.db.pragma(`key = "x'${hexKey}'"`);
-            // 验证加密是否工作（如果密钥错误，此处会抛出异常）
-            this.db.pragma('cipher_version');
-        }
-        catch {
-            // 如果不支持 SQLCipher，继续使用普通 SQLite
-            // 用户应依赖文件系统加密
+        // 如果启用加密，尝试使用 SQLCipher
+        if (this.enableEncryption) {
+            this.useSQLCipher = this.trySetupSQLCipher();
         }
         // 启用 WAL 模式（支持并发读写）
         this.db.pragma('journal_mode = WAL');
@@ -181,6 +178,32 @@ export class CorivoDatabase {
         this.db.pragma('cache_size = -64000'); // 64MB 缓存
         this.db.pragma('temp_store = MEMORY');
         this.createSchema();
+    }
+    /**
+     * 尝试设置 SQLCipher 加密
+     *
+     * @returns 是否成功设置 SQLCipher
+     */
+    trySetupSQLCipher() {
+        try {
+            const hexKey = this.config.key.toString('hex');
+            // 设置加密密钥
+            this.db.pragma(`key = "x'${hexKey}'"`);
+            // 尝试查询 cipher_version 验证 SQLCipher 可用
+            const result = this.db.pragma('cipher_version');
+            this.useSQLCipher = result !== undefined;
+            if (this.useSQLCipher) {
+                // SQLCipher 可用，配置加密参数
+                // 使用 PBKDF2 加强密钥派生
+                this.db.pragma('kdf_iter = 256000'); // PBKDF2 迭代次数
+                this.db.pragma('cipher_page_size = 4096');
+            }
+            return this.useSQLCipher;
+        }
+        catch {
+            // SQLCipher 不可用，回退到应用层加密
+            return false;
+        }
     }
     /**
      * 创建数据库表结构
@@ -210,6 +233,16 @@ export class CorivoDatabase {
         // FTS5 全文搜索表
         // 使用独立的 FTS5 表（而非 external content）避免虚拟表腐烂问题
         // 数据通过触发器自动同步
+        //
+        // 迁移逻辑：检测并修复旧版本的外部内容表
+        const ftsTable = this.db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='blocks_fts'").get();
+        if (ftsTable && ftsTable.sql.includes("content='blocks'")) {
+            // 旧版本：外部内容表模式，需要重建
+            this.db.exec(`DROP TABLE IF EXISTS blocks_fts`);
+            this.db.exec(`DROP TRIGGER IF EXISTS blocks_ai`);
+            this.db.exec(`DROP TRIGGER IF EXISTS blocks_au`);
+            this.db.exec(`DROP TRIGGER IF EXISTS blocks_ad`);
+        }
         const ftsExists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='blocks_fts'").get();
         if (!ftsExists) {
             this.db.exec(`
@@ -240,6 +273,11 @@ export class CorivoDatabase {
           DELETE FROM blocks_fts WHERE id = old.id;
         END
       `);
+            // 重建索引：从现有 blocks 表同步数据
+            this.db.exec(`
+        INSERT INTO blocks_fts(id, content, annotation)
+        SELECT id, content, annotation FROM blocks
+      `);
         }
         // 索引
         this.db.exec(`
@@ -249,6 +287,44 @@ export class CorivoDatabase {
       CREATE INDEX IF NOT EXISTS idx_blocks_updated ON blocks(updated_at);
       CREATE INDEX IF NOT EXISTS idx_blocks_created_at ON blocks(created_at);
     `);
+        // Associations 表（关联表）
+        const assocTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='associations'").get();
+        if (!assocTable) {
+            this.db.exec(`
+        CREATE TABLE associations (
+          id TEXT PRIMARY KEY,
+          from_id TEXT NOT NULL,
+          to_id TEXT NOT NULL,
+          type TEXT NOT NULL,
+          direction TEXT NOT NULL DEFAULT 'one_way',
+          confidence REAL NOT NULL,
+          reason TEXT,
+          context_tags TEXT DEFAULT '[]',
+          created_at INTEGER NOT NULL,
+          UNIQUE(from_id, to_id, type))
+      `);
+            // 关联表索引
+            this.db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_associations_from ON associations(from_id);
+        CREATE INDEX IF NOT EXISTS idx_associations_to ON associations(to_id);
+        CREATE INDEX IF NOT EXISTS idx_associations_type ON associations(type);
+        CREATE INDEX IF NOT EXISTS idx_associations_confidence ON associations(confidence);
+      `);
+        }
+        // Query logs 表（查询历史）
+        const queryLogsTable = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='query_logs'").get();
+        if (!queryLogsTable) {
+            this.db.exec(`
+        CREATE TABLE query_logs (
+          id TEXT PRIMARY KEY,
+          timestamp INTEGER NOT NULL,
+          query TEXT NOT NULL,
+          result_count INTEGER DEFAULT 0)
+      `);
+            this.db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_query_logs_timestamp ON query_logs(timestamp);
+      `);
+        }
     }
     /**
      * 创建 Block
@@ -302,6 +378,10 @@ export class CorivoDatabase {
         }
         const id = generateBlockId();
         const now = Math.floor(Date.now() / 1000);
+        // 如果启用加密但 SQLCipher 不可用，使用应用层加密
+        const contentToStore = (this.enableEncryption && !this.useSQLCipher)
+            ? KeyManager.encryptContent(input.content, this.config.key)
+            : input.content;
         const stmt = this.db.prepare(`
       INSERT INTO blocks (
         id, content, annotation, refs, source, vitality, status,
@@ -309,7 +389,7 @@ export class CorivoDatabase {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
         try {
-            stmt.run(id, input.content, input.annotation || 'pending', JSON.stringify(input.refs || []), input.source || 'manual', input.vitality ?? 100, input.status ?? 'active', input.access_count ?? 0, input.last_accessed ?? null, input.pattern ? JSON.stringify(input.pattern) : null, now, now);
+            stmt.run(id, contentToStore, input.annotation || 'pending', JSON.stringify(input.refs || []), input.source || 'manual', input.vitality ?? 100, input.status ?? 'active', input.access_count ?? 0, input.last_accessed ?? null, input.pattern ? JSON.stringify(input.pattern) : null, now, now);
         }
         catch (error) {
             throw new DatabaseError('创建 Block 失败', { cause: error, blockId: id });
@@ -355,11 +435,19 @@ export class CorivoDatabase {
         const values = [];
         if (updates.content !== undefined) {
             fields.push('content = ?');
-            values.push(updates.content);
+            // 如果启用加密但 SQLCipher 不可用，加密内容
+            const contentToStore = (this.enableEncryption && !this.useSQLCipher)
+                ? KeyManager.encryptContent(updates.content, this.config.key)
+                : updates.content;
+            values.push(contentToStore);
         }
         if (updates.annotation !== undefined) {
             fields.push('annotation = ?');
             values.push(updates.annotation);
+        }
+        if (updates.refs !== undefined) {
+            fields.push('refs = ?');
+            values.push(JSON.stringify(updates.refs));
         }
         if (updates.vitality !== undefined) {
             fields.push('vitality = ?');
@@ -459,6 +547,219 @@ export class CorivoDatabase {
             throw new DatabaseError('删除 Block 失败', { cause: error, blockId: id });
         }
     }
+    // ========== 关联操作 ==========
+    /**
+     * 创建关联
+     *
+     * @param input - 关联创建参数
+     * @returns 创建的关联
+     */
+    createAssociation(input) {
+        const id = generateAssociationId();
+        const now = Date.now();
+        const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO associations (
+        id, from_id, to_id, type, direction, confidence, reason, context_tags, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+        try {
+            stmt.run(id, input.from_id, input.to_id, input.type, input.direction || 'one_way', input.confidence, input.reason || null, JSON.stringify(input.context_tags || []), now);
+        }
+        catch (error) {
+            throw new DatabaseError('创建关联失败', { cause: error, associationId: id });
+        }
+        return {
+            id,
+            from_id: input.from_id,
+            to_id: input.to_id,
+            type: input.type,
+            direction: input.direction || 'one_way',
+            confidence: input.confidence,
+            reason: input.reason,
+            context_tags: input.context_tags,
+            created_at: now,
+        };
+    }
+    /**
+     * 批量创建关联
+     *
+     * @param associations - 关联列表
+     * @returns 创建成功的数量
+     */
+    batchCreateAssociations(associations) {
+        if (associations.length === 0)
+            return 0;
+        let createdCount = 0;
+        const transaction = this.db.transaction(() => {
+            const stmt = this.db.prepare(`
+        INSERT OR REPLACE INTO associations (
+          id, from_id, to_id, type, direction, confidence, reason, context_tags, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+            for (const input of associations) {
+                try {
+                    const id = generateAssociationId();
+                    const now = Date.now();
+                    stmt.run(id, input.from_id, input.to_id, input.type, input.direction || 'one_way', input.confidence, input.reason || null, JSON.stringify(input.context_tags || []), now);
+                    createdCount++;
+                }
+                catch (error) {
+                    // 单个创建失败不影响其他
+                    console.error(`批量创建关联失败 ${input.from_id} -> ${input.to_id}:`, error);
+                }
+            }
+        });
+        try {
+            transaction();
+            return createdCount;
+        }
+        catch (error) {
+            throw new DatabaseError('批量创建关联失败', { cause: error });
+        }
+    }
+    /**
+     * 查询关联
+     *
+     * @param filter - 查询过滤器
+     * @returns 关联列表
+     */
+    queryAssociations(filter = {}) {
+        const conditions = [];
+        const values = [];
+        if (filter.from_id) {
+            conditions.push('from_id = ?');
+            values.push(filter.from_id);
+        }
+        if (filter.to_id) {
+            conditions.push('to_id = ?');
+            values.push(filter.to_id);
+        }
+        if (filter.type) {
+            conditions.push('type = ?');
+            values.push(filter.type);
+        }
+        if (filter.minConfidence !== undefined) {
+            conditions.push('confidence >= ?');
+            values.push(filter.minConfidence);
+        }
+        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+        const limit = filter.limit ? Math.max(1, Math.min(filter.limit, 10000)) : null;
+        const limitClause = limit ? `LIMIT ${limit}` : '';
+        const stmt = this.db.prepare(`
+      SELECT * FROM associations ${whereClause} ORDER BY confidence DESC ${limitClause}
+    `);
+        try {
+            const rows = stmt.all(...values);
+            return rows.map(row => this.rowToAssociation(row));
+        }
+        catch (error) {
+            throw new DatabaseError('查询关联失败', { cause: error });
+        }
+    }
+    /**
+     * 获取 block 的所有关联（双向）
+     *
+     * @param blockId - Block ID
+     * @param minConfidence - 最低置信度
+     * @returns 关联列表
+     */
+    getBlockAssociations(blockId, minConfidence = 0.5) {
+        const stmt = this.db.prepare(`
+      SELECT * FROM associations
+      WHERE (from_id = ? OR to_id = ?)
+        AND confidence >= ?
+      ORDER BY confidence DESC
+    `);
+        try {
+            const rows = stmt.all(blockId, blockId, minConfidence);
+            return rows.map(row => this.rowToAssociation(row));
+        }
+        catch (error) {
+            throw new DatabaseError('获取 block 关联失败', { cause: error, blockId });
+        }
+    }
+    /**
+     * 删除关联
+     *
+     * @param id - 关联 ID
+     * @returns 是否删除成功
+     */
+    deleteAssociation(id) {
+        const stmt = this.db.prepare('DELETE FROM associations WHERE id = ?');
+        try {
+            const result = stmt.run(id);
+            return result.changes > 0;
+        }
+        catch (error) {
+            throw new DatabaseError('删除关联失败', { cause: error, associationId: id });
+        }
+    }
+    /**
+     * 删除 block 的所有关联
+     *
+     * @param blockId - Block ID
+     * @returns 删除的关联数量
+     */
+    deleteBlockAssociations(blockId) {
+        const stmt = this.db.prepare('DELETE FROM associations WHERE from_id = ? OR to_id = ?');
+        try {
+            const result = stmt.run(blockId, blockId);
+            return result.changes;
+        }
+        catch (error) {
+            throw new DatabaseError('删除 block 关联失败', { cause: error, blockId });
+        }
+    }
+    /**
+     * 获取关联统计
+     *
+     * @returns 统计数据
+     */
+    getAssociationStats() {
+        // 总数
+        const totalStmt = this.db.prepare('SELECT COUNT(*) as count FROM associations');
+        const { count: total } = totalStmt.get();
+        // 按类型分组
+        const typeStmt = this.db.prepare(`
+      SELECT type, COUNT(*) as count FROM associations GROUP BY type
+    `);
+        const typeRows = typeStmt.all();
+        const byType = {
+            [AssociationType.SIMILAR]: 0,
+            [AssociationType.RELATED]: 0,
+            [AssociationType.CONFLICTS]: 0,
+            [AssociationType.REFINES]: 0,
+            [AssociationType.SUPERSEDES]: 0,
+            [AssociationType.CAUSES]: 0,
+            [AssociationType.DEPENDS_ON]: 0,
+        };
+        for (const row of typeRows) {
+            if (row.type in byType) {
+                byType[row.type] = row.count;
+            }
+        }
+        // 平均置信度
+        const avgStmt = this.db.prepare('SELECT AVG(confidence) as avg FROM associations');
+        const { avg } = avgStmt.get();
+        // 最活跃的 block
+        const activeStmt = this.db.prepare(`
+      SELECT block_id, COUNT(*) as count FROM (
+        SELECT from_id as block_id FROM associations
+        UNION ALL
+        SELECT to_id as block_id FROM associations
+      )
+      GROUP BY block_id
+      ORDER BY count DESC
+      LIMIT 10
+    `);
+        const mostConnected = activeStmt.all();
+        return {
+            total: total || 0,
+            byType,
+            avgConfidence: avg || 0,
+            mostConnected,
+        };
+    }
     /**
      * 查询 Blocks
      *
@@ -505,8 +806,12 @@ export class CorivoDatabase {
      * @returns 相关 Block 数组
      */
     searchBlocks(query, limit = 10) {
-        // 使用 FTS5 全文搜索
-        const stmt = this.db.prepare(`
+        // 空查询返回所有结果
+        if (!query || query.trim() === '') {
+            return this.queryBlocks({ limit });
+        }
+        // 先尝试 FTS5 全文搜索
+        const ftsStmt = this.db.prepare(`
       SELECT b.* FROM blocks b
       INNER JOIN blocks_fts fts ON b.id = fts.id
       WHERE blocks_fts MATCH ?
@@ -516,16 +821,26 @@ export class CorivoDatabase {
         try {
             // 转义查询字符串中的特殊字符
             const escapedQuery = query.replace(/["']/g, '');
-            const rows = stmt.all(escapedQuery, limit);
-            return rows.map(row => this.rowToBlock(row));
+            const rows = ftsStmt.all(escapedQuery, limit);
+            // FTS5 返回结果，直接返回
+            if (rows.length > 0) {
+                return rows.map(row => this.rowToBlock(row));
+            }
         }
         catch (error) {
-            // FTS5 查询失败时（如空查询），返回空数组
-            if (error.message?.includes('syntax')) {
-                return [];
-            }
-            throw new DatabaseError('全文搜索失败', { cause: error });
+            // FTS5 查询失败，忽略错误，继续使用备用搜索
         }
+        // FTS5 无结果或失败时，使用 LIKE 备用搜索
+        // 这对中文搜索特别有用，因为 FTS5 对中文分词支持不佳
+        const likeStmt = this.db.prepare(`
+      SELECT * FROM blocks
+      WHERE content LIKE ? OR annotation LIKE ?
+      ORDER BY updated_at DESC
+      LIMIT ?
+    `);
+        const likePattern = `%${query}%`;
+        const rows = likeStmt.all(likePattern, likePattern, limit);
+        return rows.map(row => this.rowToBlock(row));
     }
     /**
      * 获取统计信息
@@ -633,9 +948,13 @@ export class CorivoDatabase {
      * 将数据库行转换为 Block 对象
      */
     rowToBlock(row) {
+        // 如果启用加密但 SQLCipher 不可用，解密内容
+        const content = (this.enableEncryption && !this.useSQLCipher)
+            ? KeyManager.decryptContent(row.content, this.config.key)
+            : row.content;
         return {
             id: row.id,
-            content: row.content,
+            content,
             annotation: row.annotation,
             refs: JSON.parse(row.refs || '[]'),
             source: row.source,
@@ -646,6 +965,34 @@ export class CorivoDatabase {
             pattern: row.pattern ? JSON.parse(row.pattern) : undefined,
             created_at: row.created_at,
             updated_at: row.updated_at,
+        };
+    }
+    /**
+     * 将数据库行转换为 Association 对象
+     */
+    rowToAssociation(row) {
+        return {
+            id: row.id,
+            from_id: row.from_id,
+            to_id: row.to_id,
+            type: row.type,
+            direction: row.direction,
+            confidence: row.confidence,
+            reason: row.reason,
+            context_tags: row.context_tags ? JSON.parse(row.context_tags) : undefined,
+            created_at: row.created_at,
+        };
+    }
+    /**
+     * 获取加密信息（用于状态显示）
+     */
+    getEncryptionInfo() {
+        if (!this.enableEncryption) {
+            return { enabled: false, method: 'none' };
+        }
+        return {
+            enabled: true,
+            method: this.useSQLCipher ? 'sqlcipher' : 'application',
         };
     }
 }

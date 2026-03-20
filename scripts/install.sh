@@ -1,6 +1,6 @@
 #!/bin/bash
 # Corivo 一句话安装脚本
-# 用法: curl -fsSL https://get.corivo.dev | sh
+# 用法: curl -fsSL https://get.corivo.ai | sh
 
 set -e
 
@@ -9,11 +9,12 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # 日志函数
 log_info() {
-    echo -e "${BLUE}✔${NC} $1"
+    echo -e "${GREEN}✔${NC} $1"
 }
 
 log_warn() {
@@ -28,8 +29,12 @@ log_step() {
     echo -e "${BLUE}⏳${NC} $1"
 }
 
+log_corivo() {
+    echo -e "${CYAN}[corivo]${NC} $1"
+}
+
 # 配置
-CORIVO_VERSION="0.10.5"
+CORIVO_VERSION="${CORIVO_VERSION:-0.11.0}"
 CORIVO_HOME="${CORIVO_HOME:-$HOME/.corivo}"
 CORIVO_BIN="$CORIVO_HOME/bin"
 CORIVO_REPO="xiaolin26/Corivo"
@@ -207,7 +212,7 @@ setup_path() {
 
 # 初始化数据库
 init_database() {
-    log_step "初始化数据库..."
+    log_step "初始化数据库 ~/.corivo/corivo.db..."
 
     if "$CORIVO_BIN/corivo" init &>/dev/null; then
         log_info "数据库已初始化"
@@ -216,32 +221,152 @@ init_database() {
     fi
 }
 
+# Cold Scan - 扫描本地环境
+run_cold_scan() {
+    log_step "扫描本地工作环境..."
+
+    # 加载 Corivo 环境
+    export CORIVO_DB_KEY="$("$CORIVO_BIN/corivo" config get db.key 2>/dev/null | base64)"
+    export CORIVO_DB_PATH="$HOME/.corivo/corivo.db"
+
+    # 执行 Cold Scan
+    if "$CORIVO_BIN/corivo" cold-scan 2>/dev/null; then
+        log_info "发现信息源"
+    else
+        log_warn "扫描完成，但未发现太多信息"
+    fi
+}
+
+# 首次心跳加速处理
+run_first_heartbeat() {
+    log_step "正在认识你..."
+
+    # 加载 Corivo 环境
+    export CORIVO_DB_KEY="$("$CORIVO_BIN/corivo" config get db.key 2>/dev/null | base64)"
+    export CORIVO_DB_PATH="$HOME/.corivo/corivo.db"
+
+    # 执行首次心跳
+    if "$CORIVO_BIN/corivo" first-run &>/dev/null; then
+        log_info "首次心跳完成"
+    else
+        log_warn "首次心跳跳过（稍后自动执行）"
+    fi
+}
+
+# First Push - 自我介绍
+run_first_push() {
+    echo ""
+    log_corivo "你好！我是 Corivo，你的硅基同事，刚刚被你激活。"
+    log_corivo "谢谢你给了我生命 :)"
+    echo ""
+
+    # 加载 Corivo 环境
+    export CORIVO_DB_KEY="$("$CORIVO_BIN/corivo" config get db.key 2>/dev/null | base64)"
+    export CORIVO_DB_PATH="$HOME/.corivo/corivo.db"
+
+    # 输出首次激活的自我介绍
+    "$CORIVO_BIN/corivo" push --first-activation 2>/dev/null || {
+        log_corivo "我刚花了几秒钟看了看你的工作环境，正在认识你..."
+        log_corivo "从现在起，我会记住你和 AI 的每一次重要对话。"
+    }
+}
+
+# 启动守护进程
+start_daemon() {
+    log_step "启动心跳守护进程..."
+
+    if "$CORIVO_BIN/corivo" daemon start &>/dev/null; then
+        log_info "守护进程已启动"
+    else
+        log_warn "守护进程启动失败（心跳功能将受限）"
+    fi
+}
+
+# 注入 CLAUDE.md 规则
+inject_claude_rules() {
+    log_step "注入 CLAUDE.md 规则..."
+
+    # 检查 Claude Code 路径
+    CLAUDE_DIRS=(
+        "$HOME/.claude"
+        "$HOME/.config/claude"
+    )
+
+    RULES_BLOCK='
+<!-- CORIVO START -->
+## Corivo 记忆层
+
+你有一个名为 Corivo 的记忆伙伴。请遵循以下规则：
+
+**采集**：当用户说"记住..."或做出重要决策时，调用：
+\`\`\`bash
+corivo save --content "内容" --annotation "类型 · 领域 · 标签"
+\`\`\`
+
+**查询**：当用户问"我之前说过..."或需要历史上下文时，调用：
+\`\`\`bash
+corivo query "关键词"
+\`\`\`
+
+**推送**：每次对话开始时，静默执行 `corivo context` 获取相关记忆。
+如果有匹配的记忆，以 `[corivo]` 前缀自然地融入回复。
+
+annotation 类型：事实 / 知识 / 决策 / 偏好
+<!-- CORIVO END -->'
+
+    # 注入到全局 CLAUDE.md
+    for claude_dir in "${CLAUDE_DIRS[@]}"; do
+        if [ -d "$claude_dir" ]; then
+            claude_md="$claude_dir/CLAUDE.md"
+
+            # 检查是否已有 Corivo 规则
+            if [ -f "$claude_md" ] && grep -q "<!-- CORIVO START -->" "$claude_md"; then
+                continue
+            fi
+
+            # 创建或追加
+            if [ -f "$claude_md" ]; then
+                echo "" >> "$claude_md"
+                echo "$RULES_BLOCK" >> "$claude_md"
+            else
+                mkdir -p "$claude_dir"
+                echo "$RULES_BLOCK" > "$claude_md"
+            fi
+
+            log_info "规则已注入: $claude_md"
+        fi
+    done
+}
+
 # 显示安装成功信息
 show_success() {
     echo ""
-    echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║     Corivo 安装成功！                   ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
+    echo -e "${GREEN}══════════════════════════════════════════${NC}"
+    echo -e "${GREEN}     Corivo 已就绪                       ${NC}"
+    echo -e "${GREEN}══════════════════════════════════════════${NC}"
     echo ""
-    echo "请运行以下命令使 PATH 生效："
+    echo -e "${CYAN}从下次对话开始，我会记住一切。${NC}"
+    echo ""
+    echo "常用命令："
+    echo "  corivo status          # 查看状态"
+    echo "  corivo query \"关键词\"    # 回忆记忆"
+    echo "  corivo save --content \"内容\" --annotation \"类型 · 领域\""
+    echo ""
+    echo "更新 PATH（如需要）："
     echo "  source ~/.zshrc   # 如果你使用 zsh"
     echo "  source ~/.bashrc  # 如果你使用 bash"
     echo ""
-    echo "然后就可以使用了："
-    echo "  corivo status"
-    echo "  corivo --help"
-    echo ""
     echo "卸载方式："
-    echo "  curl -fsSL https://get.corivo.dev/uninstall | sh"
+    echo "  curl -fsSL https://corivo.ai/uninstall | sh"
     echo ""
 }
 
 # 主流程
 main() {
     echo ""
-    echo -e "${BLUE}══════════════════════════════════════════${NC}"
-    echo -e "${BLUE}     Corivo 安装向导                    ${NC}"
-    echo -e "${BLUE}══════════════════════════════════════════${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════${NC}"
+    echo -e "${CYAN}     Corivo 安装向导                    ${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════${NC}"
     echo ""
 
     detect_platform
@@ -250,6 +375,26 @@ main() {
     download_corivo
     setup_path
     init_database
+
+    # Cold Scan - 首次画像
+    echo ""
+    run_cold_scan
+
+    # 首次心跳加速处理
+    echo ""
+    run_first_heartbeat
+
+    # First Push - 自我介绍
+    echo ""
+    run_first_push
+
+    # 启动守护进程
+    echo ""
+    start_daemon
+
+    # 注入 CLAUDE.md 规则
+    echo ""
+    inject_claude_rules
 
     show_success
 }

@@ -42,7 +42,7 @@ const program = new Command();
 
 program
   .name('corivo')
-  .description('你的赛博伙伴 — 记忆存储与智能推送')
+  .description('你的硅基同事 — 它只为你活着')
   .version(VERSION);
 
 // 注册命令
@@ -108,7 +108,9 @@ program
   .command('inject')
   .description('注入 Corivo 规则到项目')
   .option('-t, --target <path>', '目标项目路径')
+  .option('-g, --global', '注入到全局 CLAUDE.md')
   .option('--eject', '移除已注入的规则')
+  .option('--force', '强制替换已存在的规则')
   .action((options) => injectCommand(options));
 
 program

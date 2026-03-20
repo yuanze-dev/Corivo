@@ -39,25 +39,47 @@ export async function statusCommand(options = {}) {
     let dbKey;
     const skipPassword = options.noPassword || process.env.CORIVO_NO_PASSWORD === '1';
     if (skipPassword) {
-        // 使用默认密钥（不加密模式）
-        dbKey = KeyManager.generateDatabaseKey();
+        // 无密码模式：使用 config 中的 db_key（如果有）
+        if (config.db_key) {
+            dbKey = Buffer.from(config.db_key, 'base64');
+        }
+        else if (config.encrypted_db_key) {
+            throw new ConfigError('数据库已加密，请输入密码或移除 --no-password 选项');
+        }
+        else {
+            dbKey = KeyManager.generateDatabaseKey();
+            config.db_key = dbKey.toString('base64');
+            await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+        }
     }
     else {
         const password = await readPassword('请输入主密码: ', { allowEmpty: !process.stdin.isTTY });
         if (password === '') {
-            // 空密码表示跳过
-            dbKey = KeyManager.generateDatabaseKey();
+            if (config.db_key) {
+                dbKey = Buffer.from(config.db_key, 'base64');
+            }
+            else if (config.encrypted_db_key) {
+                throw new ConfigError('数据库已加密，请输入密码');
+            }
+            else {
+                dbKey = KeyManager.generateDatabaseKey();
+                config.db_key = dbKey.toString('base64');
+                await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+            }
         }
         else {
             const salt = Buffer.from(config.salt, 'base64');
             const masterKey = KeyManager.deriveMasterKey(password, salt);
             const encryptedDbKey = config.encrypted_db_key;
+            if (!encryptedDbKey) {
+                throw new ConfigError('未设置密码，请先运行: corivo setup-password');
+            }
             dbKey = KeyManager.decryptDatabaseKey(encryptedDbKey, masterKey);
         }
     }
     // 打开数据库
     const dbPath = getDefaultDatabasePath();
-    const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
+    const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey, enableEncryption: config.encrypted_db_key !== undefined });
     // 获取统计信息
     const stats = db.getStats();
     const health = db.checkHealth();

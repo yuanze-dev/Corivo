@@ -25,10 +25,19 @@ import { stopCommand } from './commands/stop.js';
 import { doctorCommand } from './commands/doctor.js';
 import { recoverCommand } from './commands/recover.js';
 import { injectCommand } from './commands/inject.js';
+import { identityCommand } from './commands/identity.js';
+import { setupPasswordCommand } from './commands/setup-password.js';
+import { unlockCommand } from './commands/unlock.js';
+import { verifyIdentityCommand } from './commands/verify-identity.js';
+import { coldScanCommand } from './commands/cold-scan.js';
+import { pushCommand } from './commands/push.js';
+import { firstRunCommand } from './commands/heartbeat-first-run.js';
+import { daemonCommand } from './commands/daemon.js';
+import { updateCommand } from './commands/update.js';
 const program = new Command();
 program
     .name('corivo')
-    .description('你的赛博伙伴 — 记忆存储与智能推送')
+    .description('你的硅基同事 — 它只为你活着')
     .version(VERSION);
 // 注册命令
 program
@@ -86,8 +95,37 @@ program
     .command('inject')
     .description('注入 Corivo 规则到项目')
     .option('-t, --target <path>', '目标项目路径')
+    .option('-g, --global', '注入到全局 CLAUDE.md')
     .option('--eject', '移除已注入的规则')
+    .option('--force', '强制替换已存在的规则')
     .action((options) => injectCommand(options));
+program
+    .command('identity')
+    .description('查看身份信息')
+    .option('-v, --verbose', '显示详细信息')
+    .action((options) => identityCommand(options));
+program
+    .command('setup-password')
+    .description('设置主密码（用于数据库加密和跨设备验证）')
+    .option('-f, --force', '强制修改已有密码')
+    .action((options) => setupPasswordCommand(options));
+program
+    .command('unlock')
+    .description('解锁并查看数据库内容')
+    .option('-r, --raw', '原始格式输出')
+    .option('-l, --limit <number>', '返回数量', '100')
+    .action((options) => unlockCommand(options));
+program
+    .command('verify-identity')
+    .description('跨设备身份验证（指纹 + 密码）')
+    .option('-p, --password <password>', '主密码')
+    .option('-v, --verbose', '显示详细信息')
+    .action((options) => verifyIdentityCommand(options));
+program.addCommand(coldScanCommand);
+program.addCommand(pushCommand);
+program.addCommand(firstRunCommand);
+program.addCommand(daemonCommand);
+program.addCommand(updateCommand);
 // 错误处理
 program.configureOutput({
     writeErr: (str) => {

@@ -60,5 +60,54 @@ export declare class ContextPusher {
      * @returns 决策模式推送文本
      */
     pushPatterns(query: string, limit?: number): Promise<string>;
+    /**
+     * 基于关联推送相关记忆
+     *
+     * 不同于 pushContext 的全文搜索，这里基于已建立的关联关系
+     *
+     * @param query - 查询关键词
+     * @param limit - 返回数量限制
+     * @returns 关联记忆推送文本
+     */
+    pushRelated(query: string, limit?: number): Promise<string>;
+    /**
+     * 推送矛盾提醒
+     *
+     * 检测当前内容与已有决策的冲突
+     *
+     * @param content - 当前内容
+     * @returns 矛盾提醒文本
+     */
+    pushConflicts(content: string): Promise<string>;
+    /**
+     * 推送相关决策（增强版）
+     *
+     * 结合关联关系的决策推送
+     *
+     * @param context - 上下文描述
+     * @returns 决策建议文本
+     */
+    pushDecisions(context: string): Promise<string>;
+    /**
+     * 推送摘要
+     *
+     * 基于主题推送相关内容的摘要
+     *
+     * @param topic - 主题关键词
+     * @returns 摘要文本
+     */
+    pushSummary(topic: string): Promise<string>;
+    /**
+     * 提取关键词
+     */
+    private extractKeywords;
+    /**
+     * 计算相关性
+     */
+    private calculateRelevance;
+    /**
+     * 获取关联类型标签
+     */
+    private getAssociationTypeLabel;
 }
 //# sourceMappingURL=context.d.ts.map

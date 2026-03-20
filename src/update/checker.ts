@@ -10,7 +10,7 @@ import https from 'node:https';
 import { SemVer, parseSemVer, compareSemVer } from '../utils/semver.js';
 import type { VersionInfo, UpdateStatus, UpdateConfig, Platform, BinaryInfo } from './types.js';
 
-const VERSION_URL = 'https://get.corivo.dev/version.json';
+const VERSION_URL = 'https://corivo.ai/version.json';
 const FALLBACK_VERSION_URL = 'https://raw.githubusercontent.com/xiaolin26/Corivo/main/version.json';
 const CHECK_INTERVAL = 6 * 60 * 60 * 1000; // 6 小时
 const REQUEST_TIMEOUT = 5000; // 5 秒
@@ -23,9 +23,9 @@ export function getCurrentVersion(): string {
     const packagePath = path.join(process.cwd(), 'package.json');
     // 如果在开发环境，尝试读取 package.json
     // 否则使用版本常量
-    return '0.10.5'; // TODO: 从动态导入获取
+    return '0.11.0'; // TODO: 从动态导入获取
   } catch {
-    return '0.10.5';
+    return '0.11.0';
   }
 }
 

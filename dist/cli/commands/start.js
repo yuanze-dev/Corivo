@@ -1,14 +1,13 @@
 /**
  * CLI 命令 - start
  *
- * 启动心跳守护进程（支持自动重启）
+ * 启动心跳守护进程（无需密码，基于平台指纹认证）
  */
 import fs from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { getDefaultDatabasePath, getConfigDir, getPidFilePath } from '../../storage/database.js';
 import { ProcessError, ConfigError } from '../../errors/index.js';
-import { readPassword } from '../utils/password.js';
 const MAX_RESTART_ATTEMPTS = 3;
 const RESTART_DELAY = 5000; // 5 秒
 export async function startCommand() {
@@ -22,6 +21,25 @@ export async function startCommand() {
     }
     catch {
         throw new ConfigError('Corivo 未初始化。请先运行: corivo init');
+    }
+    let dbKey = config.db_key;
+    // 如果是旧格式（有 encrypted_db_key 但没有 db_key），提示用户重新初始化
+    if (!dbKey && config.encrypted_db_key) {
+        console.log('⚠️  检测到旧版配置格式（需要密码）');
+        console.log('');
+        console.log('Corivo v0.10+ 已移除密码系统，改为基于平台指纹认证。');
+        console.log('请按以下步骤迁移：');
+        console.log('');
+        console.log('  1. 备份数据库：cp ~/.corivo/corivo.db ~/.corivo/corivo.db.backup');
+        console.log('  2. 重新初始化：corivo init');
+        console.log('  3. 恢复数据：cp ~/.corivo/corivo.db.backup ~/.corivo/corivo.db');
+        console.log('');
+        console.log('或者直接删除旧配置重新开始：');
+        console.log('  rm ~/.corivo/config.json && corivo init');
+        return;
+    }
+    if (!dbKey) {
+        throw new ConfigError('配置文件无效：缺少 db_key');
     }
     // 检查是否已在运行
     const pidPath = getPidFilePath();
@@ -38,21 +56,17 @@ export async function startCommand() {
         }
     }
     catch { }
-    // 获取主密码
-    console.log('启动心跳守护进程需要主密码\n');
-    const password = await readPassword('请输入主密码: ');
     console.log('正在启动心跳守护进程...');
-    // 启动守护进程
+    // 启动守护进程（无需密码）
     const pid = spawn(process.execPath, ['./dist/engine/heartbeat.js'], {
         cwd: process.cwd(),
         detached: true,
-        stdio: 'ignore',
+        stdio: ['ignore', 'pipe', 'pipe'],
         env: {
             ...process.env,
             CORIVO_DB_PATH: getDefaultDatabasePath(),
             CORIVO_CONFIG_DIR: configDir,
-            CORIVO_ENCRYPTED_KEY: config.encrypted_db_key,
-            CORIVO_DAEMON_PASSWORD: password,
+            CORIVO_DB_KEY: dbKey,
             NODE_ENV: 'production',
         },
     });
@@ -82,15 +96,17 @@ export async function startWatchCommand() {
     catch {
         throw new ConfigError('Corivo 未初始化。请先运行: corivo init');
     }
-    // 获取主密码
-    console.log('启动心跳守护进程监控模式需要主密码\n');
-    const password = await readPassword('请输入主密码: ');
+    // 检查密钥
+    const dbKey = config.db_key || config.encrypted_db_key;
+    if (!dbKey) {
+        throw new ConfigError('配置文件无效：缺少 db_key');
+    }
     console.log('正在启动心跳守护进程（监控模式）...');
     console.log('监控模式会在心跳进程崩溃时自动重启\n');
     let restartCount = 0;
     // 启动循环
     while (restartCount < MAX_RESTART_ATTEMPTS) {
-        const childPid = await spawnHeartbeat(configDir, config, password);
+        const childPid = await spawnHeartbeat(configDir, dbKey);
         // 监控子进程
         const exitCode = await waitForExit(childPid);
         if (exitCode === 0) {
@@ -116,7 +132,7 @@ export async function startWatchCommand() {
 /**
  * 生成心跳子进程
  */
-async function spawnHeartbeat(configDir, config, password) {
+async function spawnHeartbeat(configDir, dbKey) {
     const pidPath = getPidFilePath();
     // 检查是否已在运行
     try {
@@ -140,8 +156,7 @@ async function spawnHeartbeat(configDir, config, password) {
             ...process.env,
             CORIVO_DB_PATH: getDefaultDatabasePath(),
             CORIVO_CONFIG_DIR: configDir,
-            CORIVO_ENCRYPTED_KEY: config.encrypted_db_key,
-            CORIVO_DAEMON_PASSWORD: password,
+            CORIVO_DB_KEY: dbKey,
             NODE_ENV: 'production',
         },
     });

@@ -442,4 +442,89 @@ export class KeyManager {
     const salt = this.generateSalt();
     return `SALT:${salt.toString('base64')}`;
   }
+
+  /**
+   * 加密内容（用于数据库存储）
+   *
+   * 使用 AES-256-GCM 加密，返回 Base64 编码的密文
+   *
+   * @param content - 明文内容
+   * @param dbKey - 数据库密钥
+   * @returns Base64 编码的密文（IV + AuthTag + 密文）
+   */
+  static encryptContent(content: string, dbKey: Buffer): string {
+    try {
+      const iv = randomBytes(16);
+      const cipher = createCipheriv('aes-256-gcm', dbKey, iv);
+
+      const encrypted = Buffer.concat([
+        cipher.update(content, 'utf8'),
+        cipher.final(),
+      ]);
+
+      const authTag = cipher.getAuthTag();
+
+      // 格式: iv(16) + authTag(16) + encrypted
+      const combined = Buffer.concat([iv, authTag, encrypted]);
+      return combined.toString('base64');
+    } catch (error) {
+      throw new CryptoError('内容加密失败', { cause: error });
+    }
+  }
+
+  /**
+   * 解密内容（从数据库读取）
+   *
+   * @param encrypted - Base64 编码的密文
+   * @param dbKey - 数据库密钥
+   * @returns 解密后的明文
+   */
+  static decryptContent(encrypted: string, dbKey: Buffer): string {
+    try {
+      const data = Buffer.from(encrypted, 'base64');
+
+      if (data.length < 32) {
+        throw new CryptoError('密文格式无效：长度不足');
+      }
+
+      const iv = data.subarray(0, 16);
+      const authTag = data.subarray(16, 32);
+      const ciphertext = data.subarray(32);
+
+      const decipher = createDecipheriv('aes-256-gcm', dbKey, iv);
+      decipher.setAuthTag(authTag);
+
+      const decrypted = Buffer.concat([
+        decipher.update(ciphertext),
+        decipher.final(),
+      ]);
+
+      return decrypted.toString('utf8');
+    } catch (error) {
+      if (error instanceof CryptoError) {
+        throw error;
+      }
+      throw new CryptoError('内容解密失败', { cause: error });
+    }
+  }
+
+  /**
+   * 检测内容是否为加密格式
+   *
+   * 加密的内容是有效的 Base64，且解密后长度合理
+   *
+   * @param content - 待检测内容
+   * @returns 是否为加密格式
+   */
+  static isEncryptedContent(content: string): boolean {
+    try {
+      // 基本检查：是否为有效 Base64
+      const decoded = Buffer.from(content, 'base64');
+      // 加密后的内容至少应该是 32 字节（IV + AuthTag）
+      // 加上至少 1 字节的实际内容
+      return decoded.length >= 33 && content.length > 44; // 33 字节编码后至少 44 字符
+    } catch {
+      return false;
+    }
+  }
 }

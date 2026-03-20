@@ -10,7 +10,7 @@ import { coldScan } from '../../cold-scan/index.js';
 export const coldScanCommand = new Command('cold-scan');
 
 coldScanCommand
-  .description('扫描本地环境，构建初始画像')
+  .description('认识你 - 扫描本地环境构建初始画像')
   .option('-v, --verbose', '显示详细输出')
   .option('--dry-run', '不保存到数据库')
   .option('--skip <sources...>', '跳过指定的扫描源')
@@ -20,10 +20,12 @@ coldScanCommand
       console.log(
         chalk.cyan('══════════════════════════════════════════')
       );
-      console.log(chalk.cyan('     Corivo Cold Scan                  '));
+      console.log(chalk.cyan('     正在认识你...                      '));
       console.log(
         chalk.cyan('══════════════════════════════════════════')
       );
+      console.log('');
+      console.log(chalk.gray('让我看看你的工作环境...'));
       console.log('');
 
       const result = await coldScan({
@@ -33,11 +35,11 @@ coldScanCommand
 
       console.log('');
       console.log(chalk.green('══════════════════════════════════════════'));
-      console.log(chalk.green('     扫描完成                            '));
+      console.log(chalk.green('     认识你完成！                        '));
       console.log(chalk.green('══════════════════════════════════════════'));
       console.log('');
-      console.log(`扫描源: ${result.totalScanned}`);
-      console.log(`发现信息: ${result.totalFound} 条`);
+      console.log(`看过的地方: ${result.totalScanned}`);
+      console.log(`记住的事: ${result.totalFound} 条`);
       console.log('');
 
       // 显示摘要

@@ -11,6 +11,7 @@ import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../stor
 import { KeyManager } from '../../crypto/keys.js';
 import { ConfigError } from '../../errors/index.js';
 import { ContextPusher } from '../../push/context.js';
+import { QueryHistoryTracker } from '../../engine/query-history.js';
 import { readPassword } from '../utils/password.js';
 
 interface QueryOptions {
@@ -38,24 +39,42 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
   const skipPassword = options.noPassword || process.env.CORIVO_NO_PASSWORD === '1';
 
   if (skipPassword) {
-    // 使用默认密钥（不加密模式）
-    dbKey = KeyManager.generateDatabaseKey();
+    // 无密码模式：使用 config 中的 db_key（如果有）
+    if (config.db_key) {
+      dbKey = Buffer.from(config.db_key, 'base64');
+    } else if (config.encrypted_db_key) {
+      throw new ConfigError('数据库已加密，请输入密码或移除 --no-password 选项');
+    } else {
+      dbKey = KeyManager.generateDatabaseKey();
+      config.db_key = dbKey.toString('base64');
+      await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+    }
   } else {
     const password = await readPassword('请输入主密码: ', { allowEmpty: !process.stdin.isTTY });
     if (password === '') {
-      // 空密码表示跳过
-      dbKey = KeyManager.generateDatabaseKey();
+      if (config.db_key) {
+        dbKey = Buffer.from(config.db_key, 'base64');
+      } else if (config.encrypted_db_key) {
+        throw new ConfigError('数据库已加密，请输入密码');
+      } else {
+        dbKey = KeyManager.generateDatabaseKey();
+        config.db_key = dbKey.toString('base64');
+        await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+      }
     } else {
       const salt = Buffer.from(config.salt, 'base64');
       const masterKey = KeyManager.deriveMasterKey(password, salt);
       const encryptedDbKey = config.encrypted_db_key;
+      if (!encryptedDbKey) {
+        throw new ConfigError('未设置密码，请先运行: corivo setup-password');
+      }
       dbKey = KeyManager.decryptDatabaseKey(encryptedDbKey, masterKey);
     }
   }
 
   // 打开数据库
   const dbPath = getDefaultDatabasePath();
-  const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
+  const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey, enableEncryption: config.encrypted_db_key !== undefined });
 
   // 搜索
   const limit = options.limit ? parseInt(options.limit, 10) : 10;
@@ -103,6 +122,16 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
 
   // 附加上下文推送
   const pusher = new ContextPusher(db);
+  const queryTracker = new QueryHistoryTracker(db);
+
+  // 记录本次查询
+  queryTracker.recordQuery(query, results);
+
+  // 检查是否有相似的历史查询
+  const similarReminder = queryTracker.findSimilarQueries(query);
+  if (similarReminder.hasSimilar) {
+    console.log(chalk.gray(similarReminder.message));
+  }
 
   // 决策模式推送
   if (options.pattern) {

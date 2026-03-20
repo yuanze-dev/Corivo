@@ -56,7 +56,7 @@ export type CreateBlockInput = {
  *
  * 注意: updated_at 仅用于测试，生产环境总是自动设置为当前时间
  */
-export type UpdateBlockInput = Partial<Pick<Block, 'content' | 'annotation' | 'vitality' | 'status' | 'access_count' | 'last_accessed' | 'pattern' | 'updated_at' | 'created_at'>>;
+export type UpdateBlockInput = Partial<Pick<Block, 'content' | 'annotation' | 'refs' | 'vitality' | 'status' | 'access_count' | 'last_accessed' | 'pattern' | 'updated_at' | 'created_at'>>;
 /**
  * Block 查询过滤器
  */

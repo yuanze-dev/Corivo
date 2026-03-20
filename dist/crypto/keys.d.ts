@@ -77,5 +77,32 @@ export declare class KeyManager {
      * @returns 用于显示的盐值提示
      */
     static getSaltHint(): string;
+    /**
+     * 加密内容（用于数据库存储）
+     *
+     * 使用 AES-256-GCM 加密，返回 Base64 编码的密文
+     *
+     * @param content - 明文内容
+     * @param dbKey - 数据库密钥
+     * @returns Base64 编码的密文（IV + AuthTag + 密文）
+     */
+    static encryptContent(content: string, dbKey: Buffer): string;
+    /**
+     * 解密内容（从数据库读取）
+     *
+     * @param encrypted - Base64 编码的密文
+     * @param dbKey - 数据库密钥
+     * @returns 解密后的明文
+     */
+    static decryptContent(encrypted: string, dbKey: Buffer): string;
+    /**
+     * 检测内容是否为加密格式
+     *
+     * 加密的内容是有效的 Base64，且解密后长度合理
+     *
+     * @param content - 待检测内容
+     * @returns 是否为加密格式
+     */
+    static isEncryptedContent(content: string): boolean;
 }
 //# sourceMappingURL=keys.d.ts.map

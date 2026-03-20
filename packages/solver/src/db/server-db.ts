@@ -31,7 +31,6 @@ function createSchema(db: SQLiteDatabase): void {
       identity_id TEXT PRIMARY KEY,
       fingerprints TEXT NOT NULL,
       shared_secret TEXT NOT NULL,
-      salt TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       last_seen_at INTEGER NOT NULL
     );
@@ -61,5 +60,8 @@ function createSchema(db: SQLiteDatabase): void {
 
     CREATE INDEX IF NOT EXISTS idx_changesets_lookup
       ON changesets(identity_id, db_version);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_changesets_unique
+      ON changesets(identity_id, site_id, table_name, pk, col_version);
   `);
 }

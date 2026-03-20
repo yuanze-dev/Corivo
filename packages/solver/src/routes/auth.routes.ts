@@ -57,9 +57,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const sharedSecret = generateSharedSecret();
 
     db.prepare(`
-      INSERT INTO accounts (identity_id, fingerprints, shared_secret, salt, created_at, last_seen_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(identity_id, JSON.stringify(fingerprints), sharedSecret, '', now, now);
+      INSERT INTO accounts (identity_id, fingerprints, shared_secret, created_at, last_seen_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(identity_id, JSON.stringify(fingerprints), sharedSecret, now, now);
 
     db.prepare(`
       INSERT INTO devices (device_id, identity_id, device_name, site_id, created_at, last_seen_at)

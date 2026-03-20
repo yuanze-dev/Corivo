@@ -7,6 +7,5 @@ export const config = {
   dbPath: process.env.SOLVER_DB_PATH ?? path.join(os.homedir(), '.corivo', 'solver.db'),
   tokenTtlMs: 60 * 60 * 1000,       // 1 hour
   challengeTtlMs: 5 * 60 * 1000,    // 5 minutes
-  pbkdf2Iterations: 100_000,
   version: '0.1.0',
 };

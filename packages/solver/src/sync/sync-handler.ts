@@ -26,7 +26,7 @@ export function pushChangesets(identityId: string, payload: PushPayload): { stor
   const now = Date.now();
 
   const stmt = db.prepare(`
-    INSERT INTO changesets (identity_id, site_id, table_name, pk, col_name, col_version, db_version, value, created_at)
+    INSERT OR IGNORE INTO changesets (identity_id, site_id, table_name, pk, col_name, col_version, db_version, value, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 

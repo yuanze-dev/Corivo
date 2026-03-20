@@ -103,8 +103,8 @@ export function createSyncCommand(): Command {
 
       try {
         await saveSolverConfig(solverConfig);
-      } catch (err: any) {
-        console.error('保存 solver.json 失败:', err.message);
+      } catch (err: unknown) {
+        console.error('保存 solver.json 失败:', err instanceof Error ? err.message : String(err));
         // 继续执行，不终止进程
       }
       console.log(`注册成功！site_id: ${siteId}`);

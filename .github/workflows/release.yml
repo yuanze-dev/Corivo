@@ -20,17 +20,10 @@ jobs:
           - os: macos-latest
             target: darwin-arm64
             artifact_name: corivo-Darwin-arm64.tar.gz
-            pkg_target: node18-macos-arm64
-          # macOS x64 (Intel)
-          - os: macos-13
-            target: darwin-x64
-            artifact_name: corivo-Darwin-x64.tar.gz
-            pkg_target: node18-macos-x64
           # Linux x64
-          - os: ubuntu-20.04
+          - os: ubuntu-latest
             target: linux-x64
             artifact_name: corivo-Linux-x64.tar.gz
-            pkg_target: node18-linux-x64
 
     steps:
       - name: Checkout
@@ -49,10 +42,10 @@ jobs:
 
       - name: Create package directory
         run: |
-          mkdir -p release/corivo
+          mkdir -p release/corivo/bin
           cp -r dist release/corivo/
           cp -r node_modules release/corivo/
-          cp bin/corivo.js release/corivo/
+          cp bin/corivo.js release/corivo/bin/
           cp package.json release/corivo/
           cp README.md release/corivo/
           cp LICENSE release/corivo/ 2>/dev/null || true

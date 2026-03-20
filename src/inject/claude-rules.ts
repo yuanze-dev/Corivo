@@ -15,6 +15,7 @@ const END_MARKER = '<!-- CORIVO END -->';
  * 标准规则模板
  */
 export const CORIVO_RULES = `
+<!-- CORIVO START -->
 ## Corivo 记忆层
 
 你有一个名为 Corivo 的记忆伙伴。请遵循以下规则：

@@ -79,20 +79,20 @@ corivo daemon stop
 cd /tmp/test-project
 corivo inject
 ```
-- [ ] 项目 `CLAUDE.md` 已创建
-- [ ] 包含 `<!-- CORIVO START -->` 标记
-- [ ] 包含采集/查询/推送指令
+- [x] 项目 `CLAUDE.md` 已创建
+- [x] 包含 `<!-- CORIVO START -->` 标记
+- [x] 包含采集/查询/推送指令
 
 ```bash
 corivo inject --global
 ```
-- [ ] `~/.claude/CLAUDE.md` 已创建
-- [ ] 规则已注入
+- [x] `~/.claude/CLAUDE.md` 已创建
+- [x] 规则已注入
 
 ```bash
 corivo inject --eject
 ```
-- [ ] 规则已移除
+- [x] 规则已移除
 
 ## Phase 6: 自动更新测试
 

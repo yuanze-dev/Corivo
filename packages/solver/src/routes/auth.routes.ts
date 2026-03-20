@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import '../types.js';
-import { getServerDb } from '../db/server-db.js';
+import { getDb } from '../db/server-db.js';
+import { accounts, devices } from '../db/schema.js';
+import { eq } from 'drizzle-orm';
 import { generateChallenge, verifyChallengeResponse, generateSharedSecret } from '../auth/challenge.js';
 import { generateToken, authPreHandler } from '../auth/auth-plugin.js';
 
@@ -46,25 +48,35 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async (req, reply) => {
     const { identity_id, fingerprints, device_id, device_name, site_id } = req.body;
-    const db = getServerDb();
+    const db = getDb();
     const now = Date.now();
 
-    const existing = db.prepare('SELECT identity_id FROM accounts WHERE identity_id = ?').get(identity_id);
+    const existing = db.select({ identityId: accounts.identityId })
+      .from(accounts)
+      .where(eq(accounts.identityId, identity_id))
+      .get();
     if (existing) {
       return reply.code(409).send({ error: 'Already registered' });
     }
 
     const sharedSecret = generateSharedSecret();
 
-    db.prepare(`
-      INSERT INTO accounts (identity_id, fingerprints, shared_secret, created_at, last_seen_at)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(identity_id, JSON.stringify(fingerprints), sharedSecret, now, now);
+    db.insert(accounts).values({
+      identityId: identity_id,
+      fingerprints: JSON.stringify(fingerprints),
+      sharedSecret,
+      createdAt: now,
+      lastSeenAt: now,
+    }).run();
 
-    db.prepare(`
-      INSERT INTO devices (device_id, identity_id, device_name, site_id, created_at, last_seen_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(device_id, identity_id, device_name ?? null, site_id, now, now);
+    db.insert(devices).values({
+      deviceId: device_id,
+      identityId: identity_id,
+      deviceName: device_name ?? null,
+      siteId: site_id,
+      createdAt: now,
+      lastSeenAt: now,
+    }).run();
 
     return reply.code(201).send({ shared_secret: sharedSecret });
   });
@@ -82,9 +94,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async (req, reply) => {
     const { identity_id } = req.body;
-    const db = getServerDb();
+    const db = getDb();
 
-    const account = db.prepare('SELECT identity_id FROM accounts WHERE identity_id = ?').get(identity_id);
+    const account = db.select({ identityId: accounts.identityId })
+      .from(accounts)
+      .where(eq(accounts.identityId, identity_id))
+      .get();
     if (!account) {
       return reply.code(404).send({ error: 'Account not found' });
     }
@@ -108,22 +123,26 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async (req, reply) => {
     const { identity_id, challenge, response } = req.body;
-    const db = getServerDb();
+    const db = getDb();
 
-    const account = db.prepare('SELECT shared_secret FROM accounts WHERE identity_id = ?').get(identity_id) as
-      | { shared_secret: string }
-      | undefined;
+    const account = db.select({ sharedSecret: accounts.sharedSecret })
+      .from(accounts)
+      .where(eq(accounts.identityId, identity_id))
+      .get();
 
     if (!account) {
       return reply.code(404).send({ error: 'Account not found' });
     }
 
-    const valid = verifyChallengeResponse(identity_id, challenge, response, account.shared_secret);
+    const valid = verifyChallengeResponse(identity_id, challenge, response, account.sharedSecret);
     if (!valid) {
       return reply.code(401).send({ error: 'Invalid challenge response' });
     }
 
-    db.prepare('UPDATE accounts SET last_seen_at = ? WHERE identity_id = ?').run(Date.now(), identity_id);
+    db.update(accounts)
+      .set({ lastSeenAt: Date.now() })
+      .where(eq(accounts.identityId, identity_id))
+      .run();
 
     const token = generateToken(identity_id);
     return reply.send({ token });
@@ -146,18 +165,25 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   }, async (req, reply) => {
     const identityId = req.identityId!;
     const { device_id, device_name, site_id } = req.body;
-    const db = getServerDb();
+    const db = getDb();
     const now = Date.now();
 
-    const existing = db.prepare('SELECT device_id FROM devices WHERE device_id = ?').get(device_id);
+    const existing = db.select({ deviceId: devices.deviceId })
+      .from(devices)
+      .where(eq(devices.deviceId, device_id))
+      .get();
     if (existing) {
       return reply.code(409).send({ error: 'Device already registered' });
     }
 
-    db.prepare(`
-      INSERT INTO devices (device_id, identity_id, device_name, site_id, created_at, last_seen_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(device_id, identityId, device_name ?? null, site_id, now, now);
+    db.insert(devices).values({
+      deviceId: device_id,
+      identityId,
+      deviceName: device_name ?? null,
+      siteId: site_id,
+      createdAt: now,
+      lastSeenAt: now,
+    }).run();
 
     return reply.code(201).send({ ok: true });
   });

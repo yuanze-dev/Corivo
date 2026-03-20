@@ -1,4 +1,6 @@
-import { getServerDb } from '../db/server-db.js';
+import { getDb } from '../db/server-db.js';
+import { changesets, devices } from '../db/schema.js';
+import { and, eq, gt, ne, asc, max, count } from 'drizzle-orm';
 
 export interface ChangesetRow {
   table_name: string;
@@ -22,34 +24,28 @@ export interface PullPayload {
 }
 
 export function pushChangesets(identityId: string, payload: PushPayload): { stored: number } {
-  const db = getServerDb();
+  const db = getDb();
   const now = Date.now();
 
-  const stmt = db.prepare(`
-    INSERT OR IGNORE INTO changesets (identity_id, site_id, table_name, pk, col_name, col_version, db_version, value, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const insert = db.transaction((changesets: ChangesetRow[]) => {
-    let count = 0;
-    for (const cs of changesets) {
-      stmt.run(
+  const stored = db.transaction((tx) => {
+    let insertCount = 0;
+    for (const cs of payload.changesets) {
+      tx.insert(changesets).values({
         identityId,
-        cs.site_id || payload.site_id,
-        cs.table_name,
-        cs.pk,
-        cs.col_name ?? null,
-        cs.col_version,
-        cs.db_version,
-        cs.value ?? null,
-        now
-      );
-      count++;
+        siteId: cs.site_id || payload.site_id,
+        tableName: cs.table_name,
+        pk: cs.pk,
+        colName: cs.col_name ?? null,
+        colVersion: cs.col_version,
+        dbVersion: cs.db_version,
+        value: cs.value ?? null,
+        createdAt: now,
+      }).onConflictDoNothing().run();
+      insertCount++;
     }
-    return count;
+    return insertCount;
   });
 
-  const stored = insert(payload.changesets);
   return { stored };
 }
 
@@ -57,49 +53,64 @@ export function pullChangesets(
   identityId: string,
   payload: PullPayload
 ): { changesets: ChangesetRow[]; current_version: number } {
-  const db = getServerDb();
+  const db = getDb();
 
-  const rows = db.prepare(`
-    SELECT table_name, pk, col_name, col_version, db_version, value, site_id
-    FROM changesets
-    WHERE identity_id = ? AND db_version > ? AND site_id != ?
-    ORDER BY db_version ASC
-    LIMIT 1000
-  `).all(identityId, payload.since_version, payload.site_id) as any[];
+  const rows = db.select({
+    tableName: changesets.tableName,
+    pk: changesets.pk,
+    colName: changesets.colName,
+    colVersion: changesets.colVersion,
+    dbVersion: changesets.dbVersion,
+    value: changesets.value,
+    siteId: changesets.siteId,
+  })
+    .from(changesets)
+    .where(and(
+      eq(changesets.identityId, identityId),
+      gt(changesets.dbVersion, payload.since_version),
+      ne(changesets.siteId, payload.site_id),
+    ))
+    .orderBy(asc(changesets.dbVersion))
+    .limit(1000)
+    .all();
 
-  const changesets: ChangesetRow[] = rows.map(row => ({
-    table_name: row.table_name,
+  const result: ChangesetRow[] = rows.map(row => ({
+    table_name: row.tableName,
     pk: row.pk,
-    col_name: row.col_name,
-    col_version: row.col_version,
-    db_version: row.db_version,
+    col_name: row.colName,
+    col_version: row.colVersion,
+    db_version: row.dbVersion,
     value: row.value,
-    site_id: row.site_id,
+    site_id: row.siteId,
   }));
 
   // Fix 1: current_version = last row's db_version (not global max),
   // so clients paginate correctly when LIMIT truncates the result.
   // Only fall back to global max when there are no rows (i.e. fully caught up).
   let currentVersion: number;
-  if (changesets.length > 0) {
-    currentVersion = changesets[changesets.length - 1].db_version;
+  if (result.length > 0) {
+    currentVersion = result[result.length - 1].db_version;
   } else {
-    const versionRow = db.prepare(`
-      SELECT MAX(db_version) as max_version FROM changesets WHERE identity_id = ?
-    `).get(identityId) as { max_version: number | null };
-    currentVersion = versionRow.max_version ?? 0;
+    const versionRow = db.select({ maxVersion: max(changesets.dbVersion) })
+      .from(changesets)
+      .where(eq(changesets.identityId, identityId))
+      .get();
+    currentVersion = versionRow?.maxVersion ?? 0;
   }
 
   // Fix 2: update devices.last_sync_version so the server tracks progress.
-  if (changesets.length > 0) {
-    db.prepare(`
-      UPDATE devices SET last_sync_version = ?, last_seen_at = ?
-      WHERE identity_id = ? AND site_id = ?
-    `).run(currentVersion, Date.now(), identityId, payload.site_id);
+  if (result.length > 0) {
+    db.update(devices)
+      .set({ lastSyncVersion: currentVersion, lastSeenAt: Date.now() })
+      .where(and(
+        eq(devices.identityId, identityId),
+        eq(devices.siteId, payload.site_id),
+      ))
+      .run();
   }
 
   return {
-    changesets,
+    changesets: result,
     current_version: currentVersion,
   };
 }
@@ -110,21 +121,25 @@ export function getSyncStatus(identityId: string, deviceId: string): {
   last_sync_version: number;
   total_changesets: number;
 } {
-  const db = getServerDb();
+  const db = getDb();
 
-  const device = db.prepare(`
-    SELECT device_id, last_sync_version FROM devices
-    WHERE identity_id = ? AND device_id = ?
-  `).get(identityId, deviceId) as { device_id: string; last_sync_version: number } | undefined;
+  const device = db.select({ deviceId: devices.deviceId, lastSyncVersion: devices.lastSyncVersion })
+    .from(devices)
+    .where(and(
+      eq(devices.identityId, identityId),
+      eq(devices.deviceId, deviceId),
+    ))
+    .get();
 
-  const countRow = db.prepare(`
-    SELECT COUNT(*) as count FROM changesets WHERE identity_id = ?
-  `).get(identityId) as { count: number };
+  const countResult = db.select({ total: count() })
+    .from(changesets)
+    .where(eq(changesets.identityId, identityId))
+    .get();
 
   return {
     identity_id: identityId,
     device_id: deviceId,
-    last_sync_version: device?.last_sync_version ?? 0,
-    total_changesets: countRow.count,
+    last_sync_version: device?.lastSyncVersion ?? 0,
+    total_changesets: countResult?.total ?? 0,
   };
 }

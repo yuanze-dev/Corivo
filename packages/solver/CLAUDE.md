@@ -51,7 +51,8 @@ src/
     auth.routes.ts    POST /auth/challenge、POST /auth/verify
     sync.routes.ts    POST /sync/push、POST /sync/pull（需 Bearer Token）
   db/
-    server-db.ts    服务端 SQLite 单例（WAL 模式，进程退出自动关闭）
+    server-db.ts    服务端 SQLite 单例（WAL 模式，进程退出自动关闭）；导出 getDb()（Drizzle 实例）和 getServerDb()（原始连接）
+    schema.ts       Drizzle ORM schema 定义（accounts / devices / changesets 三张表）
   sync/
     sync-handler.ts pushChangesets() / pullChangesets() 实现
 ```
@@ -82,7 +83,7 @@ Token 存储在进程内存 `tokenStore: Map<string, TokenEntry>`，每 5 分钟
 
 ## 数据库 Schema
 
-服务端 `solver.db` 包含三张表：
+服务端 `solver.db` 包含三张表，schema 定义在 `src/db/schema.ts`（Drizzle ORM）：
 
 ```sql
 accounts     -- identity_id, fingerprints, shared_secret, created_at, last_seen_at
@@ -92,7 +93,9 @@ changesets   -- identity_id, site_id, table_name, pk(BLOB), col_name, col_versio
              -- UNIQUE(identity_id, site_id, table_name, pk, col_version)
 ```
 
-Changeset 按 `identity_id` 隔离，跨账户不可见。`INSERT OR IGNORE` 保证幂等推送。
+Changeset 按 `identity_id` 隔离，跨账户不可见。`onConflictDoNothing()`（原 `INSERT OR IGNORE`）保证幂等推送。
+
+**ORM 层**：路由和 sync-handler 通过 `getDb()`（`BetterSQLite3Database`）执行类型安全查询；建表 DDL 仍由 `createSchema()` 用原始 SQL 完成，保持与旧版数据库兼容。
 
 ---
 

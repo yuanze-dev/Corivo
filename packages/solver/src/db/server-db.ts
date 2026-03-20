@@ -3,9 +3,14 @@ import type { Database as SQLiteDatabase } from 'better-sqlite3';
 const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
 
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import * as schema from './schema.js';
+
 import { config } from '../config.js';
 
 let db: SQLiteDatabase;
+let drizzleDb: BetterSQLite3Database<typeof schema>;
 let exitHooksRegistered = false;
 
 export function getServerDb(): SQLiteDatabase {
@@ -23,6 +28,13 @@ export function getServerDb(): SQLiteDatabase {
     }
   }
   return db;
+}
+
+export function getDb(): BetterSQLite3Database<typeof schema> {
+  if (!drizzleDb) {
+    drizzleDb = drizzle(getServerDb(), { schema });
+  }
+  return drizzleDb;
 }
 
 function createSchema(db: SQLiteDatabase): void {

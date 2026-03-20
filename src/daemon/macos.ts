@@ -12,7 +12,7 @@ const LAUNCH_AGENTS_DIR = path.join(os.homedir(), 'Library', 'LaunchAgents');
 const PLIST_PATH = path.join(LAUNCH_AGENTS_DIR, PLIST_NAME);
 
 interface PlistConfig {
-  /** corivo 二进制路径 */
+  /** corivo 二进制路径或命令字符串 */
   corivoBin: string;
   /** 数据库密钥（base64） */
   dbKey: string;
@@ -24,6 +24,17 @@ interface PlistConfig {
  * 生成 launchd plist 文件内容
  */
 function generatePlist(config: PlistConfig): string {
+  // 解析命令：如果是 "node /path/to/cli.js" 格式，拆分为数组
+  let programArgs: string[];
+  if (config.corivoBin.includes('node ') || config.corivoBin.includes('nodejs ')) {
+    const parts = config.corivoBin.trim().split(/\s+/);
+    programArgs = [...parts, 'daemon', 'run'];
+  } else {
+    programArgs = [config.corivoBin, 'daemon', 'run'];
+  }
+
+  const programArgsXml = programArgs.map(arg => `    <string>${arg}</string>`).join('\n');
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -33,9 +44,7 @@ function generatePlist(config: PlistConfig): string {
 
   <key>ProgramArguments</key>
   <array>
-    <string>${config.corivoBin}</string>
-    <string>daemon</string>
-    <string>run</string>
+${programArgsXml}
   </array>
 
   <key>EnvironmentVariables</key>
@@ -150,8 +159,8 @@ export async function getStatus(): Promise<{
       encoding: 'utf-8',
     });
 
-    // 输出格式: "com.corivo.daemon\tPID\t..."
-    const match = output.match(/com\.corivo\.daemon\s+(\d+)/);
+    // 输出格式: "PID\texit_code\tcom.corivo.daemon"
+    const match = output.match(/^(\d+)\s+\d+\s+com\.corivo\.daemon/);
     const pid = match ? parseInt(match[1], 10) : undefined;
 
     // 如果 PID 是 "-" 或没有，说明服务没有运行

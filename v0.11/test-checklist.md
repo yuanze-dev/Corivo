@@ -63,15 +63,15 @@ corivo push --first-activation
 corivo daemon start
 corivo daemon status
 ```
-- [ ] 守护进程启动成功
-- [ ] `launchctl list | grep corivo` 显示服务已加载
-- [ ] `corivo daemon status` 显示运行中
+- [x] 守护进程启动成功
+- [x] `launchctl list | grep corivo` 显示服务已加载
+- [x] `corivo daemon status` 显示运行中
 
 ```bash
 corivo daemon stop
 ```
-- [ ] 守护进程停止成功
-- [ ] `launchctl list | grep corivo` 服务已卸载
+- [x] 守护进程停止成功
+- [x] `launchctl list | grep corivo` 服务已卸载
 
 ## Phase 5: 注入规则测试
 

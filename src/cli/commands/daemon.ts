@@ -2,6 +2,7 @@
  * Daemon 命令 - 守护进程管理
  */
 
+import fs from 'node:fs/promises';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import path from 'node:path';
@@ -51,13 +52,29 @@ daemonCommand
       const dbKey = config.db_key;
 
       // 获取 corivo 二进制路径
-      const corivoBin = process.env.CORIVO_BIN || path.join(process.cwd(), 'bin', 'corivo');
-      // 或者是全局安装的路径
-      const globalBin = path.join(os.homedir(), '.corivo', 'bin', 'corivo');
+      // 开发环境：使用 node + dist/cli/index.js
+      // 生产环境：使用独立的 corivo 二进制
+      const possiblePaths = [
+        process.env.CORIVO_BIN,
+        path.join(process.cwd(), 'bin', 'corivo'),
+        path.join(os.homedir(), '.corivo', 'bin', 'corivo'),
+      ];
 
-      const actualBin = await import('fs/promises').then(fs =>
-        fs.access(corivoBin).then(() => corivoBin).catch(() => globalBin)
-      );
+      let actualBin = '';
+
+      for (const p of possiblePaths) {
+        if (p && await fs.access(p).then(() => true).catch(() => false)) {
+          actualBin = p;
+          break;
+        }
+      }
+
+      // 如果没有找到二进制文件，使用开发模式（node + dist）
+      if (!actualBin) {
+        const nodePath = process.execPath; // 当前 node 路径
+        const cliPath = path.join(process.cwd(), 'dist', 'cli', 'index.js');
+        actualBin = `${nodePath} ${cliPath}`;
+      }
 
       // 安装服务
       console.log('正在启动后台心跳...');

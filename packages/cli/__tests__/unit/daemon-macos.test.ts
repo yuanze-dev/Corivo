@@ -139,7 +139,8 @@ describe('macOS Daemon Manager', () => {
   describe('getStatus', () => {
     it('should return running status when daemon is active', async () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
-      vi.mocked(execSync).mockReturnValue('com.corivo.daemon\t12345\t0\n');
+      // launchctl list 输出格式: PID\tStatus\tLabel
+      vi.mocked(execSync).mockReturnValue('12345\t0\tcom.corivo.daemon\n');
 
       const status = await macos.getStatus();
 
@@ -159,7 +160,8 @@ describe('macOS Daemon Manager', () => {
 
     it('should return not running when PID is not found', async () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
-      vi.mocked(execSync).mockReturnValue('com.corivo.daemon\t-\t0\n');
+      // launchctl list 中服务没有运行时，PID 为 "-"
+      vi.mocked(execSync).mockReturnValue('-\t0\tcom.corivo.daemon\n');
 
       const status = await macos.getStatus();
 

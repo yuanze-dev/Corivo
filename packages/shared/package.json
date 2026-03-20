@@ -1,0 +1,16 @@
+{
+  "name": "@corivo/shared",
+  "version": "0.11.0",
+  "description": "Corivo shared API and skills for multi-platform support",
+  "type": "module",
+  "main": "api/index.ts",
+  "keywords": [
+    "memory",
+    "knowledge",
+    "ai",
+    "storage",
+    "context"
+  ],
+  "author": "xiaolin26",
+  "license": "MIT"
+}

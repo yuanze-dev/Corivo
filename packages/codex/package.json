@@ -1,0 +1,15 @@
+{
+  "name": "@corivo/codex",
+  "version": "0.11.0",
+  "description": "Corivo Agent Skills for OpenAI Codex CLI",
+  "type": "module",
+  "keywords": [
+    "codex",
+    "openai",
+    "memory",
+    "knowledge",
+    "skills"
+  ],
+  "author": "xiaolin26",
+  "license": "MIT"
+}

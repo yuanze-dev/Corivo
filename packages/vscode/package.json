@@ -1,0 +1,92 @@
+{
+  "name": "corivo",
+  "displayName": "Corivo - Your Cyber Partner",
+  "description": "Persistent memory for AI coding assistants. Save and retrieve knowledge across sessions.",
+  "version": "0.11.0",
+  "publisher": "xiaolin26",
+  "author": {
+    "name": "xiaolin26"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xiaolin26/Corivo"
+  },
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Other"
+  ],
+  "keywords": [
+    "memory",
+    "knowledge",
+    "ai",
+    "copilot",
+    "context",
+    "corivo"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "corivo.save",
+        "title": "Corivo: Save Memory",
+        "category": "corivo"
+      },
+      {
+        "command": "corivo.query",
+        "title": "Corivo: Query Memories",
+        "category": "corivo"
+      },
+      {
+        "command": "corivo.status",
+        "title": "Corivo: Show Status",
+        "category": "corivo"
+      },
+      {
+        "command": "corivo.init",
+        "title": "Corivo: Initialize",
+        "category": "corivo"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "corivo-sidebar",
+          "title": "Corivo",
+          "icon": "assets/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "corivo-sidebar": [
+        {
+          "id": "corivo-memories",
+          "name": "Memories"
+        },
+        {
+          "id": "corivo-status",
+          "name": "Status"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.96.0",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "@corivo/shared": "workspace:*"
+  }
+}

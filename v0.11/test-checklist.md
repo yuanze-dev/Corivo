@@ -15,11 +15,11 @@
 npm install -g corivo
 corivo init
 ```
-- [ ] 安装成功
-- [ ] `~/.corivo/` 目录已创建
-- [ ] `corivo.db` 数据库已创建
-- [ ] `config.json` 配置文件已创建
-- [ ] `corivo --version` 显示正确版本
+- [x] 安装成功
+- [x] `~/.corivo/` 目录已创建
+- [x] `corivo.db` 数据库已创建
+- [x] `config.json` 配置文件已创建
+- [x] `corivo --version` 显示正确版本
 
 ### curl | sh 安装方式（推荐）
 ```bash
@@ -37,25 +37,25 @@ curl -fsSL https://corivo.ai | sh
 ```bash
 corivo cold-scan
 ```
-- [ ] 显示扫描进度
-- [ ] 发现信息源数量 ≥ 5
-- [ ] 扫描完成，无错误
+- [x] 显示扫描进度
+- [x] 发现信息源数量 ≥ 5
+- [x] 扫描完成，无错误
 
 验证扫描结果：
-- [ ] `corivo query "git"` - 能查到用户名/邮箱
-- [ ] `corivo query "TypeScript"` - 能查到技术栈
-- [ ] `corivo query "缩进"` - 能查到代码风格
+- [x] `corivo query "git"` - 能查到用户名/邮箱
+- [x] `corivo query "TypeScript"` - 能查到技术栈
+- [x] `corivo query "缩进"` - 能查到代码风格
 
 ## Phase 3: First Push 测试
 
 ```bash
 corivo push --first-activation
 ```
-- [ ] 输出自我介绍
-- [ ] 包含用户姓名
-- [ ] 包含技术栈信息
-- [ ] 包含代码风格
-- [ ] 显示来源标注
+- [x] 输出自我介绍
+- [x] 包含用户姓名
+- [x] 包含技术栈信息
+- [x] 包含代码风格
+- [x] 显示来源标注
 
 ## Phase 4: 守护进程测试
 

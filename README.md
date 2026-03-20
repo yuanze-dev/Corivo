@@ -44,20 +44,33 @@
 
 ## 开始使用
 
-### 1. 让 Corivo 住进来
+### 一句话安装
+
+```bash
+curl -fsSL https://get.corivo.dev | sh
+```
+
+安装后 Corivo 会：
+- 自动扫描你的工作环境（Git、项目配置、AI 工具设置等）
+- 生成初始用户画像
+- 启动后台心跳进程
+- 注入规则到你的 Claude Code
+
+### 或使用 npm 安装
 
 ```bash
 npm install -g corivo
 corivo init
 ```
 
-### 2. 在 Claude Code 中唤醒它
+### 注入 Claude Code 规则
 
 ```bash
-/plugin install xiaolin26/corivo
+cd 你的项目
+corivo inject
 ```
 
-### 3. 开始对话
+### 开始对话
 
 ```
 你: 记住，我是产品经理，叫晓力
@@ -135,6 +148,21 @@ corivo status
 - [完整设计文档](./v0.10/README.md) - 了解它是如何工作的
 - [插件说明](./corivo-plugin/README.md) - Claude Code 集成详情
 - [使用示例](./corivo-plugin/EXAMPLES.md) - 更多对话场景
+- [内测说明](./BETA.md) - 内测邀请和反馈渠道
+
+---
+
+## 内测计划
+
+Corivo v0.11 正在小范围内测中：
+
+**一句话安装** → 自动认识你 → 后台默默工作
+
+- ✅ macOS arm64 支持（主要平台）
+- ⏳ Linux、Windows 计划中
+- 🔄 功能快速迭代中
+
+[加入内测 →](./BETA.md) | [反馈 →](https://github.com/xiaolin26/Corivo/issues)
 
 ---
 

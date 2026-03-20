@@ -3,10 +3,12 @@
  * 输出推送消息
  */
 
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { generateFirstPush, getWelcomeMessage } from '../../first-push/index.js';
-import { CorivoDatabase } from '../../storage/database.js';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
 
 export const pushCommand = new Command('push');
 
@@ -24,28 +26,48 @@ pushCommand
         return;
       }
 
+      // 读取配置
+      const configDir = getConfigDir();
+      const configPath = path.join(configDir, 'config.json');
+
+      let config;
+      try {
+        const content = await fs.readFile(configPath, 'utf-8');
+        config = JSON.parse(content);
+      } catch {
+        console.log('');
+        console.log(chalk.yellow('请先运行 corivo init'));
+        console.log('');
+        return;
+      }
+
+      // 获取数据库密钥
+      let dbKeyBase64 = process.env.CORIVO_DB_KEY;
+      const dbPath = process.env.CORIVO_DB_PATH || getDefaultDatabasePath();
+
+      if (!dbKeyBase64 && config.db_key) {
+        dbKeyBase64 = config.db_key;
+      }
+
+      if (!dbKeyBase64) {
+        console.log('');
+        console.log(chalk.yellow('数据库未初始化，请先运行: corivo init'));
+        console.log('');
+        return;
+      }
+
+      const dbKey = Buffer.from(dbKeyBase64, 'base64');
+      const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
+
       if (options.firstActivation) {
         // 输出首次激活的自我介绍
-        // 使用环境变量获取数据库配置
-        const dbKeyBase64 = process.env.CORIVO_DB_KEY;
-        const dbPath = process.env.CORIVO_DB_PATH;
-
-        if (!dbKeyBase64 || !dbPath) {
-          console.log('');
-          console.log(chalk.yellow('请先运行 corivo init 初始化数据库'));
-          console.log('');
-          return;
-        }
-
-        const dbKey = Buffer.from(dbKeyBase64, 'base64');
-        const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
-
         // 获取最近扫描的 blocks
         const blocks = db.queryBlocks({ limit: 100 });
 
-        // 过滤出带有 scan_source 的 blocks（来自 Cold Scan）
+        // 过滤出来自 Cold Scan 的 blocks（source 为 cold-scan 或已知的扫描源）
+        const scanSources = new Set(['cold-scan', 'package-json', 'claude-code', 'prettier-config', 'editorconfig', 'tsconfig', 'git-config', 'npm-config', 'yarn-config', 'pnpm-config']);
         const scannedBlocks = blocks.filter(
-          (b: any) => b.metadata?.scan_source
+          (b: any) => scanSources.has(b.source)
         );
 
         const { message } = generateFirstPush(
@@ -63,18 +85,6 @@ pushCommand
       }
 
       // 默认：显示待推送的消息
-      const dbKeyBase64 = process.env.CORIVO_DB_KEY;
-      const dbPath = process.env.CORIVO_DB_PATH;
-
-      if (!dbKeyBase64 || !dbPath) {
-        console.log('');
-        console.log(chalk.yellow('请先运行 corivo init 初始化数据库'));
-        console.log('');
-        return;
-      }
-
-      const dbKey = Buffer.from(dbKeyBase64, 'base64');
-      const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
       const blocks = db.queryBlocks({ limit: 10 });
 
       if (blocks.length === 0) {

@@ -24,6 +24,7 @@ const HEALTH_CHECK_INTERVAL = 30000; // 30 秒写入一次健康状态
 export class Heartbeat {
     running = false;
     db = null;
+    config;
     ruleEngine;
     associationEngine;
     consolidationEngine;
@@ -35,6 +36,8 @@ export class Heartbeat {
     lastWeeklySummary = 0;
     healthFilePath;
     constructor(config) {
+        // 保存配置
+        this.config = config;
         // 如果传入了 db，直接使用（用于测试）
         if (config?.db) {
             this.db = config.db;
@@ -161,8 +164,16 @@ export class Heartbeat {
         try {
             // 初始化数据库（如果还没有）
             if (!this.db) {
-                const dbKeyBase64 = process.env.CORIVO_DB_KEY;
-                const dbPath = process.env.CORIVO_DB_PATH;
+                let dbKeyBase64 = process.env.CORIVO_DB_KEY;
+                let dbPath = process.env.CORIVO_DB_PATH;
+                // 从构造函数的配置中获取
+                if (!dbKeyBase64 && this.config?.dbKey) {
+                    const key = this.config.dbKey;
+                    dbKeyBase64 = Buffer.isBuffer(key) ? key.toString('base64') : key;
+                }
+                if (!dbPath && this.config?.dbPath) {
+                    dbPath = this.config.dbPath;
+                }
                 if (!dbKeyBase64 || !dbPath) {
                     throw new Error('缺少环境变量：CORIVO_DB_KEY 或 CORIVO_DB_PATH');
                 }

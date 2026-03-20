@@ -3,9 +3,12 @@
  * 首次安装时扫描用户本地环境，构建初始画像
  */
 
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { coldScan } from '../../cold-scan/index.js';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
 
 export const coldScanCommand = new Command('cold-scan');
 
@@ -33,6 +36,54 @@ coldScanCommand
         skipSources: options.skip || [],
       });
 
+      // 如果不是 dry-run，保存到数据库
+      if (!options.dryRun) {
+        // 读取配置
+        const configDir = getConfigDir();
+        const configPath = path.join(configDir, 'config.json');
+
+        let config;
+        try {
+          const content = await fs.readFile(configPath, 'utf-8');
+          config = JSON.parse(content);
+        } catch {
+          console.log('');
+          console.log(chalk.yellow('⚠️  未找到配置文件，跳过保存到数据库'));
+          console.log(chalk.gray('提示: 运行 corivo init 初始化数据库'));
+          console.log('');
+        }
+
+        if (config?.db_key) {
+          const dbKey = Buffer.from(config.db_key, 'base64');
+          const dbPath = process.env.CORIVO_DB_PATH || getDefaultDatabasePath();
+          const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
+
+          // 使用事务批量保存 blocks，确保数据持久化
+          let saved = 0;
+          const saveTransaction = db['db'].transaction(() => {
+            for (const block of result.blocks) {
+              db.createBlock({
+                content: String((block as any).content || ''),
+                annotation: (block as any).annotation || 'pending',  // 保留原始 annotation
+                source: (block as any).source || (block as any).metadata?.scan_source || 'cold-scan',
+                vitality: 100,
+              });
+              saved++;
+            }
+          });
+
+          saveTransaction();
+
+          // 执行 WAL checkpoint 确保数据写入主文件
+          db['db'].pragma('wal_checkpoint(TRUNCATE)');
+
+          if (saved > 0) {
+            console.log('');
+            console.log(chalk.green(`💾 已保存 ${saved} 条信息到数据库`));
+          }
+        }
+      }
+
       console.log('');
       console.log(chalk.green('══════════════════════════════════════════'));
       console.log(chalk.green('     认识你完成！                        '));
@@ -52,6 +103,12 @@ coldScanCommand
 
       if (failCount > 0) {
         console.log(chalk.yellow(`失败: ${failCount} 个来源`));
+      }
+
+      // 下一步提示
+      if (!options.dryRun && result.totalFound > 0) {
+        console.log('');
+        console.log(chalk.gray('下一步: 运行 corivo first-run 整理这些信息'));
       }
 
       console.log('');

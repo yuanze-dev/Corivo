@@ -3,9 +3,12 @@
  * 安装后立即执行，加速处理 Cold Scan 结果
  */
 
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { Heartbeat } from '../../engine/heartbeat.js';
+import { getConfigDir, getDefaultDatabasePath } from '../../storage/database.js';
 
 export const firstRunCommand = new Command('first-run');
 
@@ -27,7 +30,37 @@ firstRunCommand
       );
       console.log('');
 
-      const heartbeat = new Heartbeat();
+      // 读取配置
+      const configDir = getConfigDir();
+      const configPath = path.join(configDir, 'config.json');
+
+      let config;
+      try {
+        const content = await fs.readFile(configPath, 'utf-8');
+        config = JSON.parse(content);
+      } catch {
+        console.log('');
+        console.log(chalk.yellow('请先运行 corivo init'));
+        console.log('');
+        return;
+      }
+
+      // 获取数据库密钥
+      let dbKey = process.env.CORIVO_DB_KEY;
+      const dbPath = process.env.CORIVO_DB_PATH || getDefaultDatabasePath();
+
+      if (!dbKey && config.db_key) {
+        dbKey = config.db_key;
+      }
+
+      if (!dbKey) {
+        console.log('');
+        console.log(chalk.yellow('数据库未初始化，请先运行: corivo init'));
+        console.log('');
+        return;
+      }
+
+      const heartbeat = new Heartbeat({ dbKey, dbPath });
 
       const result = await heartbeat.runFirstRun({
         maxPendingBlocks: parseInt(options.maxPending, 10),

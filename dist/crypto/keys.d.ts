@@ -3,9 +3,6 @@
  *
  * 提供密钥派生、加解密、恢复密钥等功能
  */
-/**
- * 密钥管理静态类
- */
 export declare class KeyManager {
     /**
      * 从密码派生主密钥（PBKDF2）

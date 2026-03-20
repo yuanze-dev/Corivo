@@ -11,6 +11,10 @@ import { CorivoDatabase } from '../storage/database.js';
 export interface HeartbeatConfig {
     /** 数据库实例（可选，用于测试） */
     db?: CorivoDatabase;
+    /** 数据库密钥（可选，base64 编码） */
+    dbKey?: Buffer | string;
+    /** 数据库路径（可选） */
+    dbPath?: string;
 }
 /**
  * 首次运行配置
@@ -31,6 +35,7 @@ export interface FirstRunConfig {
 export declare class Heartbeat {
     private running;
     private db;
+    private config?;
     private ruleEngine;
     private associationEngine;
     private consolidationEngine;

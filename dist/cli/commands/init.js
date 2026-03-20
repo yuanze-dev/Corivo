@@ -11,11 +11,11 @@
  */
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
-import path from 'node:path';
 import { KeyManager } from '../../crypto/keys.js';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
 import { FileSystemError } from '../../errors/index.js';
 import { initializeIdentity, } from '../../identity/index.js';
+import { saveConfig } from '../../config.js';
 import { startCommand } from './start.js';
 /**
  * 退出并清理
@@ -94,14 +94,17 @@ export async function initCommand() {
         exit(1);
     }
     // 保存配置
-    const configPath = path.join(configDir, 'config.json');
     const config = {
-        version: '0.10.0-mvp',
+        version: '0.11.0',
         created_at: new Date().toISOString(),
-        identity_id: identityResult.identity.identity_id, // 身份 ID
-        db_key: dbKeyBase64, // 明文数据库密钥
+        identity_id: identityResult.identity.identity_id,
+        db_key: dbKeyBase64,
     };
-    await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+    const saveResult = await saveConfig(config, configDir);
+    if (!saveResult.success) {
+        console.log('❌ 配置保存失败: ' + saveResult.error);
+        exit(1);
+    }
     console.log('\n═══════════════════════════════════════════════════════');
     console.log('                  ✅ 初始化完成！');
     console.log('═══════════════════════════════════════════════════════\n');

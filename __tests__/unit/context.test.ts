@@ -51,8 +51,12 @@ describe('ContextPusher', () => {
       )
     `);
 
-    // 创建触发器同步数据到 FTS5
+    // 创建触发器同步数据到 FTS5（先删除可能存在的旧触发器）
     sqliteDb.exec(`
+      DROP TRIGGER IF EXISTS blocks_ai;
+      DROP TRIGGER IF EXISTS blocks_au;
+      DROP TRIGGER IF EXISTS blocks_ad;
+
       CREATE TRIGGER blocks_ai AFTER INSERT ON blocks BEGIN
         INSERT INTO blocks_fts(id, content, annotation)
         VALUES (new.id, new.content, new.annotation);
@@ -76,6 +80,8 @@ describe('ContextPusher', () => {
   });
 
   afterEach(async () => {
+    db.close();
+    CorivoDatabase.closeAll();
     await fs.unlink(dbPath).catch(() => {});
   });
 

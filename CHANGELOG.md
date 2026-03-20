@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-03-20
+
+### Added
+- **一键安装**: `npm i -g corivo && corivo init` 即可完成初始化并启动心跳
+- **Cold Scan**: 首次运行时自动提取用户信息（git config、package.json、Claude Code settings、编辑器配置等）
+- **macOS 后台心跳**: 通过 launchd 实现系统级守护进程，心跳持续自动运行
+- **自动更新系统**: 检查新版本，支持破坏性更新提醒和手动更新
+- **GitHub Actions CI/CD**: 自动化构建、测试和发布流程
+- **身份识别系统**: 基于平台指纹（Claude Code、飞书）的跨设备身份关联
+- **CLI 新命令**: `update`、`daemon`、`identity`、`cold-scan`、`inject`、`push`、`query`
+
+### Changed
+- 重构配置管理: 统一配置读取逻辑到 `src/config.ts`
+- 修复更新检查器破坏性更新逻辑错误
+- 完善 BIP39 词表（2048 个单词）支持恢复密钥生成
+
+### Fixed
+- Update Checker 破坏性更新逻辑反转的问题
+- 测试清理: 修复数据库单例模式导致的测试间干扰
+- BIP39 词表从 238 词补充到完整的 2048 词
+
 ## [0.10.5] - 2026-03-19
 
 ### Fixed

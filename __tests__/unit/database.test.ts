@@ -46,7 +46,10 @@ describe('CorivoDatabase', () => {
   });
 
   afterEach(async () => {
-    // 清理
+    // 清理数据库实例
+    db.close();
+    CorivoDatabase.closeAll();
+    // 删除文件
     await fs.unlink(dbPath).catch(() => {});
   });
 

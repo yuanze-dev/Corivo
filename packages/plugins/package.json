@@ -1,6 +1,6 @@
 {
-  "name": "corivo-plugin",
-  "version": "0.10.0",
+  "name": "@corivo/plugins",
+  "version": "0.11.0",
   "description": "Corivo Claude Code Plugin - 记忆存储与智能推送",
   "type": "module",
   "main": "dist/index.js",

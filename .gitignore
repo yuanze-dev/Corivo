@@ -20,6 +20,7 @@ coverage/
 
 # Claude
 .gstack/
+.claude/
 
 # Prebuild
 prebuilds/

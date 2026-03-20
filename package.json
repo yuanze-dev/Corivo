@@ -1,43 +1,20 @@
 {
   "name": "corivo",
-  "version": "0.11.0",
-  "description": "你的硅基同事 — 它只为你活着",
-  "type": "module",
-  "main": "dist/index.js",
-  "bin": {
-    "corivo": "bin/corivo.js"
-  },
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build": "pnpm -r run build",
+    "dev": "pnpm -r run dev",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
-    "format": "prettier --write \"src/**/*.ts\"",
-    "prepublishOnly": "npm run build",
-    "package": "npm run build && pkg . --targets node18-macos-arm64,node18-macos-x64,node18-linux-x64 --output ./binaries/corivo"
-  },
-  "keywords": [
-    "memory",
-    "ai",
-    "knowledge-management",
-    "cli"
-  ],
-  "author": "Corivo Team",
-  "license": "MIT",
-  "dependencies": {
-    "better-sqlite3": "^9.4.3",
-    "chalk": "^5.3.0",
-    "commander": "^12.1.0"
+    "lint": "eslint packages",
+    "lint:fix": "eslint packages --fix",
+    "format": "prettier --write \"packages/**/*.ts\""
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.19.37",
     "@vitest/coverage-v8": "^1.6.0",
     "eslint": "^9.9.1",
-    "pkg": "^5.8.1",
-    "prebuildify": "^6.0.1",
     "prettier": "^3.3.3",
     "typescript": "^5.5.4",
     "vitest": "^1.6.0"

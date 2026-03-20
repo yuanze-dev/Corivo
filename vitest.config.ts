@@ -12,8 +12,8 @@ export default defineConfig({
         '**/*.test.ts',
         '**/*.spec.ts',
         '**/node_modules/**',
-        '__tests__/**',
-        'src/cli/commands/**' // CLI commands mainly handle I/O
+        'packages/cli/__tests__/**',
+        'packages/cli/src/cli/commands/**' // CLI commands mainly handle I/O
       ],
       // MVP 覆盖率目标
       thresholds: {

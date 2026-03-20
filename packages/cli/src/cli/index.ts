@@ -34,6 +34,8 @@ import { unlockCommand } from './commands/unlock.js';
 import { verifyIdentityCommand } from './commands/verify-identity.js';
 import { coldScanCommand } from './commands/cold-scan.js';
 import { pushCommand } from './commands/push.js';
+import { pushQueueCommand } from './commands/push-queue.js';
+import { suggestCommand } from './commands/suggest.js';
 import { firstRunCommand } from './commands/heartbeat-first-run.js';
 import { daemonCommand } from './commands/daemon.js';
 import { updateCommand } from './commands/update.js';
@@ -142,6 +144,8 @@ program
 
 program.addCommand(coldScanCommand);
 program.addCommand(pushCommand);
+program.addCommand(pushQueueCommand);
+program.addCommand(suggestCommand);
 program.addCommand(firstRunCommand);
 program.addCommand(daemonCommand);
 program.addCommand(updateCommand);

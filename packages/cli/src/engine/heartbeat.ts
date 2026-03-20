@@ -13,6 +13,8 @@ import { AssociationEngine } from './associations.js';
 import { ConsolidationEngine } from './consolidation.js';
 import { WeeklySummary } from './weekly-summary.js';
 import { FollowUpManager } from './follow-up.js';
+import { TriggerDecision } from './trigger-decision.js';
+import { PushQueue } from './push-queue.js';
 import { DatabaseError } from '../errors/index.js';
 import type { BlockStatus, Pattern } from '../models/index.js';
 import { vitalityToStatus } from '../models/block.js';
@@ -60,10 +62,13 @@ export class Heartbeat {
   private consolidationEngine: ConsolidationEngine;
   private weeklySummary: WeeklySummary | null = null;
   private followUpManager: FollowUpManager | null = null;
+  private triggerDecision: TriggerDecision | null = null;
+  private pushQueue: PushQueue | null = null;
   private timeoutRef: NodeJS.Timeout | null = null;
   private lastHealthCheck = 0;
   private cycleCount = 0;
   private lastWeeklySummary = 0;
+  private lastTriggerDecision = 0;
   private healthFilePath: string;
 
   constructor(config?: HeartbeatConfig) {
@@ -118,6 +123,8 @@ export class Heartbeat {
       // 初始化依赖 db 的 managers
       this.weeklySummary = new WeeklySummary(this.db);
       this.followUpManager = new FollowUpManager(this.db);
+      this.triggerDecision = new TriggerDecision(this.db);
+      this.pushQueue = new PushQueue();
 
       console.log(`心跳守护进程启动中... (规则: ${this.ruleEngine.ruleCount})`);
     }
@@ -161,6 +168,11 @@ export class Heartbeat {
         // 进展提醒（每 864 个周期 = 1 小时，检查一次）
         if (this.cycleCount % 864 === 0 && this.db) {
           await this.checkFollowUps();
+        }
+
+        // 触发决策（每 120 个周期 = 10 分钟，检查一次）
+        if (this.cycleCount % 120 === 0 && this.db && this.triggerDecision && this.pushQueue) {
+          await this.processTriggerDecision();
         }
 
         // 更新健康状态（每 6 个周期更新一次）
@@ -715,6 +727,35 @@ export class Heartbeat {
       }
     } catch (error) {
       console.error('[心跳] 进展提醒失败:', error);
+    }
+  }
+
+  /**
+   * 处理触发决策
+   *
+   * 定期检查是否需要向用户推送提醒
+   */
+  private async processTriggerDecision(): Promise<void> {
+    if (!this.db || !this.triggerDecision || !this.pushQueue) {
+      return;
+    }
+
+    try {
+      // 加载推送队列
+      await this.pushQueue.load();
+
+      // 执行触发决策
+      const items = this.triggerDecision.decide({
+        now: Date.now(),
+      });
+
+      // 添加到队列
+      if (items.length > 0) {
+        await this.pushQueue.addAll(items);
+        console.log(`[心跳] 触发决策: 生成了 ${items.length} 条推送`);
+      }
+    } catch (error) {
+      console.error('[心跳] 触发决策失败:', error);
     }
   }
 

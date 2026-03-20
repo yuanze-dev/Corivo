@@ -106,14 +106,12 @@ cleanup_claude_md() {
         if [ -f "$file" ]; then
             # 检查是否包含标记
             if grep -q "$start_marker" "$file" 2>/dev/null; then
-                # 使用 sed 删除标记之间的内容（包括标记本身）
-                if sed -i.tmp "/$start_marker/,/$end_marker/d" "$file" 2>/dev/null; then
-                    rm -f "${file}.tmp"
-                    log_info "已清理: $file"
-                    ((cleaned_count++))
-                elif [[ "$OSTYPE" == "darwin"* ]]; then
-                    # macOS 需要不同的 sed 语法
-                    sed -i '' "/$start_marker/,/$end_marker/d" "$file" 2>/dev/null || true
+                # 使用 perl 删除标记之间的内容（包括标记）
+                # perl 在 macOS 和 Linux 上都可用
+                perl -i -ne "print unless /$start_marker/../$end_marker/" "$file" 2>/dev/null
+
+                # 检查是否成功（标记是否还存在）
+                if ! grep -q "$start_marker" "$file" 2>/dev/null; then
                     log_info "已清理: $file"
                     ((cleaned_count++))
                 fi

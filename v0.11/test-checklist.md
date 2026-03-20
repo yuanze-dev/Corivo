@@ -115,11 +115,13 @@ corivo update status
 ```bash
 curl -fsSL https://get.corivo.dev/uninstall | sh
 ```
-- [ ] 停止守护进程
-- [ ] 移除 launchd 配置
-- [ ] 删除 `~/.corivo/` 目录
-- [ ] CLAUDE.md 规则已清理
-- [ ] PATH 条目已移除
+- [x] 停止守护进程
+- [x] 移除 launchd 配置
+- [x] 删除 `~/.corivo/` 目录
+- [x] CLAUDE.md 规则已清理
+- [x] PATH 条目已移除（如有配置）
+
+**修复**: 使用 perl 替代 sed 修复 macOS 多行删除兼容性
 
 ---
 

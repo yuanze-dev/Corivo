@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-03-20
+
+### Added
+- **主动提醒系统** (`ReminderManager`): 5种提醒类型（进展/需关注/矛盾/周总结/自定义），支持优先级、过期、忽略
+- **上下文建议引擎** (`SuggestionEngine`): 基于长期记忆预测用户下一步，支持会话启动和请求后两种上下文
+- **触发决策引擎** (`TriggerDecisionEngine`): 检测矛盾、被遗忘的决策、需要关注的事项，智能推送
+- **推送队列** (`PushQueue`): 持久化存储推送项，支持去重和过期机制
+- **CLI 命令**: `reminders`（提醒管理）、`suggest`（建议生成）、`push-queue`（队列管理）
+- **Hook 集成**: `stop-suggest.sh` 在请求完成后自动推送建议
+- **文档**: `push-system-design.md`、`suggestion-design.md`、`trigger-decision-design.md`
+
+### Changed
+- First Push 文案优化：「几秒钟」→「一点时间」
+
+### Fixed
+- 测试隔离问题: 使用随机 ID 而非 `Date.now()` 生成临时数据库路径
+- daemon-macos 测试: 修正 `launchctl list` 输出格式 mock
+
 ## [0.11.0] - 2026-03-20
 
 ### Added

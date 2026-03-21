@@ -162,38 +162,9 @@ export class CorivoDatabase {
    * @throws {DatabaseError} 如果数据库被其他进程锁定
    */
   private detectAndCleanupStaleLock(): void {
-    const fs = require('node:fs');
-    const path = require('node:path');
-
-    const walPath = `${this.config.path}-wal`;
-    const shmPath = `${this.config.path}-shm`;
-
-    // 如果 WAL 文件不存在，无需处理
-    if (!fs.existsSync(walPath)) {
-      return;
-    }
-
-    // 尝试通过 SQLite 检测锁状态
-    // better-sqlite3 会在打开时尝试获取锁，如果失败会抛出错误
-    try {
-      const testDb = new Database(this.config.path, { readonly: true });
-      testDb.close();
-      // 如果能成功打开，说明没有其他进程持有锁
-      // 清理陈旧的 WAL 文件（SQLite 会重新创建）
-      fs.unlinkSync(walPath);
-      if (fs.existsSync(shmPath)) {
-        fs.unlinkSync(shmPath);
-      }
-    } catch (error) {
-      const errorCode = (error as any).code;
-      if (errorCode === 'SQLITE_BUSY' || errorCode === 'SQLITE_LOCKED') {
-        throw new DatabaseError(
-          '数据库被其他进程占用。请检查是否有其他 Corivo 进程正在运行，或手动删除 .wal 文件。',
-          { cause: error }
-        );
-      }
-      // 其他错误（如文件不存在）可以忽略，稍后会重新创建
-    }
+    // WAL 文件由 SQLite 自动管理，无需手动干预。
+    // 即使进程崩溃，SQLite 在下次打开时会自动恢复 WAL。
+    // 手动删除 WAL 会导致未 checkpoint 的数据丢失。
   }
 
   /**
@@ -948,6 +919,21 @@ export class CorivoDatabase {
     // 空查询返回所有结果
     if (!query || query.trim() === '') {
       return this.queryBlocks({ limit });
+    }
+
+    // 应用层加密时，内容以密文存储，SQL 层搜索无法匹配明文。
+    // 改为全量读取后在内存中解密匹配。
+    if (this.enableEncryption && !this.useSQLCipher) {
+      const allRows = this.db.prepare('SELECT * FROM blocks ORDER BY updated_at DESC').all() as any[];
+      const matched: Block[] = [];
+      for (const row of allRows) {
+        const block = this.rowToBlock(row);
+        if (block.content.includes(query) || block.annotation.includes(query)) {
+          matched.push(block);
+          if (matched.length >= limit) break;
+        }
+      }
+      return matched;
     }
 
     // 先尝试 FTS5 全文搜索

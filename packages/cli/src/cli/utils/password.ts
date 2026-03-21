@@ -76,3 +76,28 @@ export function readPassword(prompt: string, options: { allowEmpty?: boolean } =
     stdin.on('data', onData);
   });
 }
+
+/**
+ * 读取 y/n 确认输入
+ *
+ * @param prompt - 提示文本（不含 [y/N]）
+ * @param defaultNo - 默认值是否为 No（true = 按 Enter 视为 No）
+ */
+export function readConfirm(prompt: string, defaultNo = true): Promise<boolean> {
+  return new Promise((resolve) => {
+    const hint = defaultNo ? '[y/N]' : '[Y/n]';
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    rl.question(`${prompt} ${hint}: `, (answer: string) => {
+      rl.close();
+      const normalized = answer.trim().toLowerCase();
+      if (defaultNo) {
+        resolve(normalized === 'y' || normalized === 'yes');
+      } else {
+        resolve(normalized !== 'n' && normalized !== 'no');
+      }
+    });
+  });
+}

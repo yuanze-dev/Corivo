@@ -22,9 +22,10 @@ import {
   getIdentityId,
   type Fingerprint,
 } from '../../identity/index.js';
-import { saveConfig, saveSolverConfig, type CorivoConfig, type SolverConfig } from '../../config.js';
+import { saveConfig, saveSolverConfig, loadConfig, type CorivoConfig, type SolverConfig } from '../../config.js';
 import { startCommand } from './start.js';
 import { registerWithSolver, post } from './sync.js';
+import { readConfirm } from '../utils/password.js';
 
 /**
  * 退出并清理
@@ -41,16 +42,18 @@ export async function initCommand(options: { join?: string; server?: string } = 
   console.log('           Corivo — 一个为你而活着的数字伙伴');
   console.log('═══════════════════════════════════════════════════════\n');
 
-  // 检查是否已初始化
+  // 检查是否已初始化（--join 场景允许已存在，会提示用户确认合并）
   const dbPath = getDefaultDatabasePath();
-  try {
-    if (fsSync.existsSync(dbPath)) {
-      console.log(`⚠️  检测到 Corivo 已存在于: ${dbPath}`);
-      console.log('如果需要重新初始化，请先删除现有数据库：');
-      console.log(`  rm ${dbPath}`);
-      exit(1);
-    }
-  } catch {}
+  if (!options.join) {
+    try {
+      if (fsSync.existsSync(dbPath)) {
+        console.log(`⚠️  检测到 Corivo 已存在于: ${dbPath}`);
+        console.log('如果需要重新初始化，请先删除现有数据库：');
+        console.log(`  rm ${dbPath}`);
+        exit(1);
+      }
+    } catch {}
+  }
 
   // 创建配置目录
   const configDir = getConfigDir();
@@ -95,24 +98,51 @@ export async function initCommand(options: { join?: string; server?: string } = 
     console.log('✓ 配对成功');
     console.log(`  身份 ID: ${identityId}`);
 
-    // 创建本地 identity（使用指定 ID）
+    // 检测本地是否已有 identity（冲突场景）
+    const existingConfig = await loadConfig(configDir);
+    let dbKey: Buffer;
+    let dbKeyBase64: string;
+
+    if (existingConfig && existingConfig.identity_id !== identityId) {
+      console.log('\n⚠️  检测到本机已有 Corivo 身份：');
+      console.log(`   当前身份 ID: ${existingConfig.identity_id}`);
+      console.log(`   将加入身份 ID: ${identityId}`);
+      console.log('\n   选择 Yes：保留本机数据，切换到新 identity（本机数据将在下次同步时推送至服务器）');
+      console.log('   选择 No：取消操作，保持现状\n');
+
+      const confirmed = await readConfirm('是否继续？');
+      if (!confirmed) {
+        console.log('已取消。');
+        exit(0);
+      }
+
+      // 保留现有 db_key（数据库不变，只更新 identity）
+      dbKey = Buffer.from(existingConfig.db_key, 'base64');
+      dbKeyBase64 = existingConfig.db_key;
+    } else {
+      // 全新设备，生成新的 db_key
+      dbKey = KeyManager.generateDatabaseKey();
+      dbKeyBase64 = dbKey.toString('base64');
+    }
+
+    // 创建本地 identity（使用指定 ID，覆盖已有）
+    const identityPath = path.join(configDir, 'identity.json');
+    try { await fs.unlink(identityPath); } catch { /* 不存在则忽略 */ }
     await initializeIdentityWithId(identityId, configDir);
 
-    // 生成本地 db_key（各设备独立加密）
-    const dbKey = KeyManager.generateDatabaseKey();
-    const dbKeyBase64 = dbKey.toString('base64');
-
-    console.log('\n正在创建加密数据库...');
-    const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
-    const health = db.checkHealth();
-    if (!health.ok) {
-      console.log('❌ 数据库创建失败');
-      exit(1);
+    if (!existingConfig || existingConfig.identity_id !== identityId) {
+      console.log('\n正在创建加密数据库...');
+      const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
+      const health = db.checkHealth();
+      if (!health.ok) {
+        console.log('❌ 数据库创建失败');
+        exit(1);
+      }
     }
 
     const config: CorivoConfig = {
       version: '0.11.0',
-      created_at: new Date().toISOString(),
+      created_at: existingConfig?.created_at ?? new Date().toISOString(),
       identity_id: identityId,
       db_key: dbKeyBase64,
     };

@@ -79,7 +79,15 @@ program
   .command('status')
   .description('查看状态')
   .option('--no-password', '跳过密码输入（开发模式）')
-  .action((options) => statusCommand(options));
+  .option('--tui', '启动交互式状态面板')
+  .action(async (options) => {
+    if (options.tui) {
+      const { renderTui } = await import('../tui/index.js');
+      await renderTui();
+    } else {
+      await statusCommand(options);
+    }
+  });
 
 program
   .command('start')

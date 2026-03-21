@@ -107,8 +107,8 @@ export class Heartbeat {
   }
 
   private computeSyncCycles(seconds: number | undefined): number {
-    if (!Number.isFinite(seconds) || seconds! <= 0) return 60;
-    return Math.max(1, Math.round(seconds! / 5));
+    if (!Number.isFinite(seconds) || (seconds as number) <= 0) return 60;
+    return Math.max(1, Math.round((seconds as number) / 5));
   }
 
   /**

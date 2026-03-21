@@ -217,6 +217,11 @@ describe('Heartbeat Integration', () => {
       const hb = new Heartbeat({ db, syncIntervalSeconds: NaN });
       expect(getSyncCycles(hb)).toBe(60);
     });
+
+    it('ignores Infinity and uses default', () => {
+      const hb = new Heartbeat({ db, syncIntervalSeconds: Infinity });
+      expect(getSyncCycles(hb)).toBe(60);
+    });
   });
 
   describe('association discovery', () => {

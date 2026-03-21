@@ -185,6 +185,21 @@ Claude Code 插件包，让 AI 工具能读写 Corivo 记忆。
 
 类型：feat / fix / refactor / docs / hotfix
 
+### 原子化提交
+
+每个 commit 只做一件事，保持最小可理解单元：
+
+- ✅ 一个功能点、一个 bug fix、一次重构对应一个 commit
+- ❌ 不在同一个 commit 里混合功能实现与格式整理
+- ❌ 不把"顺手改的东西"塞进不相关的 commit
+
+**判断标准：** commit message 能用一句话清晰描述，且 diff 只包含该描述涉及的改动。
+
+**拆分时机：**
+- 实现某功能前，先把前置重构单独提交
+- bug fix 和触发该 bug 的测试分两个 commit（测试先提交）
+- 同一文件的多处无关改动，分多次 `git add -p` 暂存后分别提交
+
 ---
 
 ## Design System

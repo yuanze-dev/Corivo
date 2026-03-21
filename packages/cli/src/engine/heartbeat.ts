@@ -15,6 +15,7 @@ import { WeeklySummary } from './weekly-summary.js';
 import { FollowUpManager } from './follow-up.js';
 import { TriggerDecision } from './trigger-decision.js';
 import { PushQueue } from './push-queue.js';
+import { AutoSync } from './auto-sync.js';
 import { DatabaseError } from '../errors/index.js';
 import type { BlockStatus, Pattern } from '../models/index.js';
 import { vitalityToStatus } from '../models/block.js';
@@ -64,6 +65,7 @@ export class Heartbeat {
   private followUpManager: FollowUpManager | null = null;
   private triggerDecision: TriggerDecision | null = null;
   private pushQueue: PushQueue | null = null;
+  private autoSync: AutoSync | null = null;
   private timeoutRef: NodeJS.Timeout | null = null;
   private lastHealthCheck = 0;
   private cycleCount = 0;
@@ -125,6 +127,7 @@ export class Heartbeat {
       this.followUpManager = new FollowUpManager(this.db);
       this.triggerDecision = new TriggerDecision(this.db);
       this.pushQueue = new PushQueue();
+      this.autoSync = new AutoSync(this.db);
 
       console.log(`心跳守护进程启动中... (规则: ${this.ruleEngine.ruleCount})`);
     }
@@ -173,6 +176,11 @@ export class Heartbeat {
         // 触发决策（每 120 个周期 = 10 分钟，检查一次）
         if (this.cycleCount % 120 === 0 && this.db && this.triggerDecision && this.pushQueue) {
           await this.processTriggerDecision();
+        }
+
+        // 自动同步（每 60 个周期 = 5 分钟）
+        if (this.cycleCount % 60 === 0 && this.db && this.autoSync) {
+          await this.processSync();
         }
 
         // 更新健康状态（每 6 个周期更新一次）
@@ -756,6 +764,23 @@ export class Heartbeat {
       }
     } catch (error) {
       console.error('[心跳] 触发决策失败:', error);
+    }
+  }
+
+  /**
+   * 处理自动同步
+   *
+   * 后台静默执行 push/pull，未注册时跳过
+   */
+  private async processSync(): Promise<void> {
+    if (!this.autoSync) return;
+    try {
+      const result = await this.autoSync.run();
+      if (result) {
+        console.log(`[心跳] 自动同步: Push ${result.pushed}, Pull ${result.pulled}`);
+      }
+    } catch (error) {
+      console.error('[心跳] 自动同步失败:', error instanceof Error ? error.message : error);
     }
   }
 

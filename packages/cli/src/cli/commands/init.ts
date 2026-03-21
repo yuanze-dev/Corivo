@@ -23,6 +23,8 @@ import {
 } from '../../identity/index.js';
 import { saveConfig, type CorivoConfig } from '../../config.js';
 import { startCommand } from './start.js';
+import { registerWithSolver } from './sync.js';
+import { saveSolverConfig } from '../../config.js';
 
 /**
  * 退出并清理
@@ -137,6 +139,19 @@ export async function initCommand(): Promise<void> {
   console.log('\n💡 提示：');
   console.log('   数据库密钥明文存储在本地，依赖文件系统权限保护');
   console.log('   请确保你的用户目录安全（不与他人共享）\n');
+
+  // ========== 自动注册 solver ==========
+  const defaultSolverUrl = process.env.CORIVO_SOLVER_URL || 'http://localhost:3141';
+  try {
+    const solverConfig = await registerWithSolver(defaultSolverUrl, identityResult.identity.identity_id);
+    if (solverConfig) {
+      await saveSolverConfig(solverConfig, configDir);
+      console.log('🔗 已连接同步服务器\n');
+    }
+  } catch {
+    // 服务器不可达，静默跳过；daemon 稍后会重试
+  }
+  // ========== 自动注册 solver 结束 ==========
 
   // ========== 自动启动心跳 ==========
   console.log('🫀 正在启动心跳...');

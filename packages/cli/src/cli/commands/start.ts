@@ -5,10 +5,17 @@
  */
 
 import fs from 'node:fs/promises';
+import fs_sync from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getDefaultDatabasePath, getConfigDir, getPidFilePath } from '../../storage/database.js';
 import { ProcessError, ConfigError } from '../../errors/index.js';
+
+// start.js 编译后位于 dist/cli/commands/start.js，包根目录是上三级
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const packageRoot = path.resolve(__dirname, '..', '..', '..');
 
 const MAX_RESTART_ATTEMPTS = 3;
 const RESTART_DELAY = 5000; // 5 秒
@@ -64,14 +71,20 @@ export async function startCommand(): Promise<void> {
 
   console.log('正在启动心跳守护进程...');
 
+  // 将 stdout/stderr 重定向到日志文件
+  const logPath = path.join(configDir, 'daemon.log');
+  const errPath = path.join(configDir, 'daemon.err');
+  const logFd = fs_sync.openSync(logPath, 'a');
+  const errFd = fs_sync.openSync(errPath, 'a');
+
   // 启动守护进程（无需密码）
   const pid = spawn(
     process.execPath,
     ['./dist/engine/heartbeat.js'],
     {
-      cwd: process.cwd(),
+      cwd: packageRoot,
       detached: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', logFd, errFd],
       env: {
         ...process.env,
         CORIVO_DB_PATH: getDefaultDatabasePath(),
@@ -81,6 +94,9 @@ export async function startCommand(): Promise<void> {
       },
     }
   );
+
+  fs_sync.closeSync(logFd);
+  fs_sync.closeSync(errFd);
 
   pid.unref();
 
@@ -92,6 +108,9 @@ export async function startCommand(): Promise<void> {
   await fs.writeFile(pidPath, childPid.toString());
 
   console.log(`✅ 心跳守护进程已启动 (PID: ${childPid})`);
+  console.log(`\n日志路径:`);
+  console.log(`  stdout: ${logPath}`);
+  console.log(`  stderr: ${errPath}`);
   console.log('\n提示: 心跳进程会自动处理待标注的 block 和执行衰减');
   console.log('如需启用自动重启功能，请使用: corivo start --watch');
 }
@@ -178,7 +197,7 @@ async function spawnHeartbeat(
     process.execPath,
     ['./dist/engine/heartbeat.js'],
     {
-      cwd: process.cwd(),
+      cwd: packageRoot,
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {

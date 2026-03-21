@@ -14,7 +14,7 @@ interface RegisterResponse {
 }
 
 // 简单 fetch wrapper（Node.js 18+ 内置 fetch）
-async function post(url: string, body: unknown, token?: string): Promise<unknown> {
+export async function post(url: string, body: unknown, token?: string): Promise<unknown> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,7 +30,7 @@ async function post(url: string, body: unknown, token?: string): Promise<unknown
   return res.json();
 }
 
-async function get(url: string, token: string): Promise<unknown> {
+export async function get(url: string, token: string): Promise<unknown> {
   const res = await fetch(url, {
     headers: { 'Authorization': `Bearer ${token}` },
   });
@@ -41,7 +41,7 @@ async function get(url: string, token: string): Promise<unknown> {
   return res.json();
 }
 
-async function authenticate(serverUrl: string, identityId: string, sharedSecret: string): Promise<string> {
+export async function authenticate(serverUrl: string, identityId: string, sharedSecret: string): Promise<string> {
   const { challenge } = await post(`${serverUrl}/auth/challenge`, { identity_id: identityId }) as { challenge: string };
   const response = createHmac('sha256', sharedSecret).update(challenge).digest('hex');
   const { token } = await post(`${serverUrl}/auth/verify`, {
@@ -50,6 +50,38 @@ async function authenticate(serverUrl: string, identityId: string, sharedSecret:
     response,
   }) as { token: string };
   return token;
+}
+
+/**
+ * 向 solver 服务器注册，返回 SolverConfig；失败返回 null
+ */
+export async function registerWithSolver(
+  serverUrl: string,
+  identityId: string
+): Promise<import('../../config.js').SolverConfig | null> {
+  const { randomBytes } = await import('node:crypto');
+  const siteId = randomBytes(16).toString('hex');
+  const deviceId = randomBytes(8).toString('hex');
+
+  try {
+    const result = await post(`${serverUrl}/auth/register`, {
+      identity_id: identityId,
+      fingerprints: [],
+      device_id: deviceId,
+      device_name: `corivo-cli-${deviceId.slice(0, 8)}`,
+      site_id: siteId,
+    }) as RegisterResponse;
+
+    return {
+      server_url: serverUrl,
+      shared_secret: result.shared_secret,
+      site_id: siteId,
+      last_push_version: 0,
+      last_pull_version: 0,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function createSyncCommand(): Command {

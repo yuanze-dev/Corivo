@@ -412,22 +412,38 @@ cd packages/cli && npm run build
 
 期望：`dist/` 成功生成，无错误
 
-- [ ] **Step 6: build 并运行测试**
+- [ ] **Step 6: 编译测试专用 tsconfig 并运行**
 
-tsup 的入口只编译 `cli/index` 和 `engine/heartbeat`，不自动编译 `service/` 和测试文件。需要先用 tsc 编译全量源码：
+`tsconfig.json` 的 `rootDir` 是 `src/`，且排除了 `*.test.ts`，无法直接编译测试文件。需要创建一个测试专用配置（只用于本步骤，不提交）：
 
 ```bash
-cd packages/cli && npx tsc --project tsconfig.json --outDir dist-test --noEmit false
+cd packages/cli
+
+# 创建临时测试 tsconfig（只用于编译测试，不需提交）
+cat > tsconfig.test.json << 'EOF'
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "./dist-test",
+    "noEmit": false
+  },
+  "include": ["src/**/*", "__tests__/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+EOF
+
+npx tsc --project tsconfig.test.json
 node --test dist-test/__tests__/unit/service-manager.test.js
 ```
 
-> 如果 `tsconfig.json` 不包含 `__tests__/` 目录，改用：
-> ```bash
-> node --test --loader ts-node/esm __tests__/unit/service-manager.test.ts
-> ```
-> 或跳过单元测试，在 Task 9 通过手动冒烟测试验证。
-
 期望：所有测试 pass（`UnsupportedServiceManager` 和 `LinuxServiceManager` 的测试无需 macOS 即可运行）
+
+清理临时文件：
+
+```bash
+rm -rf dist-test tsconfig.test.json
+```
 
 - [ ] **Step 7: commit**
 

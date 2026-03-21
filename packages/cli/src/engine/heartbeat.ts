@@ -812,13 +812,13 @@ export class Heartbeat {
 }
 
 // 如果直接运行此文件（作为守护进程）
-// 检测方式：比较 process.argv[1]（当前执行的脚本路径）与 import.meta.url
+// 检测方式：当前文件路径和入口脚本路径都以 heartbeat.js 结尾
+// 注意：不能用 currentFilePath === argv1，因为 tsup 打包后两者都指向 dist/cli/index.js
 const isDirectRun = () => {
   try {
     const currentFilePath = new URL(import.meta.url).pathname;
     const argv1 = process.argv[1];
-    // 规范化路径后比较
-    return currentFilePath === argv1 || currentFilePath.endsWith('/heartbeat.js') && argv1.endsWith('heartbeat.js');
+    return currentFilePath.endsWith('/heartbeat.js') && argv1.endsWith('heartbeat.js');
   } catch {
     return false;
   }

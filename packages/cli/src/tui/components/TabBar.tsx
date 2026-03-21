@@ -2,15 +2,24 @@ import React from 'react';
 import { Box, Text } from 'ink';
 
 export const TABS = [
-  { id: 'overview', label: '1:Overview' },
-  { id: 'sync',     label: '2:Sync' },
-  { id: 'daemon',   label: '3:Daemon' },
-  { id: 'device',   label: '4:Device' },
-  { id: 'config',   label: '5:Config' },
-  { id: 'logs',     label: '6:Logs' },
+  { id: 'overview', icon: '●', label: 'overview' },
+  { id: 'sync',     icon: '⇌', label: 'sync' },
+  { id: 'daemon',   icon: '↺', label: 'daemon' },
+  { id: 'device',   icon: '□', label: 'device' },
+  { id: 'config',   icon: '✦', label: 'config' },
+  { id: 'logs',     icon: '▪', label: 'logs' },
 ] as const;
 
 export type TabId = (typeof TABS)[number]['id'];
+
+const TAB_ICON_COLOR: Record<string, string> = {
+  overview: 'green',
+  sync:     'cyan',
+  daemon:   'yellow',
+  device:   '#a78bfa',
+  config:   'blue',
+  logs:     'gray',
+};
 
 interface TabBarProps {
   active: TabId;
@@ -18,18 +27,23 @@ interface TabBarProps {
 
 export function TabBar({ active }: TabBarProps) {
   return (
-    <Box paddingX={1} marginBottom={1}>
-      {TABS.map((tab) => {
+    <Box marginBottom={1}>
+      {TABS.map((tab, i) => {
         const isActive = tab.id === active;
+        const iconColor = TAB_ICON_COLOR[tab.id] ?? 'gray';
+        if (isActive) {
+          return (
+            <Box key={tab.id} borderStyle="round" borderColor="green" marginRight={2}>
+              <Text color="green" bold>
+                {tab.icon} {tab.label}
+              </Text>
+            </Box>
+          );
+        }
         return (
-          <Box key={tab.id} marginRight={2}>
-            <Text
-              color={isActive ? 'green' : 'gray'}
-              bold={isActive}
-              underline={isActive}
-            >
-              {tab.label}
-            </Text>
+          <Box key={tab.id} marginRight={3} alignSelf="center">
+            <Text color={iconColor as any}>{tab.icon}</Text>
+            <Text color="gray"> {tab.label}</Text>
           </Box>
         );
       })}

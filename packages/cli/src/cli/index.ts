@@ -78,8 +78,8 @@ program
 program
   .command('status')
   .description('查看状态')
-  .option('--no-password', '跳过密码输入（开发模式）')
   .option('--tui', '启动交互式状态面板')
+  .option('--no-password', '跳过密码输入（开发模式）')
   .action(async (options) => {
     if (options.tui) {
       const { renderTui } = await import('../tui/index.js');

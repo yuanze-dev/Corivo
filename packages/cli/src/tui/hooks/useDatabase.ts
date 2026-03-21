@@ -4,8 +4,11 @@ import type { Block } from '../../models/index.js';
 
 export interface DbStats {
   total: number;
+  weeklyNew: number;
+  queryHits: number;
   byStatus: Record<string, number>;
   byAnnotation: Record<string, number>;
+  byNature: Record<string, number>;
   associationCount: number;
   sizeBytes: number;
   healthy: boolean;
@@ -21,18 +24,19 @@ export function useDatabase(db: CorivoDatabase | null): { stats: DbStats | null;
 
     const fetch = () => {
       try {
-        const rawStats = db.getStats();
+        const tui = db.getTUIStats();
         const health = db.checkHealth();
-        const associations = db.queryAssociations({ limit: 500 });
-        const recentBlocks = db.queryBlocks({ limit: 5 });
         setStats({
-          total: rawStats.total,
-          byStatus: rawStats.byStatus,
-          byAnnotation: rawStats.byAnnotation,
-          associationCount: associations.length,
-          sizeBytes: health.size ?? 0,
+          total: tui.total,
+          weeklyNew: tui.weeklyNew,
+          queryHits: tui.queryHits,
+          byStatus: tui.byStatus,
+          byAnnotation: {},
+          byNature: tui.byNature,
+          associationCount: tui.associations,
+          sizeBytes: tui.dbSize,
           healthy: health.ok,
-          recentBlocks,
+          recentBlocks: tui.recentBlocks as unknown as Block[],
         });
       } catch {
         // DB error — leave stats null

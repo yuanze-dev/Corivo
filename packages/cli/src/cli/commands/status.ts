@@ -12,6 +12,7 @@ import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../stor
 import { ConfigError } from '../../errors/index.js';
 import { getDatabaseKey, loadSolverConfig } from '../../config.js';
 import { ContextPusher } from '../../push/context.js';
+import { getServiceManager } from '../../service/index.js';
 
 export async function statusCommand(_options: { noPassword?: boolean } = {}): Promise<void> {
   const configDir = getConfigDir();
@@ -25,16 +26,9 @@ export async function statusCommand(_options: { noPassword?: boolean } = {}): Pr
     throw new ConfigError('Corivo 未初始化。请先运行: corivo init');
   }
 
-  // 检查守护进程状态
-  const pidPath = path.join(configDir, 'heartbeat.pid');
-  let heartbeatRunning = false;
-  try {
-    if (await fs.stat(pidPath)) {
-      const pid = parseInt(await fs.readFile(pidPath, 'utf-8'));
-      process.kill(pid, 0);
-      heartbeatRunning = true;
-    }
-  } catch {}
+  // 检查守护进程状态（通过 ServiceManager）
+  const serviceManager = getServiceManager()
+  const serviceStatus = await serviceManager.getStatus()
 
   const dbKey = await getDatabaseKey(configDir);
   if (!dbKey) {
@@ -75,8 +69,11 @@ export async function statusCommand(_options: { noPassword?: boolean } = {}): Pr
     console.log(chalk.gray('  大小:   ') + chalk.white(`${(health.size / 1024 / 1024).toFixed(2)} MB`));
   }
 
-  console.log(chalk.cyan('\n⚡ 心跳守护进程'));
-  console.log(chalk.gray('  状态:   ') + (heartbeatRunning ? chalk.green('🟢 运行中') : chalk.gray('⚪ 未启动')));
+  console.log(chalk.cyan('\n⚡ 心跳守护进程'))
+  console.log(chalk.gray('  状态:   ') + (serviceStatus.running ? chalk.green('🟢 运行中') : chalk.gray('⚪ 未启动')))
+  if (serviceStatus.pid) {
+    console.log(chalk.gray('  PID:    ') + chalk.white(serviceStatus.pid.toString()))
+  }
 
   console.log(chalk.cyan('\n🔗 同步'));
   if (solverConfig) {

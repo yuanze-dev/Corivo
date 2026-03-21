@@ -38,7 +38,7 @@ suggestCommand
 
       // 获取数据库密钥（无密码模式）
       let dbKey: Buffer;
-      const skipPassword = options.noPassword || process.env.CORIVO_NO_PASSWORD === '1';
+      const skipPassword = options.password === false || process.env.CORIVO_NO_PASSWORD === '1';
 
       if (skipPassword) {
         if (config.db_key) {

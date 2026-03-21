@@ -36,7 +36,7 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
 
   // 解密数据库密钥（可选密码）
   let dbKey: Buffer;
-  const skipPassword = options.noPassword || process.env.CORIVO_NO_PASSWORD === '1';
+  const skipPassword = options.password === false || process.env.CORIVO_NO_PASSWORD === '1';
 
   if (skipPassword) {
     // 无密码模式：使用 config 中的 db_key（如果有）

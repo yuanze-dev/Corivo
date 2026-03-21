@@ -9,7 +9,14 @@ import { OverviewPanel } from './components/panels/OverviewPanel.js';
 import { SyncPanel } from './components/panels/SyncPanel.js';
 import { DaemonPanel } from './components/panels/DaemonPanel.js';
 import { DevicePanel } from './components/panels/DevicePanel.js';
-import { ConfigPanel, CONFIG_ITEM_COUNT, FEATURE_ITEMS } from './components/panels/ConfigPanel.js';
+import {
+  ConfigPanel,
+  CONFIG_ITEM_COUNT,
+  FEATURE_ITEMS,
+  SYNC_INTERVAL_INDEX,
+  nextSyncPreset,
+  prevSyncPreset,
+} from './components/panels/ConfigPanel.js';
 import { LogsPanel } from './components/panels/LogsPanel.js';
 
 import { useDatabase } from './hooks/useDatabase.js';
@@ -89,8 +96,24 @@ export function App({ db, configDir, dbPath }: AppProps) {
         return;
       }
       if (input === ' ' || key.return) {
-        const item = FEATURE_ITEMS[configFocus];
-        if (item) configState.toggleFeature(item.key);
+        if (configFocus < FEATURE_ITEMS.length) {
+          const item = FEATURE_ITEMS[configFocus];
+          if (item) configState.toggleFeature(item.key);
+        }
+        return;
+      }
+      if (input === '+' || input === '=') {
+        if (configFocus === SYNC_INTERVAL_INDEX) {
+          const current = configState.config?.settings?.syncIntervalSeconds ?? 300;
+          configState.updateSetting('syncIntervalSeconds', nextSyncPreset(current));
+        }
+        return;
+      }
+      if (input === '-') {
+        if (configFocus === SYNC_INTERVAL_INDEX) {
+          const current = configState.config?.settings?.syncIntervalSeconds ?? 300;
+          configState.updateSetting('syncIntervalSeconds', prevSyncPreset(current));
+        }
         return;
       }
     }

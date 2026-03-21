@@ -5,6 +5,7 @@ import { accounts, devices } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { generateChallenge, verifyChallengeResponse, generateSharedSecret } from '../auth/challenge.js';
 import { generateToken, authPreHandler } from '../auth/auth-plugin.js';
+import { generatePairingCode, redeemPairingCode } from '../auth/pairing.js';
 
 interface RegisterBody {
   identity_id: string;
@@ -25,6 +26,13 @@ interface VerifyBody {
 }
 
 interface AddDeviceBody {
+  device_id: string;
+  device_name?: string;
+  site_id: string;
+}
+
+interface RedeemPairBody {
+  pairing_code: string;
   device_id: string;
   device_name?: string;
   site_id: string;
@@ -186,5 +194,66 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }).run();
 
     return reply.code(201).send({ ok: true });
+  });
+
+  // POST /auth/pair — 生成配对码（需认证）
+  app.post('/auth/pair', {
+    preHandler: authPreHandler,
+  }, async (req, reply) => {
+    const identityId = req.identityId!;
+    const { code, expiresAt } = generatePairingCode(identityId);
+    return reply.send({ pairing_code: code, expires_at: expiresAt });
+  });
+
+  // POST /auth/redeem-pair — 兑换配对码，注册新设备（无需认证）
+  app.post<{ Body: RedeemPairBody }>('/auth/redeem-pair', {
+    schema: {
+      body: {
+        type: 'object',
+        required: ['pairing_code', 'device_id', 'site_id'],
+        properties: {
+          pairing_code: { type: 'string', maxLength: 16 },
+          device_id: { type: 'string', maxLength: 256 },
+          device_name: { type: 'string' },
+          site_id: { type: 'string', maxLength: 256 },
+        },
+      },
+    },
+  }, async (req, reply) => {
+    const { pairing_code, device_id, device_name, site_id } = req.body;
+    const db = getDb();
+
+    const identityId = redeemPairingCode(pairing_code);
+    if (!identityId) {
+      return reply.code(404).send({ error: 'Pairing code invalid or expired' });
+    }
+
+    const account = db.select({ sharedSecret: accounts.sharedSecret })
+      .from(accounts)
+      .where(eq(accounts.identityId, identityId))
+      .get();
+    if (!account) {
+      return reply.code(404).send({ error: 'Account not found' });
+    }
+
+    const existingDevice = db.select({ deviceId: devices.deviceId })
+      .from(devices)
+      .where(eq(devices.deviceId, device_id))
+      .get();
+    if (existingDevice) {
+      return reply.code(409).send({ error: 'Device already registered' });
+    }
+
+    const now = Date.now();
+    db.insert(devices).values({
+      deviceId: device_id,
+      identityId,
+      deviceName: device_name ?? null,
+      siteId: site_id,
+      createdAt: now,
+      lastSeenAt: now,
+    }).run();
+
+    return reply.code(201).send({ identity_id: identityId, shared_secret: account.sharedSecret });
   });
 }

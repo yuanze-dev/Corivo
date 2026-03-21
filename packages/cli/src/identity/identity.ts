@@ -142,6 +142,45 @@ export class IdentityManager {
   }
 
   /**
+   * 用指定 ID 创建身份（用于加入已有 identity）
+   */
+  async createWithId(
+    identityId: string,
+    fingerprints: Fingerprint[],
+    displayName?: string
+  ): Promise<IdentityConfig> {
+    const existing = await this.load();
+    if (existing) {
+      throw new IdentityError('身份已存在');
+    }
+
+    const fingerprintMap: Record<string, PlatformFingerprint> = {};
+    const now = new Date().toISOString();
+
+    for (const fp of fingerprints) {
+      fingerprintMap[fp.platform] = {
+        current: fp.value,
+        historical: [],
+        added_at: now,
+        updated_at: now,
+        confidence: fp.confidence,
+      };
+    }
+
+    const config: IdentityConfig = {
+      identity_id: identityId,
+      created_at: now,
+      updated_at: now,
+      display_name: displayName,
+      fingerprints: fingerprintMap,
+      devices: {},
+    };
+
+    await this.save(config);
+    return config;
+  }
+
+  /**
    * 创建新身份
    */
   async create(
@@ -473,4 +512,18 @@ export async function initializeIdentity(configDir?: string): Promise<{
 export async function getIdentityId(configDir?: string): Promise<string | null> {
   const manager = new IdentityManager(configDir);
   return manager.getIdentityId();
+}
+
+/**
+ * 用指定 identity_id 初始化本地身份（用于加入已有 identity 的新设备）
+ */
+export async function initializeIdentityWithId(
+  identityId: string,
+  configDir?: string
+): Promise<IdentityConfig> {
+  const manager = new IdentityManager(configDir);
+  const fingerprints = await FingerprintCollector.collectAll();
+  const identity = await manager.createWithId(identityId, fingerprints);
+  await manager.registerDevice();
+  return identity;
 }

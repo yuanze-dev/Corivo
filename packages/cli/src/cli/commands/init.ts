@@ -18,13 +18,13 @@ import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../stor
 import { FileSystemError } from '../../errors/index.js';
 import {
   initializeIdentity,
+  initializeIdentityWithId,
   getIdentityId,
   type Fingerprint,
 } from '../../identity/index.js';
-import { saveConfig, type CorivoConfig } from '../../config.js';
+import { saveConfig, saveSolverConfig, type CorivoConfig, type SolverConfig } from '../../config.js';
 import { startCommand } from './start.js';
-import { registerWithSolver } from './sync.js';
-import { saveSolverConfig } from '../../config.js';
+import { registerWithSolver, post } from './sync.js';
 
 /**
  * 退出并清理
@@ -36,7 +36,7 @@ function exit(code = 0): never {
 /**
  * 初始化命令
  */
-export async function initCommand(): Promise<void> {
+export async function initCommand(options: { join?: string; server?: string } = {}): Promise<void> {
   console.log('\n═══════════════════════════════════════════════════════');
   console.log('           Corivo — 一个为你而活着的数字伙伴');
   console.log('═══════════════════════════════════════════════════════\n');
@@ -60,17 +60,114 @@ export async function initCommand(): Promise<void> {
     throw new FileSystemError(`无法创建配置目录: ${configDir}`, { cause: error });
   }
 
-  // ========== 身份识别 (v0.10 新增) ==========
+  // ========== 身份识别 ==========
+  let identityId: string;
+
+  if (options.join) {
+    // --join 流程：通过配对码加入已有 identity
+    const serverUrl = options.server || process.env.CORIVO_SOLVER_URL || 'http://localhost:3141';
+    console.log(`正在通过配对码加入 identity...\n`);
+
+    const deviceId = (await import('node:crypto')).randomBytes(8).toString('hex');
+    const siteId = (await import('node:crypto')).randomBytes(16).toString('hex');
+
+    let redeemResult: { identity_id: string; shared_secret: string };
+    try {
+      redeemResult = await post(`${serverUrl}/auth/redeem-pair`, {
+        pairing_code: options.join,
+        device_id: deviceId,
+        device_name: `corivo-cli-${deviceId.slice(0, 8)}`,
+        site_id: siteId,
+      }) as { identity_id: string; shared_secret: string };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('404')) {
+        console.error('❌ 配对码无效或已过期，请在 Device A 重新运行 corivo sync --pair');
+      } else if (msg.includes('409')) {
+        console.error('❌ 该设备已注册');
+      } else {
+        console.error('❌ 配对失败:', msg);
+      }
+      exit(1);
+    }
+
+    identityId = redeemResult.identity_id;
+    console.log('✓ 配对成功');
+    console.log(`  身份 ID: ${identityId}`);
+
+    // 创建本地 identity（使用指定 ID）
+    await initializeIdentityWithId(identityId, configDir);
+
+    // 生成本地 db_key（各设备独立加密）
+    const dbKey = KeyManager.generateDatabaseKey();
+    const dbKeyBase64 = dbKey.toString('base64');
+
+    console.log('\n正在创建加密数据库...');
+    const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
+    const health = db.checkHealth();
+    if (!health.ok) {
+      console.log('❌ 数据库创建失败');
+      exit(1);
+    }
+
+    const config: CorivoConfig = {
+      version: '0.11.0',
+      created_at: new Date().toISOString(),
+      identity_id: identityId,
+      db_key: dbKeyBase64,
+    };
+    const saveResult = await saveConfig(config, configDir);
+    if (!saveResult.success) {
+      console.log('❌ 配置保存失败: ' + saveResult.error);
+      exit(1);
+    }
+
+    const solverConfig: SolverConfig = {
+      server_url: serverUrl,
+      shared_secret: redeemResult.shared_secret,
+      site_id: siteId,
+      last_push_version: 0,
+      last_pull_version: 0,
+    };
+    await saveSolverConfig(solverConfig, configDir);
+
+    console.log('\n═══════════════════════════════════════════════════════');
+    console.log('                  ✅ 加入成功！');
+    console.log('═══════════════════════════════════════════════════════\n');
+    console.log('🎯 Corivo 已准备就绪');
+    console.log('   身份 ID: ' + identityId);
+    console.log('   数据库:   ' + dbPath);
+    console.log('   同步服务器: ' + serverUrl + '\n');
+
+    // 自动启动心跳
+    console.log('🫀 正在启动心跳...');
+    try {
+      await startCommand();
+      console.log('\n✨ Corivo 已苏醒！心跳将自动同步数据。');
+    } catch {
+      console.log('\n⚠️  心跳启动失败，请手动运行: corivo start');
+    }
+
+    console.log('\n下一步：');
+    console.log('  corivo sync       # 立即拉取已有数据');
+    console.log('  corivo query "..."');
+    console.log('  corivo status\n');
+
+    exit(0);
+  }
+
+  // 正常初始化流程
   console.log('正在识别您的身份...\n');
 
   const identityResult = await initializeIdentity(configDir);
+  identityId = identityResult.identity.identity_id;
 
   if (identityResult.isNew) {
     console.log('✓ 创建新身份');
-    console.log(`  身份 ID: ${identityResult.identity.identity_id}`);
+    console.log(`  身份 ID: ${identityId}`);
   } else {
     console.log('✓ 识别到现有身份');
-    console.log(`  身份 ID: ${identityResult.identity.identity_id}`);
+    console.log(`  身份 ID: ${identityId}`);
   }
 
   // 显示检测到的平台指纹
@@ -119,7 +216,7 @@ export async function initCommand(): Promise<void> {
   const config: CorivoConfig = {
     version: '0.11.0',
     created_at: new Date().toISOString(),
-    identity_id: identityResult.identity.identity_id,
+    identity_id: identityId,
     db_key: dbKeyBase64,
   };
 
@@ -134,7 +231,7 @@ export async function initCommand(): Promise<void> {
   console.log('═══════════════════════════════════════════════════════\n');
 
   console.log('🎯 Corivo 已准备就绪');
-  console.log('   身份 ID: ' + identityResult.identity.identity_id);
+  console.log('   身份 ID: ' + identityId);
   console.log('   数据库:   ' + dbPath);
   console.log('\n💡 提示：');
   console.log('   数据库密钥明文存储在本地，依赖文件系统权限保护');
@@ -143,7 +240,7 @@ export async function initCommand(): Promise<void> {
   // ========== 自动注册 solver ==========
   const defaultSolverUrl = process.env.CORIVO_SOLVER_URL || 'http://localhost:3141';
   try {
-    const solverConfig = await registerWithSolver(defaultSolverUrl, identityResult.identity.identity_id);
+    const solverConfig = await registerWithSolver(defaultSolverUrl, identityId);
     if (solverConfig) {
       await saveSolverConfig(solverConfig, configDir);
       console.log('🔗 已连接同步服务器\n');

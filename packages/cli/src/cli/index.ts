@@ -53,6 +53,8 @@ program
 program
   .command('init')
   .description('初始化 Corivo')
+  .option('--join <code>', '通过配对码加入已有 identity（多设备同步）')
+  .option('--server <url>', 'Solver 服务器地址（配合 --join 使用）')
   .action(initCommand);
 
 program

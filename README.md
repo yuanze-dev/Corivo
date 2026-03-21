@@ -172,7 +172,7 @@ Claude Code / Cursor / Feishu
 |---------|-------------|
 | [`@corivo/cli`](packages/cli) | Core CLI, local database, heartbeat engine |
 | [`@corivo/solver`](packages/solver) | CRDT sync relay server (Fastify v5) |
-| [`@corivo/plugins`](packages/plugins) | Claude Code plugin integration |
+| [`@corivo/claude-code`](packages/plugins/claude-code) | Claude Code plugin integration |
 
 ---
 

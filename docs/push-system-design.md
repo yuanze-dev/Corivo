@@ -211,7 +211,7 @@ packages/cli/src/
   engine/
     suggestion.ts        # 保留，被 PushManager 调用
 
-packages/plugins/hooks/scripts/
+packages/plugins/claude-code/hooks/scripts/
   session-init.sh        # 简化，调用 corivo push
   stop-suggest.sh        # 简化，调用 corivo push
 ```

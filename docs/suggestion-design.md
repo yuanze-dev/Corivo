@@ -160,7 +160,7 @@ packages/cli/src/
   engine/
     suggestion.ts        # 新增：建议生成逻辑
 
-packages/plugins/hooks/scripts/
+packages/plugins/claude-code/hooks/scripts/
   session-init.sh        # 修改：启动时显示建议
   stop-suggest.sh        # 修改：请求后显示建议
 ```

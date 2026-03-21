@@ -171,7 +171,7 @@ Claude Code / Cursor / 飞书
 |----|------|
 | [`@corivo/cli`](packages/cli) | 核心 CLI、本地数据库、心跳引擎 |
 | [`@corivo/solver`](packages/solver) | CRDT 同步中继服务器（Fastify v5） |
-| [`@corivo/plugins`](packages/plugins) | Claude Code 插件集成 |
+| [`@corivo/claude-code`](packages/plugins/claude-code) | Claude Code 插件集成 |
 
 ---
 

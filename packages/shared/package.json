@@ -1,9 +1,14 @@
 {
   "name": "@corivo/shared",
   "version": "0.11.0",
-  "description": "Corivo shared API and skills for multi-platform support",
+  "description": "Corivo shared API for multi-platform plugin support",
   "type": "module",
-  "main": "api/index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
   "keywords": [
     "memory",
     "knowledge",

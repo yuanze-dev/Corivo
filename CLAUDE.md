@@ -18,7 +18,7 @@ Corivo 是一个融入用户已有工作流的赛博**伙伴**。它不是一个
 
 - [`packages/cli/CLAUDE.md`](./packages/cli/CLAUDE.md) — CLI 工具、数据库、心跳引擎
 - [`packages/solver/CLAUDE.md`](./packages/solver/CLAUDE.md) — CRDT 同步服务器
-- [`packages/plugins/CLAUDE.md`](./packages/plugins/CLAUDE.md) — Claude Code 插件
+- [`packages/plugins/claude-code/CLAUDE.md`](./packages/plugins/claude-code/CLAUDE.md) — Claude Code 插件
 
 **进入某个 package 工作时，优先阅读该 package 的 CLAUDE.md。**
 
@@ -40,8 +40,8 @@ npm run dev            # tsx watch src/index.ts（开发热重载）
 npm run build          # tsc
 npm run start          # node dist/index.js
 
-# packages/plugins
-cd packages/plugins
+# packages/plugins/claude-code
+cd packages/plugins/claude-code
 npm run build          # tsc
 ```
 
@@ -153,7 +153,7 @@ Changeset 存储于服务端 SQLite（`src/db/server-db.ts`），每条记录按
 
 ---
 
-### packages/plugins（`@corivo/plugins`）
+### packages/plugins/claude-code（`@corivo/claude-code`）
 
 Claude Code 插件包，让 AI 工具能读写 Corivo 记忆。
 

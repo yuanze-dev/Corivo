@@ -1,5 +1,5 @@
 {
-  "name": "@corivo/plugins",
+  "name": "@corivo/claude-code",
   "version": "0.11.0",
   "description": "Corivo Claude Code Plugin - 记忆存储与智能推送",
   "type": "module",
@@ -22,6 +22,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@corivo/shared": "*",
     "better-sqlite3": "^9.4.3"
   },
   "devDependencies": {

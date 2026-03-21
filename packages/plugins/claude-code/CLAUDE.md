@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 包概述
 
-`@corivo/plugins` — Corivo 的 Claude Code 插件包。让 Claude Code 能读写本地 Corivo 记忆，并在每次会话启动时自动汇报记忆状态。
+`@corivo/claude-code` — Corivo 的 Claude Code 插件包。让 Claude Code 能读写本地 Corivo 记忆，并在每次会话启动时自动汇报记忆状态。
 
 - ESM TypeScript，Node ≥ 18
 - **不直接操作数据库**：通过 `execSync('corivo ...')` 调用本地已安装的 `@corivo/cli`

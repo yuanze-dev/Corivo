@@ -65,58 +65,6 @@ corivo status --no-password
    用户喜欢简洁的代码风格...
 ```
 
-## 查询策略
-
-### 开场查询
-每次对话开始时，可以查询用户的基本信息：
-```bash
-corivo query "" --annotation "指令 · self" --limit 5 --no-password
-```
-
-### 上下文相关查询
-当讨论特定主题时，查询相关记忆：
-```bash
-corivo query "React" --limit 10 --no-password
-```
-
-### 决策查询
-当需要了解历史决策时：
-```bash
-corivo query "" --annotation "决策 · project" --limit 10 --no-password
-```
-
-## 示例对话
-
-```
-用户: 我之前对代码风格有什么要求？
-Agent: [查询记忆]
-       让我查一下你的偏好...
-
-       [执行 corivo query "代码风格" --annotation "指令 · self"]
-
-       [corivo] 找到 2 条相关记忆:
-       1. 使用 2 空格缩进，优先使用 const
-       2. 函数名使用 camelCase
-
-       根据记忆，你喜欢：
-       - 2 空格缩进
-       - 优先使用 const 而非 let
-       - 函数名使用 camelCase
-```
-
-```
-用户: 我们用什么数据库？
-Agent: [查询记忆]
-       根据之前的记录...
-
-       [执行 corivo query "数据库" --annotation "决策 · project"]
-
-       [corivo] 找到 1 条相关记忆:
-       选择 PostgreSQL 因为需要更好的 JSON 支持
-
-       你们选择了 PostgreSQL，主要因为需要更好的 JSON 支持和 ACID 特性。
-```
-
 ## 注意事项
 
 - 查询结果可能为空，这是正常的

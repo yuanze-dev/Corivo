@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import Table from 'ink-table';
+import Table from '../Table.js';
 import type { DaemonStatus } from '../../hooks/useDaemon.js';
 import { KeyValue } from '../KeyValue.js';
 

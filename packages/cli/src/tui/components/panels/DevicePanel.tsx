@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import Table from 'ink-table';
+import Table from '../Table.js';
 import type { DeviceInfo } from '../../hooks/useDevice.js';
 import { KeyValue } from '../KeyValue.js';
 

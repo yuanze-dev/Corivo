@@ -10,6 +10,40 @@ import os from 'os';
 import { getConfigDir } from './storage/database.js';
 
 /**
+ * Feature flags (opt-out model: missing key = true = enabled)
+ */
+export interface CorivoFeatures {
+  /** 多设备同步 */
+  sync?: boolean;
+  /** 保存时自动推送 */
+  autoPushOnSave?: boolean;
+  /** 唤醒时同步 */
+  syncOnWake?: boolean;
+  /** 心跳引擎 */
+  heartbeatEngine?: boolean;
+  /** 登录时自动启动 */
+  autoStartOnLogin?: boolean;
+  /** 被动监听（Claude Code / Cursor 对话） */
+  passiveListening?: boolean;
+  /** 关联发现 */
+  associationDiscovery?: boolean;
+  /** 整合去重 */
+  consolidation?: boolean;
+  /** CJK 全文搜索降级 */
+  cjkFtsFallback?: boolean;
+  /** Claude Code 集成 */
+  claudeCode?: boolean;
+  /** Cursor 集成 */
+  cursor?: boolean;
+  /** 飞书集成 */
+  feishu?: boolean;
+  /** 数据库加密 */
+  dbEncryption?: boolean;
+  /** 遥测 */
+  telemetry?: boolean;
+}
+
+/**
  * Corivo 配置
  */
 export interface CorivoConfig {
@@ -21,6 +55,7 @@ export interface CorivoConfig {
   identity_id: string;
   /** 数据库密钥（base64 编码） */
   db_key: string;
+  features?: CorivoFeatures;
 }
 
 /**

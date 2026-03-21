@@ -23,7 +23,7 @@ export function useDatabase(db: CorivoDatabase | null): { stats: DbStats | null;
       try {
         const rawStats = db.getStats();
         const health = db.checkHealth();
-        const associations = db.queryAssociations({ limit: 9999 });
+        const associations = db.queryAssociations({ limit: 500 });
         const recentBlocks = db.queryBlocks({ limit: 5 });
         setStats({
           total: rawStats.total,

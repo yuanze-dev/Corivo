@@ -44,6 +44,14 @@ export interface CorivoFeatures {
 }
 
 /**
+ * Corivo 数值型配置
+ */
+export interface CorivoSettings {
+  /** 自动同步间隔（秒），默认 300（5 分钟） */
+  syncIntervalSeconds?: number;
+}
+
+/**
  * Corivo 配置
  */
 export interface CorivoConfig {
@@ -56,6 +64,7 @@ export interface CorivoConfig {
   /** 数据库密钥（base64 编码） */
   db_key: string;
   features?: CorivoFeatures;
+  settings?: CorivoSettings;
 }
 
 /**

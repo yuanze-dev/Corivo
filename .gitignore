@@ -33,3 +33,9 @@ prebuilds/
 
 # Worktrees
 .worktrees/
+
+# ENV
+**/.env
+
+# TypeScript build cache
+*.tsbuildinfo

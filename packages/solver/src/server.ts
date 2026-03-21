@@ -8,7 +8,9 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 export async function buildServer() {
   const app = Fastify({
+    disableRequestLogging: true,
     logger: {
+      level: isDev ? 'debug' : 'info',
       ...(isDev
         ? {
             transport: {
@@ -34,6 +36,16 @@ export async function buildServer() {
         },
       },
     },
+  });
+
+  app.addHook('onRequest', (req, _reply, done) => {
+    req.log.debug({ req }, 'IncomingRequest');
+    done();
+  });
+
+  app.addHook('onResponse', (req, reply, done) => {
+    req.log.debug({ req, res: reply, responseTime: reply.elapsedTime }, 'RequestCompleted');
+    done();
   });
 
   await app.register(cors, { origin: false });

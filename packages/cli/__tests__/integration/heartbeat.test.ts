@@ -187,6 +187,38 @@ describe('Heartbeat Integration', () => {
     });
   });
 
+  describe('syncCycles from config', () => {
+    // syncCycles is private — we access it via double-cast for white-box testing.
+    // This is intentional: the field has no public accessor.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const getSyncCycles = (hb: Heartbeat) => (hb as any).syncCycles as number;
+
+    it('defaults to 60 cycles (5 minutes) when no settings', () => {
+      const hb = new Heartbeat({ db });
+      expect(getSyncCycles(hb)).toBe(60);
+    });
+
+    it('computes correct cycles for 15 minutes (900s)', () => {
+      const hb = new Heartbeat({ db, syncIntervalSeconds: 900 });
+      expect(getSyncCycles(hb)).toBe(180);
+    });
+
+    it('computes correct cycles for 30 minutes (1800s)', () => {
+      const hb = new Heartbeat({ db, syncIntervalSeconds: 1800 });
+      expect(getSyncCycles(hb)).toBe(360);
+    });
+
+    it('clamps to minimum 1 cycle for absurdly small values', () => {
+      const hb = new Heartbeat({ db, syncIntervalSeconds: 1 });
+      expect(getSyncCycles(hb)).toBe(1);
+    });
+
+    it('ignores invalid (non-finite) values and uses default', () => {
+      const hb = new Heartbeat({ db, syncIntervalSeconds: NaN });
+      expect(getSyncCycles(hb)).toBe(60);
+    });
+  });
+
   describe('association discovery', () => {
     it('should run association analysis without errors', async () => {
       // 创建多个 active blocks

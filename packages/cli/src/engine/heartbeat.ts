@@ -19,6 +19,7 @@ import { AutoSync } from './auto-sync.js';
 import { DatabaseError } from '../errors/index.js';
 import type { BlockStatus, Pattern } from '../models/index.js';
 import { vitalityToStatus } from '../models/block.js';
+import { loadConfig } from '../config.js';
 
 const HEARTBEAT_INTERVAL = 5000; // 5 秒
 const PENDING_BATCH_SIZE = 10; // 每次处理的 pending 数量
@@ -35,6 +36,8 @@ export interface HeartbeatConfig {
   dbKey?: Buffer | string;
   /** 数据库路径（可选） */
   dbPath?: string;
+  /** 同步间隔秒数（可选，用于测试；生产环境从 config.json 读取） */
+  syncIntervalSeconds?: number;
 }
 
 /**
@@ -69,6 +72,7 @@ export class Heartbeat {
   private timeoutRef: NodeJS.Timeout | null = null;
   private lastHealthCheck = 0;
   private cycleCount = 0;
+  private syncCycles = 60; // 默认 5 分钟（60 × 5s）
   private lastWeeklySummary = 0;
   private lastTriggerDecision = 0;
   private healthFilePath: string;
@@ -95,6 +99,16 @@ export class Heartbeat {
     // 健康文件路径
     const configDir = process.env.CORIVO_CONFIG_DIR || getConfigDir();
     this.healthFilePath = `${configDir}/${HEALTH_CHECK_FILE}`;
+
+    // 测试模式：从 config 直接注入 syncIntervalSeconds
+    if (config?.syncIntervalSeconds !== undefined) {
+      this.syncCycles = this.computeSyncCycles(config.syncIntervalSeconds);
+    }
+  }
+
+  private computeSyncCycles(seconds: number | undefined): number {
+    if (!Number.isFinite(seconds) || seconds! <= 0) return 60;
+    return Math.max(1, Math.round(seconds! / 5));
   }
 
   /**
@@ -128,6 +142,11 @@ export class Heartbeat {
       this.triggerDecision = new TriggerDecision(this.db);
       this.pushQueue = new PushQueue();
       this.autoSync = new AutoSync(this.db);
+
+      // 从 config.json 读取同步间隔（生产路径；测试模式走构造函数注入，不会进入此块）
+      const configDir = process.env.CORIVO_CONFIG_DIR || getConfigDir();
+      const corivoConfig = await loadConfig(configDir);
+      this.syncCycles = this.computeSyncCycles(corivoConfig?.settings?.syncIntervalSeconds);
 
       console.log(`心跳守护进程启动中... (规则: ${this.ruleEngine.ruleCount})`);
     }
@@ -178,8 +197,8 @@ export class Heartbeat {
           await this.processTriggerDecision();
         }
 
-        // 自动同步（每 60 个周期 = 5 分钟）
-        if (this.cycleCount % 60 === 0 && this.db && this.autoSync) {
+        // 自动同步（每 syncCycles 个周期，默认 60 = 5 分钟）
+        if (this.cycleCount % this.syncCycles === 0 && this.db && this.autoSync) {
           await this.processSync();
         }
 

@@ -216,6 +216,7 @@ daemonCommand.command('run').action(async () => {
   const heartbeat = new Heartbeat()
   await heartbeat.start()
 })
+```
 
 ---
 

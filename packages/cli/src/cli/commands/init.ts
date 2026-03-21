@@ -23,6 +23,7 @@ import {
   type Fingerprint,
 } from '../../identity/index.js';
 import { saveConfig, saveSolverConfig, loadConfig, type CorivoConfig, type SolverConfig } from '../../config.js';
+import os from 'node:os';
 import { startCommand } from './start.js';
 import { registerWithSolver, post } from './sync.js';
 import { readConfirm } from '../utils/password.js';
@@ -76,10 +77,14 @@ export async function initCommand(options: { join?: string; server?: string } = 
 
     let redeemResult: { identity_id: string; shared_secret: string };
     try {
+      const platformNames: Record<string, string> = { darwin: 'Mac', win32: 'Windows', linux: 'Linux' };
+      const deviceDisplayName = `${platformNames[process.platform] || process.platform} (${os.hostname()})`;
       redeemResult = await post(`${serverUrl}/auth/redeem-pair`, {
         pairing_code: options.join,
         device_id: deviceId,
-        device_name: `corivo-cli-${deviceId.slice(0, 8)}`,
+        device_name: deviceDisplayName,
+        platform: process.platform,
+        arch: process.arch,
         site_id: siteId,
       }) as { identity_id: string; shared_secret: string };
     } catch (err: unknown) {

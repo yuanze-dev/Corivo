@@ -12,6 +12,8 @@ interface RegisterBody {
   fingerprints: string[];
   device_id: string;
   device_name?: string;
+  platform?: string;
+  arch?: string;
   site_id: string;
 }
 
@@ -28,6 +30,8 @@ interface VerifyBody {
 interface AddDeviceBody {
   device_id: string;
   device_name?: string;
+  platform?: string;
+  arch?: string;
   site_id: string;
 }
 
@@ -35,6 +39,8 @@ interface RedeemPairBody {
   pairing_code: string;
   device_id: string;
   device_name?: string;
+  platform?: string;
+  arch?: string;
   site_id: string;
 }
 
@@ -55,7 +61,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
     },
   }, async (req, reply) => {
-    const { identity_id, fingerprints, device_id, device_name, site_id } = req.body;
+    const { identity_id, fingerprints, device_id, device_name, platform, arch, site_id } = req.body;
     const db = getDb();
     const now = Date.now();
 
@@ -81,6 +87,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       deviceId: device_id,
       identityId: identity_id,
       deviceName: device_name ?? null,
+      platform: platform ?? null,
+      arch: arch ?? null,
       siteId: site_id,
       createdAt: now,
       lastSeenAt: now,
@@ -172,7 +180,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async (req, reply) => {
     const identityId = req.identityId!;
-    const { device_id, device_name, site_id } = req.body;
+    const { device_id, device_name, platform, arch, site_id } = req.body;
     const db = getDb();
     const now = Date.now();
 
@@ -188,6 +196,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       deviceId: device_id,
       identityId,
       deviceName: device_name ?? null,
+      platform: platform ?? null,
+      arch: arch ?? null,
       siteId: site_id,
       createdAt: now,
       lastSeenAt: now,
@@ -220,7 +230,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
     },
   }, async (req, reply) => {
-    const { pairing_code, device_id, device_name, site_id } = req.body;
+    const { pairing_code, device_id, device_name, platform, arch, site_id } = req.body;
     const db = getDb();
 
     const identityId = redeemPairingCode(pairing_code);
@@ -249,11 +259,35 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       deviceId: device_id,
       identityId,
       deviceName: device_name ?? null,
+      platform: platform ?? null,
+      arch: arch ?? null,
       siteId: site_id,
       createdAt: now,
       lastSeenAt: now,
     }).run();
 
     return reply.code(201).send({ identity_id: identityId, shared_secret: account.sharedSecret });
+  });
+
+  // GET /auth/devices — 列出当前 identity 的所有设备（需认证）
+  app.get('/auth/devices', {
+    preHandler: authPreHandler,
+  }, async (req, reply) => {
+    const identityId = req.identityId!;
+    const db = getDb();
+
+    const rows = db.select({
+      deviceId: devices.deviceId,
+      deviceName: devices.deviceName,
+      platform: devices.platform,
+      arch: devices.arch,
+      createdAt: devices.createdAt,
+      lastSeenAt: devices.lastSeenAt,
+    })
+      .from(devices)
+      .where(eq(devices.identityId, identityId))
+      .all();
+
+    return reply.send({ devices: rows });
   });
 }

@@ -6,11 +6,20 @@
 
 import { Command } from 'commander';
 import { createHmac, randomBytes } from 'node:crypto';
+import os from 'node:os';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { loadConfig, loadSolverConfig, saveSolverConfig, getDatabaseKey } from '../../config.js';
-import { CorivoDatabase, getDefaultDatabasePath } from '../../storage/database.js';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
 
 interface RegisterResponse {
   shared_secret: string;
+}
+
+function buildDeviceName(): string {
+  const platformNames: Record<string, string> = { darwin: 'Mac', win32: 'Windows', linux: 'Linux' };
+  const name = platformNames[process.platform] || process.platform;
+  return `${name} (${os.hostname()})`;
 }
 
 // 简单 fetch wrapper（Node.js 18+ 内置 fetch）
@@ -68,7 +77,9 @@ export async function registerWithSolver(
       identity_id: identityId,
       fingerprints: [],
       device_id: deviceId,
-      device_name: `corivo-cli-${deviceId.slice(0, 8)}`,
+      device_name: buildDeviceName(),
+      platform: process.platform,
+      arch: process.arch,
       site_id: siteId,
     }) as RegisterResponse;
 
@@ -140,7 +151,9 @@ export function createSyncCommand(): Command {
           identity_id: config.identity_id,
           fingerprints: [],
           device_id: deviceId,
-          device_name: `corivo-cli-${deviceId.slice(0, 8)}`,
+          device_name: buildDeviceName(),
+          platform: process.platform,
+          arch: process.arch,
           site_id: siteId,
         }) as RegisterResponse;
       } catch (err: unknown) {
@@ -256,6 +269,37 @@ export function createSyncCommand(): Command {
     } catch (err: unknown) {
       console.error('Pull 失败:', err instanceof Error ? err.message : String(err));
     }
+
+    // 拉取服务端设备列表，更新本地 identity.json
+    try {
+      const devicesResult = await (async () => {
+        const res = await fetch(`${server_url}/auth/devices`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json() as Promise<{ devices: Array<{ deviceId: string; deviceName: string | null; platform: string | null; arch: string | null; createdAt: number; lastSeenAt: number }> }>;
+      })();
+
+      const configDir = getConfigDir();
+      const identityPath = path.join(configDir, 'identity.json');
+      try {
+        const raw = await fs.readFile(identityPath, 'utf-8');
+        const identity = JSON.parse(raw);
+        identity.devices = {};
+        for (const d of devicesResult.devices) {
+          identity.devices[d.deviceId] = {
+            id: d.deviceId,
+            name: d.deviceName ?? d.deviceId,
+            platform: d.platform ?? 'unknown',
+            arch: d.arch ?? 'unknown',
+            first_seen: new Date(d.createdAt).toISOString(),
+            last_seen: new Date(d.lastSeenAt).toISOString(),
+          };
+        }
+        identity.updated_at = new Date().toISOString();
+        await fs.writeFile(identityPath, JSON.stringify(identity, null, 2));
+      } catch { /* identity.json 不存在则忽略 */ }
+    } catch { /* 拉取 devices 失败不影响主流程 */ }
 
     console.log(`同步完成 — Push: ${pushStored} 条, Pull: ${pullCount} 条`);
   });

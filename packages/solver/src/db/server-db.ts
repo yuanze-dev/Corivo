@@ -51,6 +51,8 @@ function createSchema(db: SQLiteDatabase): void {
       device_id TEXT PRIMARY KEY,
       identity_id TEXT NOT NULL REFERENCES accounts(identity_id),
       device_name TEXT,
+      platform TEXT,
+      arch TEXT,
       site_id TEXT NOT NULL,
       last_sync_version INTEGER DEFAULT 0,
       created_at INTEGER NOT NULL,
@@ -76,4 +78,14 @@ function createSchema(db: SQLiteDatabase): void {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_changesets_unique
       ON changesets(identity_id, site_id, table_name, pk, col_version);
   `);
+
+  // 迁移：为已有 devices 表添加 platform 和 arch 列
+  const cols = db.pragma('table_info(devices)') as { name: string }[];
+  const colNames = cols.map(c => c.name);
+  if (!colNames.includes('platform')) {
+    db.exec('ALTER TABLE devices ADD COLUMN platform TEXT');
+  }
+  if (!colNames.includes('arch')) {
+    db.exec('ALTER TABLE devices ADD COLUMN arch TEXT');
+  }
 }

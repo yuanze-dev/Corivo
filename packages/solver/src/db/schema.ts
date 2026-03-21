@@ -12,6 +12,8 @@ export const devices = sqliteTable('devices', {
   deviceId: text('device_id').primaryKey(),
   identityId: text('identity_id').notNull().references(() => accounts.identityId),
   deviceName: text('device_name'),
+  platform: text('platform'),
+  arch: text('arch'),
   siteId: text('site_id').notNull(),
   lastSyncVersion: integer('last_sync_version').default(0),
   createdAt: integer('created_at').notNull(),

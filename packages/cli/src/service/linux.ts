@@ -15,6 +15,9 @@ const SERVICE_NAME = 'com.corivo.daemon'
 const UNIT_FILE_NAME = `${SERVICE_NAME}.service`
 const SYSTEMD_USER_DIR = path.join(os.homedir(), '.config', 'systemd', 'user')
 const UNIT_FILE_PATH = path.join(SYSTEMD_USER_DIR, UNIT_FILE_NAME)
+const CORIVO_CONFIG_DIR = path.join(os.homedir(), '.corivo')
+const LOG_FILE = path.join(CORIVO_CONFIG_DIR, 'daemon.log')
+const ERR_FILE = path.join(CORIVO_CONFIG_DIR, 'daemon.err')
 
 /**
  * 生成 systemd unit 文件内容
@@ -35,6 +38,8 @@ Type=simple
 ExecStart=${execStart}
 Environment=CORIVO_DB_KEY=${config.dbKey}
 Environment=CORIVO_DB_PATH=${config.dbPath}
+StandardOutput=append:${LOG_FILE}
+StandardError=append:${ERR_FILE}
 Restart=on-failure
 RestartSec=5
 

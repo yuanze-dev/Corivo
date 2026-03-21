@@ -5,12 +5,27 @@ import path from 'node:path';
 
 const MAX_LINES = 100;
 
-export function useLogs(configDir: string): { lines: string[]; error: string | null } {
-  const [lines, setLines] = useState<string[]>([]);
+// 每条日志行带稳定 ID，避免 key 不稳定导致 React 重建节点
+export interface LogLine {
+  id: number;
+  text: string;
+}
+
+export function useLogs(
+  configDir: string,
+  enabled: boolean,
+): { lines: LogLine[]; error: string | null } {
+  const [lines, setLines] = useState<LogLine[]>([]);
   const [error, setError] = useState<string | null>(null);
   const posRef = useRef(0);
+  // 全局递增 ID，保证每条日志行的 key 唯一且稳定
+  const idCounterRef = useRef(0);
+  // fs.watch debounce timer
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    if (!enabled) return; // 非 logs tab 时不启动文件监听
+
     const logPath = path.join(configDir, 'daemon.log');
     let watcher: fs.FSWatcher | null = null;
     let pollInterval: ReturnType<typeof setInterval> | null = null;
@@ -22,7 +37,7 @@ export function useLogs(configDir: string): { lines: string[]; error: string | n
         if (size === 0) return;
 
         if (posRef.current === 0) {
-          // First read: start from max 8KB from end
+          // 首次读取：从末尾 8KB 开始，避免读取全部历史
           posRef.current = Math.max(0, size - 8192);
         }
 
@@ -35,7 +50,14 @@ export function useLogs(configDir: string): { lines: string[]; error: string | n
 
         posRef.current = size;
         const newLines = buf.toString('utf-8').split('\n').filter(l => l.trim());
-        setLines(prev => [...prev, ...newLines].slice(-MAX_LINES));
+        if (newLines.length === 0) return;
+
+        // 给每条新行分配稳定 ID
+        const tagged: LogLine[] = newLines.map(text => ({
+          id: idCounterRef.current++,
+          text,
+        }));
+        setLines(prev => [...prev, ...tagged].slice(-MAX_LINES));
         setError(null);
       } catch {
         setError(`Log file not found: ${logPath}`);
@@ -44,18 +66,25 @@ export function useLogs(configDir: string): { lines: string[]; error: string | n
 
     readNew();
 
+    const debouncedRead = () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      // 100ms 去抖：合并 daemon 快速连续写入触发的多次 watch 事件
+      debounceRef.current = setTimeout(() => readNew(), 100);
+    };
+
     try {
-      watcher = fs.watch(logPath, () => { readNew(); });
+      watcher = fs.watch(logPath, debouncedRead);
     } catch {
-      // file doesn't exist yet — fall back to polling
+      // 文件不存在时退回轮询
       pollInterval = setInterval(readNew, 2000);
     }
 
     return () => {
       watcher?.close();
       if (pollInterval) clearInterval(pollInterval);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [configDir]);
+  }, [configDir, enabled]);
 
   return { lines, error };
 }

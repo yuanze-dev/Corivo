@@ -9,7 +9,8 @@ interface StatusBarProps {
   savedFlash?: boolean;
 }
 
-export function StatusBar({ daemonRunning, syncConfigured, dbHealthy, pid, savedFlash }: StatusBarProps) {
+// 仅在 props 变化时重渲染，避免后台 hook 刷新导致的无效渲染
+export const StatusBar = React.memo(function StatusBar({ daemonRunning, syncConfigured, dbHealthy, pid, savedFlash }: StatusBarProps) {
   return (
     <Box paddingX={1} marginTop={1}>
       <Box flexGrow={1}>
@@ -28,4 +29,4 @@ export function StatusBar({ daemonRunning, syncConfigured, dbHealthy, pid, saved
       </Box>
     </Box>
   );
-}
+});

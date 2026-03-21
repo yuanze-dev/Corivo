@@ -25,7 +25,8 @@ interface TabBarProps {
   active: TabId;
 }
 
-export function TabBar({ active }: TabBarProps) {
+// 仅依赖 active prop，用 React.memo 跳过无关渲染
+export const TabBar = React.memo(function TabBar({ active }: TabBarProps) {
   return (
     <Box marginBottom={1}>
       {TABS.map((tab, i) => {
@@ -49,4 +50,4 @@ export function TabBar({ active }: TabBarProps) {
       })}
     </Box>
   );
-}
+});

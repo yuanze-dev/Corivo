@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -17,6 +17,8 @@ export function useDaemon(configDir: string): DaemonStatus {
     running: false, pid: null, uptime: null, cycleCount: null,
     lastCheckAge: null, logPath: '', errPath: '',
   });
+  // 上次数据指纹，跳过无变化更新（lastCheckAge 精度降至秒，避免每秒刷新）
+  const lastFingerprintRef = useRef('');
 
   useEffect(() => {
     const pidPath = path.join(configDir, 'heartbeat.pid');
@@ -47,6 +49,12 @@ export function useDaemon(configDir: string): DaemonStatus {
           lastCheckAge = Date.now() - (health.timestamp ?? 0);
         } catch {}
       }
+
+      // lastCheckAge 精度降至 5 秒，避免每次 check 都触发渲染
+      const ageBucket = lastCheckAge !== null ? Math.floor(lastCheckAge / 5000) : null;
+      const fingerprint = `${running}:${pid}:${uptime}:${cycleCount}:${ageBucket}`;
+      if (fingerprint === lastFingerprintRef.current) return;
+      lastFingerprintRef.current = fingerprint;
 
       setStatus({ running, pid, uptime, cycleCount, lastCheckAge, logPath, errPath });
     };

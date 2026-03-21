@@ -10,23 +10,23 @@ export interface FeatureItem {
 }
 
 export const FEATURE_ITEMS: FeatureItem[] = [
-  // Sync
+  // 同步
   { key: 'sync',              label: 'Multi-device sync',       group: 'Sync' },
   { key: 'autoPushOnSave',    label: 'Auto-push on save',       group: 'Sync' },
   { key: 'syncOnWake',        label: 'Sync on wake',            group: 'Sync' },
-  // Daemon
+  // 守护进程
   { key: 'heartbeatEngine',   label: 'Heartbeat engine',        group: 'Daemon' },
   { key: 'autoStartOnLogin',  label: 'Auto-start on login',     group: 'Daemon' },
-  // Memory Engine
+  // 记忆引擎
   { key: 'passiveListening',      label: 'Passive listening',       group: 'Memory Engine' },
   { key: 'associationDiscovery',  label: 'Association discovery',   group: 'Memory Engine' },
   { key: 'consolidation',         label: 'Consolidation',           group: 'Memory Engine' },
   { key: 'cjkFtsFallback',        label: 'CJK FTS fallback',        group: 'Memory Engine' },
-  // Integrations
+  // 集成
   { key: 'claudeCode',  label: 'Claude Code',   group: 'Integrations' },
   { key: 'cursor',      label: 'Cursor',         group: 'Integrations' },
   { key: 'feishu',      label: 'Feishu',         group: 'Integrations' },
-  // Security
+  // 安全
   { key: 'dbEncryption', label: 'Database encryption', group: 'Security' },
   { key: 'telemetry',    label: 'Telemetry',            group: 'Security' },
 ];
@@ -36,45 +36,223 @@ export const CONFIG_ITEM_COUNT = FEATURE_ITEMS.length;
 interface ConfigPanelProps {
   configState: UseConfigResult;
   focusIndex: number;
+  panelHeight: number;
 }
 
-export function ConfigPanel({ configState, focusIndex }: ConfigPanelProps) {
-  const { config, loading } = configState;
-  if (loading) return <Box paddingX={2}><Text color="gray">Loading config...</Text></Box>;
-  if (!config) return <Box paddingX={2}><Text color="red">Config unavailable</Text></Box>;
+// ─── 扁平行类型（用于虚拟滚动） ──────────────────────────────────
 
-  let currentGroup = '';
+type FlatRow =
+  | { kind: 'group'; label: string }
+  | { kind: 'item'; item: FeatureItem; globalIndex: number };
+
+/** 将 FEATURE_ITEMS 展开成扁平行列表，group header 作为分隔行 */
+function buildFlatRows(): FlatRow[] {
+  const rows: FlatRow[] = [];
+  let lastGroup = '';
+  let gi = 0;
+  for (const item of FEATURE_ITEMS) {
+    if (item.group !== lastGroup) {
+      rows.push({ kind: 'group', label: item.group });
+      lastGroup = item.group;
+    }
+    rows.push({ kind: 'item', item, globalIndex: gi++ });
+  }
+  return rows;
+}
+
+const FLAT_ROWS = buildFlatRows();
+
+/** 计算 focusIndex 对应的扁平行下标 */
+function focusRowIndex(focusIndex: number): number {
+  return FLAT_ROWS.findIndex(r => r.kind === 'item' && r.globalIndex === focusIndex);
+}
+
+// ─── 与 OverviewPanel 一致的 section 标题 ────────────────────────
+
+function SectionTitle({ label }: { label: string }) {
+  return (
+    <Box marginBottom={0}>
+      <Text color="gray" dimColor>{label}</Text>
+    </Box>
+  );
+}
+
+// ─── 单条 item 行渲染 ────────────────────────────────────────────
+
+function ItemRow({
+  item,
+  enabled,
+  focused,
+}: {
+  item: FeatureItem;
+  enabled: boolean;
+  focused: boolean;
+}) {
+  if (focused) {
+    return (
+      <Box>
+        <Text color="white">{'> '}</Text>
+        <Text color={enabled ? 'green' : 'gray'}>{enabled ? '[x]' : '[ ]'}</Text>
+        <Text color="white">{' ' + item.label}</Text>
+      </Box>
+    );
+  }
+  return (
+    <Box>
+      <Text color="gray">{'  '}</Text>
+      <Text color={enabled ? 'green' : 'gray'} dimColor={!enabled}>{enabled ? '[x]' : '[ ]'}</Text>
+      <Text color="gray">{' ' + item.label}</Text>
+    </Box>
+  );
+}
+
+// ─── 分组 bordered 样式（高度充足时） ───────────────────────────
+
+function GroupedView({
+  config,
+  focusIndex,
+}: {
+  config: NonNullable<UseConfigResult['config']>;
+  focusIndex: number;
+}) {
+  // 按 group 重新归组渲染
+  const groups: Array<{ group: string; items: Array<{ item: FeatureItem; gi: number }> }> = [];
+  let gi = 0;
+  for (const item of FEATURE_ITEMS) {
+    let g = groups.find(g => g.group === item.group);
+    if (!g) { g = { group: item.group, items: [] }; groups.push(g); }
+    g.items.push({ item, gi: gi++ });
+  }
 
   return (
     <Box flexDirection="column" paddingX={1}>
       <Box marginBottom={1}>
         <Text color="gray" dimColor>↑/↓ navigate · Enter/Space toggle</Text>
       </Box>
-      {FEATURE_ITEMS.map((item, myIndex) => {
-        const isFocused = myIndex === focusIndex;
-        // opt-out: missing key = true (enabled)
-        const enabled = config.features?.[item.key] !== false;
-
-        const showGroup = item.group !== currentGroup;
-        if (showGroup) currentGroup = item.group;
-
-        return (
-          <React.Fragment key={item.key}>
-            {showGroup && (
-              <Box marginTop={1}>
-                <Text bold color="cyan">{item.group}</Text>
-              </Box>
-            )}
-            <Box paddingX={1}>
-              {isFocused ? (
-                <Text color="white">{'> '}{enabled ? '[x]' : '[ ]'} {item.label}</Text>
-              ) : (
-                <Text color="gray">{'  '}{enabled ? '[x]' : '[ ]'} {item.label}</Text>
-              )}
-            </Box>
-          </React.Fragment>
-        );
-      })}
+      {groups.map(({ group, items }) => (
+        <Box
+          key={group}
+          borderStyle="single"
+          borderColor="gray"
+          flexDirection="column"
+          paddingX={1}
+          marginBottom={1}
+        >
+          <SectionTitle label={group} />
+          {items.map(({ item, gi }) => (
+            <ItemRow
+              key={item.key}
+              item={item}
+              enabled={config.features?.[item.key] !== false}
+              focused={gi === focusIndex}
+            />
+          ))}
+        </Box>
+      ))}
     </Box>
   );
 }
+
+// ─── 虚拟滚动样式（高度不足时） ─────────────────────────────────
+
+function ScrollView({
+  config,
+  focusIndex,
+  availableRows,
+}: {
+  config: NonNullable<UseConfigResult['config']>;
+  focusIndex: number;
+  availableRows: number;
+}) {
+  const totalRows = FLAT_ROWS.length;
+  // 单个 bordered box 开销：border_top(1) + title(1) + border_bottom(1) = 3
+  // hint 行 + hint_marginBottom = 1
+  const innerH = Math.max(3, availableRows - 4);
+
+  // 计算 scrollTop 使 focusRow 保持在视口中
+  const focusRow = focusRowIndex(focusIndex);
+  const rawTop = focusRow - Math.floor(innerH / 2);
+  const scrollTop = Math.max(0, Math.min(rawTop, totalRows - innerH));
+  const scrollEnd = scrollTop + innerH;
+
+  const visibleRows = FLAT_ROWS.slice(scrollTop, scrollEnd);
+  const hasMore  = scrollEnd < totalRows;
+  const hasAbove = scrollTop > 0;
+
+  return (
+    <Box flexDirection="column" paddingX={1}>
+      <Box marginBottom={1}>
+        <Text color="gray" dimColor>↑/↓ navigate · Enter/Space toggle</Text>
+        {hasAbove && <Text color="gray" dimColor>{'  ↑ ' + scrollTop + ' more'}</Text>}
+        {hasMore  && <Text color="gray" dimColor>{'  ↓ ' + (totalRows - scrollEnd) + ' more'}</Text>}
+      </Box>
+      <Box borderStyle="single" borderColor="gray" flexDirection="column" paddingX={1}>
+        <SectionTitle label="Features" />
+        {visibleRows.map((row, i) => {
+          if (row.kind === 'group') {
+            // group 分隔行：稍微缩进的灰色标签
+            return (
+              <Box key={`g-${row.label}-${i}`} marginTop={i === 0 ? 0 : 0}>
+                <Text color="gray" dimColor>─ {row.label}</Text>
+              </Box>
+            );
+          }
+          return (
+            <ItemRow
+              key={row.item.key}
+              item={row.item}
+              enabled={config.features?.[row.item.key] !== false}
+              focused={row.globalIndex === focusIndex}
+            />
+          );
+        })}
+      </Box>
+    </Box>
+  );
+}
+
+// ─── 每个 group 的静态高度（border×2 + title + items + marginBottom） ──
+
+function groupedContentRows(): number {
+  // 计算分组模式所需总行数
+  const groups = new Map<string, number>();
+  for (const item of FEATURE_ITEMS) {
+    groups.set(item.group, (groups.get(item.group) ?? 0) + 1);
+  }
+  let total = 1; // hint 行
+  for (const count of groups.values()) {
+    total += 2 + 1 + count + 1; // border_top + border_bottom + title + items + marginBottom
+  }
+  return total;
+}
+
+const GROUPED_ROWS_NEEDED = groupedContentRows();
+
+// ─── 主组件 ────────────────────────────────────────────────────────
+
+export const ConfigPanel = React.memo(function ConfigPanel({ configState, focusIndex, panelHeight }: ConfigPanelProps) {
+  const { config, loading } = configState;
+  const scrollModeRef = React.useRef<boolean | null>(null);
+
+  if (loading) return <Box paddingX={2}><Text color="gray">Loading config...</Text></Box>;
+  if (!config)  return <Box paddingX={2}><Text color="red">Config unavailable</Text></Box>;
+
+  const availableRows = Math.max(5, panelHeight);
+
+  // hysteresis：±2 行缓冲防止临界抖动
+  if (scrollModeRef.current === null) {
+    scrollModeRef.current = availableRows < GROUPED_ROWS_NEEDED;
+  } else if (scrollModeRef.current && availableRows >= GROUPED_ROWS_NEEDED + 2) {
+    scrollModeRef.current = false;
+  } else if (!scrollModeRef.current && availableRows < GROUPED_ROWS_NEEDED - 2) {
+    scrollModeRef.current = true;
+  }
+
+  if (!scrollModeRef.current) {
+    // 高度充足：使用分组 bordered 样式
+    return <GroupedView config={config} focusIndex={focusIndex} />;
+  }
+
+  // 高度不足：虚拟滚动
+  return <ScrollView config={config} focusIndex={focusIndex} availableRows={availableRows} />;
+});

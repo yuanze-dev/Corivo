@@ -31,7 +31,36 @@ export const FEATURE_ITEMS: FeatureItem[] = [
   { key: 'telemetry',    label: 'Telemetry',            group: 'Security' },
 ];
 
-export const CONFIG_ITEM_COUNT = FEATURE_ITEMS.length;
+// ─── Sync interval presets ────────────────────────────────────────
+
+const SYNC_PRESETS = [300, 900, 1800] as const; // 5m, 15m, 30m
+
+export function formatSeconds(s: number): string {
+  if (s < 60) return `${s}s`;
+  if (s % 60 === 0) return `${s / 60}m`;
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+export function nextSyncPreset(current: number): number {
+  const idx = SYNC_PRESETS.indexOf(current as typeof SYNC_PRESETS[number]);
+  if (idx === -1) {
+    const next = SYNC_PRESETS.find(p => p > current);
+    return next ?? SYNC_PRESETS[0];
+  }
+  return SYNC_PRESETS[(idx + 1) % SYNC_PRESETS.length];
+}
+
+export function prevSyncPreset(current: number): number {
+  const idx = SYNC_PRESETS.indexOf(current as typeof SYNC_PRESETS[number]);
+  if (idx === -1) {
+    const prev = [...SYNC_PRESETS].reverse().find(p => p < current);
+    return prev ?? SYNC_PRESETS[SYNC_PRESETS.length - 1];
+  }
+  return SYNC_PRESETS[(idx - 1 + SYNC_PRESETS.length) % SYNC_PRESETS.length];
+}
+
+export const CONFIG_ITEM_COUNT = FEATURE_ITEMS.length + 1; // +1 for sync interval row
+export const SYNC_INTERVAL_INDEX = FEATURE_ITEMS.length;   // index of sync interval row
 
 interface ConfigPanelProps {
   configState: UseConfigResult;
@@ -43,7 +72,8 @@ interface ConfigPanelProps {
 
 type FlatRow =
   | { kind: 'group'; label: string }
-  | { kind: 'item'; item: FeatureItem; globalIndex: number };
+  | { kind: 'item'; item: FeatureItem; globalIndex: number }
+  | { kind: 'syncInterval' };
 
 /** 将 FEATURE_ITEMS 展开成扁平行列表，group header 作为分隔行 */
 function buildFlatRows(): FlatRow[] {
@@ -56,6 +86,13 @@ function buildFlatRows(): FlatRow[] {
       lastGroup = item.group;
     }
     rows.push({ kind: 'item', item, globalIndex: gi++ });
+    // insert sync interval row after last Sync group item
+    if (item.group === 'Sync') {
+      const nextItem = FEATURE_ITEMS[gi];
+      if (!nextItem || nextItem.group !== 'Sync') {
+        rows.push({ kind: 'syncInterval' });
+      }
+    }
   }
   return rows;
 }
@@ -64,6 +101,9 @@ const FLAT_ROWS = buildFlatRows();
 
 /** 计算 focusIndex 对应的扁平行下标 */
 function focusRowIndex(focusIndex: number): number {
+  if (focusIndex === SYNC_INTERVAL_INDEX) {
+    return FLAT_ROWS.findIndex(r => r.kind === 'syncInterval');
+  }
   return FLAT_ROWS.findIndex(r => r.kind === 'item' && r.globalIndex === focusIndex);
 }
 
@@ -73,6 +113,34 @@ function SectionTitle({ label }: { label: string }) {
   return (
     <Box marginBottom={0}>
       <Text color="gray" dimColor>{label}</Text>
+    </Box>
+  );
+}
+
+// ─── 同步间隔行渲染 ──────────────────────────────────────────────
+
+function SyncIntervalRow({
+  seconds,
+  focused,
+}: {
+  seconds: number;
+  focused: boolean;
+}) {
+  const label = formatSeconds(seconds);
+  if (focused) {
+    return (
+      <Box>
+        <Text color="white">{'> '}</Text>
+        <Text color="gray">{'Sync interval  '}</Text>
+        <Text color="cyan">{label}</Text>
+        <Text color="gray" dimColor>{'  - / + cycle'}</Text>
+      </Box>
+    );
+  }
+  return (
+    <Box>
+      <Text color="gray">{'  Sync interval  '}</Text>
+      <Text color="white">{label}</Text>
     </Box>
   );
 }
@@ -115,7 +183,6 @@ function GroupedView({
   config: NonNullable<UseConfigResult['config']>;
   focusIndex: number;
 }) {
-  // 按 group 重新归组渲染
   const groups: Array<{ group: string; items: Array<{ item: FeatureItem; gi: number }> }> = [];
   let gi = 0;
   for (const item of FEATURE_ITEMS) {
@@ -124,10 +191,16 @@ function GroupedView({
     g.items.push({ item, gi: gi++ });
   }
 
+  const syncSeconds = config.settings?.syncIntervalSeconds ?? 300;
+
   return (
     <Box flexDirection="column" paddingX={1}>
       <Box marginBottom={1}>
-        <Text color="gray" dimColor>↑/↓ navigate · Enter/Space toggle</Text>
+        <Text color="gray" dimColor>
+          {focusIndex === SYNC_INTERVAL_INDEX
+            ? '↑/↓ navigate · - / + cycle · restart daemon to apply'
+            : '↑/↓ navigate · Enter/Space toggle'}
+        </Text>
       </Box>
       {groups.map(({ group, items }) => (
         <Box
@@ -147,6 +220,12 @@ function GroupedView({
               focused={gi === focusIndex}
             />
           ))}
+          {group === 'Sync' && (
+            <SyncIntervalRow
+              seconds={syncSeconds}
+              focused={focusIndex === SYNC_INTERVAL_INDEX}
+            />
+          )}
         </Box>
       ))}
     </Box>
@@ -165,11 +244,8 @@ function ScrollView({
   availableRows: number;
 }) {
   const totalRows = FLAT_ROWS.length;
-  // 单个 bordered box 开销：border_top(1) + title(1) + border_bottom(1) = 3
-  // hint 行 + hint_marginBottom = 1
   const innerH = Math.max(3, availableRows - 4);
 
-  // 计算 scrollTop 使 focusRow 保持在视口中
   const focusRow = focusRowIndex(focusIndex);
   const rawTop = focusRow - Math.floor(innerH / 2);
   const scrollTop = Math.max(0, Math.min(rawTop, totalRows - innerH));
@@ -179,10 +255,16 @@ function ScrollView({
   const hasMore  = scrollEnd < totalRows;
   const hasAbove = scrollTop > 0;
 
+  const syncSeconds = config.settings?.syncIntervalSeconds ?? 300;
+
   return (
     <Box flexDirection="column" paddingX={1}>
       <Box marginBottom={1}>
-        <Text color="gray" dimColor>↑/↓ navigate · Enter/Space toggle</Text>
+        <Text color="gray" dimColor>
+          {focusIndex === SYNC_INTERVAL_INDEX
+            ? '- / + cycle · restart daemon to apply'
+            : '↑/↓ navigate · Enter/Space toggle'}
+        </Text>
         {hasAbove && <Text color="gray" dimColor>{'  ↑ ' + scrollTop + ' more'}</Text>}
         {hasMore  && <Text color="gray" dimColor>{'  ↓ ' + (totalRows - scrollEnd) + ' more'}</Text>}
       </Box>
@@ -190,11 +272,19 @@ function ScrollView({
         <SectionTitle label="Features" />
         {visibleRows.map((row, i) => {
           if (row.kind === 'group') {
-            // group 分隔行：稍微缩进的灰色标签
             return (
-              <Box key={`g-${row.label}-${i}`} marginTop={i === 0 ? 0 : 0}>
+              <Box key={`g-${row.label}-${i}`}>
                 <Text color="gray" dimColor>─ {row.label}</Text>
               </Box>
+            );
+          }
+          if (row.kind === 'syncInterval') {
+            return (
+              <SyncIntervalRow
+                key="sync-interval"
+                seconds={syncSeconds}
+                focused={focusIndex === SYNC_INTERVAL_INDEX}
+              />
             );
           }
           return (
@@ -214,14 +304,14 @@ function ScrollView({
 // ─── 每个 group 的静态高度（border×2 + title + items + marginBottom） ──
 
 function groupedContentRows(): number {
-  // 计算分组模式所需总行数
   const groups = new Map<string, number>();
   for (const item of FEATURE_ITEMS) {
     groups.set(item.group, (groups.get(item.group) ?? 0) + 1);
   }
   let total = 1; // hint 行
-  for (const count of groups.values()) {
-    total += 2 + 1 + count + 1; // border_top + border_bottom + title + items + marginBottom
+  for (const [group, count] of groups.entries()) {
+    const extraRows = group === 'Sync' ? 1 : 0; // SyncIntervalRow
+    total += 2 + 1 + count + extraRows + 1; // border×2 + title + items + extra + marginBottom
   }
   return total;
 }

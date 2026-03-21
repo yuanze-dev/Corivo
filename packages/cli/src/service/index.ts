@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
+import { fileURLToPath } from 'node:url'
 import type { ServiceManager } from './types.js'
 import { MacOSServiceManager } from './macos.js'
 import { LinuxServiceManager } from './linux.js'
@@ -40,7 +41,9 @@ export async function resolveCorivoBin(): Promise<string> {
     }
   }
 
-  // fallback: 开发模式，假设在 packages/cli 目录执行
-  const cliPath = path.join(process.cwd(), 'dist', 'cli', 'index.js')
+  // fallback: 用 import.meta.url 定位当前文件，推导 cli/index.js 的绝对路径
+  // dist/service/index.js → ../../dist/cli/index.js（与 cwd 无关）
+  const thisFile = fileURLToPath(import.meta.url)
+  const cliPath = path.resolve(path.dirname(thisFile), '..', 'cli', 'index.js')
   return `${process.execPath} ${cliPath}`
 }

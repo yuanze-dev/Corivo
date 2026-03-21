@@ -12,8 +12,9 @@
     "bin"
   ],
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
     "package": "npm run build && pkg . --targets node18-macos-arm64,node18-macos-x64,node18-linux-x64 --output ../../binaries/corivo"
   },
@@ -39,6 +40,7 @@
     "@types/react": "^18.3.28",
     "pkg": "^5.8.1",
     "prebuildify": "^6.0.1",
+    "tsup": "^8.5.1",
     "typescript": "^5.5.4"
   },
   "engines": {

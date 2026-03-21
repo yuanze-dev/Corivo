@@ -1,5 +1,5 @@
 export interface ServiceConfig {
-  /** corivo 二进制路径或 "node /path/to/cli.js" 字符串，由 MacOSServiceManager 内部负责拆分 */
+  /** corivo 二进制路径，或 "node /path/to/cli.js" 格式的命令字符串 */
   corivoBin: string
   dbKey: string
   dbPath: string
@@ -16,6 +16,9 @@ export interface ServiceResult {
   error?: string
 }
 
+/**
+ * 后台常驻进程管理器。所有方法不抛出异常，失败通过 ServiceResult.success=false 返回。
+ */
 export interface ServiceManager {
   install(config: ServiceConfig): Promise<ServiceResult>
   uninstall(): Promise<ServiceResult>

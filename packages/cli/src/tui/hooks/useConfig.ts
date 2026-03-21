@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { CorivoConfig, CorivoFeatures } from '../../config.js';
+import type { CorivoConfig, CorivoFeatures, CorivoSettings } from '../../config.js';
 
 export interface UseConfigResult {
   config: CorivoConfig | null;
   loading: boolean;
   toggleFeature: (key: keyof CorivoFeatures) => Promise<void>;
+  updateSetting: (key: keyof CorivoSettings, value: number) => Promise<void>;
   savedFlash: boolean;
 }
 
@@ -54,5 +55,18 @@ export function useConfig(configDir: string): UseConfigResult {
     flashTimerRef.current = setTimeout(() => setSavedFlash(false), 500);
   }, [config, configPath]);
 
-  return { config, loading, toggleFeature, savedFlash };
+  const updateSetting = useCallback(async (key: keyof CorivoSettings, value: number) => {
+    if (!config) return;
+    const updated: CorivoConfig = {
+      ...config,
+      settings: { ...config.settings, [key]: value },
+    };
+    await fs.writeFile(configPath, JSON.stringify(updated, null, 2));
+    setConfig(updated);
+    setSavedFlash(true);
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => setSavedFlash(false), 500);
+  }, [config, configPath]);
+
+  return { config, loading, toggleFeature, updateSetting, savedFlash };
 }

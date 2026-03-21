@@ -7,6 +7,9 @@ import { LinuxServiceManager } from './linux.js'
 import { UnsupportedServiceManager } from './unsupported.js'
 
 export * from './types.js'
+export { MacOSServiceManager } from './macos.js'
+export { LinuxServiceManager } from './linux.js'
+export { UnsupportedServiceManager } from './unsupported.js'
 
 export function getServiceManager(): ServiceManager {
   switch (process.platform) {

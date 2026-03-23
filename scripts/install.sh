@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Corivo 安装脚本
 # 用法: curl -fsSL https://get.corivo.ai | sh
 
@@ -23,18 +23,48 @@ CORIVO_CONFIG_DIR="$HOME/.corivo"
 CORIVO_HOOKS_DIR="$CORIVO_CONFIG_DIR/hooks"
 GITHUB_RAW="https://raw.githubusercontent.com/xiaolin26/Corivo/main/packages/plugins/claude-code"
 
-# ── 1. 检测 Node.js ────────────────────────────────────────────────────────
-check_node() {
-  if ! command -v node &>/dev/null; then
-    log_error "需要 Node.js >= 18，请先安装: https://nodejs.org"
+# ── 1. 安装 Node.js（如未安装）────────────────────────────────────────────
+install_node_via_nvm() {
+  log_step "通过 nvm 安装 Node.js 22..."
+  # 下载并执行 nvm 安装脚本
+  if ! curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash; then
+    log_error "nvm 安装失败"
     exit 1
   fi
+  # 加载 nvm 到当前 shell（不依赖新开终端）
+  export NVM_DIR="$HOME/.nvm"
+  # shellcheck disable=SC1091
+  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+  if ! command -v nvm &>/dev/null; then
+    log_error "nvm 加载失败，请重开终端后重试"
+    exit 1
+  fi
+  nvm install 22
+  nvm use 22
+  nvm alias default 22
+  log_info "Node.js $(node -v) 已安装"
+}
+
+check_node() {
+  # 尝试加载 nvm（用户可能已装但未激活）
+  export NVM_DIR="$HOME/.nvm"
+  # shellcheck disable=SC1091
+  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+  if ! command -v node &>/dev/null; then
+    log_warn "未检测到 Node.js，正在自动安装..."
+    install_node_via_nvm
+    return
+  fi
+
   local major
   major=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
   if [ "$major" -lt 18 ]; then
-    log_error "Node.js 版本过低 ($(node -v))，需要 >= 18"
-    exit 1
+    log_warn "Node.js 版本过低 ($(node -v))，正在升级..."
+    install_node_via_nvm
+    return
   fi
+
   log_info "Node.js $(node -v)"
 }
 
@@ -58,12 +88,7 @@ init_corivo() {
 
 # ── 4. 找到 Claude Code 配置目录 ───────────────────────────────────────────
 find_claude_dir() {
-  local candidates=(
-    "$HOME/.claude"
-    "$HOME/.config/claude"
-    "$HOME/Library/Application Support/claude"
-  )
-  for dir in "${candidates[@]}"; do
+  for dir in "$HOME/.claude" "$HOME/.config/claude" "$HOME/Library/Application Support/claude"; do
     if [ -d "$dir" ]; then
       CLAUDE_DIR="$dir"
       log_info "找到 Claude Code 配置目录: $CLAUDE_DIR"
@@ -98,8 +123,7 @@ install_hook_scripts() {
   log_step "安装 hook 脚本到 $CORIVO_HOOKS_DIR..."
   mkdir -p "$CORIVO_HOOKS_DIR"
 
-  local scripts=("session-init.sh" "ingest-turn.sh" "stop-suggest.sh")
-  for script in "${scripts[@]}"; do
+  for script in session-init.sh ingest-turn.sh stop-suggest.sh; do
     local dest="$CORIVO_HOOKS_DIR/$script"
     local src_url="$GITHUB_RAW/hooks/scripts/$script"
 

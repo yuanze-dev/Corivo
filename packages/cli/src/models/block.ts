@@ -80,6 +80,8 @@ export interface BlockFilter {
   minVitality?: number;
   /** 返回数量限制 */
   limit?: number;
+  /** 按来源筛选 */
+  source?: string;
 }
 
 /**

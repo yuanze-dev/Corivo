@@ -1,5 +1,5 @@
 {
-  "name": "corivo",
+  "name": "corivo-monorepo",
   "version": "0.10.18",
   "private": true,
   "type": "module",

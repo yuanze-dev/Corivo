@@ -22,7 +22,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@corivo/shared": "*",
+    "@corivo/shared": "workspace:*",
     "better-sqlite3": "^9.4.3"
   },
   "devDependencies": {

@@ -21,7 +21,7 @@ log_corivo(){ echo -e "${CYAN}[corivo]${NC} $1"; }
 # ── 配置 ───────────────────────────────────────────────────────────────────
 CORIVO_CONFIG_DIR="$HOME/.corivo"
 CORIVO_HOOKS_DIR="$CORIVO_CONFIG_DIR/hooks"
-GITHUB_RAW="https://raw.githubusercontent.com/xiaolin26/Corivo/main/packages/plugins/claude-code"
+GITHUB_RAW="https://raw.githubusercontent.com/yuanze-dev/Corivo/main/packages/plugins/claude-code"
 
 # ── 1. 安装 Node.js（如未安装）────────────────────────────────────────────
 install_node_via_nvm() {
@@ -78,15 +78,24 @@ install_build_deps() {
 
   log_step "安装构建依赖（Python3 + gcc）..."
 
+  # 非 root 用户需要 sudo
+  SUDO=""
+  if [ "$(id -u)" -ne 0 ]; then
+    if command -v sudo &>/dev/null; then
+      SUDO="sudo"
+    else
+      log_warn "需要 root 权限安装构建依赖，但未找到 sudo"
+    fi
+  fi
+
   if command -v apt-get &>/dev/null; then
-    apt-get update -qq
-    apt-get install -y -qq python3 make g++ > /dev/null
+    $SUDO apt-get update -qq
+    $SUDO apt-get install -y -qq python3 make g++ > /dev/null
   elif command -v yum &>/dev/null; then
-    yum install -y -q python3 make gcc-c++ > /dev/null
+    $SUDO yum install -y -q python3 make gcc-c++ > /dev/null
   elif command -v apk &>/dev/null; then
-    apk add --quiet python3 make g++ > /dev/null
+    $SUDO apk add --quiet python3 make g++ > /dev/null
   elif command -v brew &>/dev/null; then
-    # macOS 上 Xcode Command Line Tools 提供 gcc，python3 用 brew 装
     command -v python3 &>/dev/null || brew install python3 > /dev/null
   else
     log_warn "无法自动安装构建依赖，请手动安装 python3 和 gcc"
@@ -102,6 +111,9 @@ install_build_deps() {
 install_corivo_cli() {
   log_step "安装 Corivo CLI..."
   npm install -g corivo
+  # npm 有时不设置执行权限，手动补上
+  CORIVO_BIN="$(npm root -g)/../bin/corivo"
+  [ -f "$CORIVO_BIN" ] && chmod +x "$CORIVO_BIN" 2>/dev/null || true
   log_info "Corivo CLI 已安装 ($(corivo --version 2>/dev/null || echo 'latest'))"
 }
 

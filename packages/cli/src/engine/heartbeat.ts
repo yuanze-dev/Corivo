@@ -16,6 +16,7 @@ import { FollowUpManager } from './follow-up.js';
 import { TriggerDecision } from './trigger-decision.js';
 import { PushQueue } from './push-queue.js';
 import { AutoSync } from './auto-sync.js';
+import { OpenClawIngestor } from '../ingestors/openclaw-ingestor.js';
 import { DatabaseError } from '../errors/index.js';
 import type { BlockStatus, Pattern } from '../models/index.js';
 import { vitalityToStatus } from '../models/block.js';
@@ -69,6 +70,7 @@ export class Heartbeat {
   private triggerDecision: TriggerDecision | null = null;
   private pushQueue: PushQueue | null = null;
   private autoSync: AutoSync | null = null;
+  private openclawIngestor: OpenClawIngestor | null = null;
   private timeoutRef: NodeJS.Timeout | null = null;
   private lastHealthCheck = 0;
   private cycleCount = 0;
@@ -142,6 +144,10 @@ export class Heartbeat {
       this.triggerDecision = new TriggerDecision(this.db);
       this.pushQueue = new PushQueue();
       this.autoSync = new AutoSync(this.db);
+
+      // 初始化 OpenClaw 采集器（事件驱动模式）
+      this.openclawIngestor = new OpenClawIngestor();
+      await this.openclawIngestor.startWatching(this.db);
 
       // 从 config.json 读取同步间隔（生产路径；测试模式走构造函数注入，不会进入此块）
       const configDir = process.env.CORIVO_CONFIG_DIR || getConfigDir();
@@ -237,6 +243,12 @@ export class Heartbeat {
     if (this.timeoutRef) {
       clearTimeout(this.timeoutRef);
       this.timeoutRef = null;
+    }
+
+    // 停止 OpenClaw 采集器
+    if (this.openclawIngestor) {
+      await this.openclawIngestor.stop();
+      this.openclawIngestor = null;
     }
 
     if (this.db) {

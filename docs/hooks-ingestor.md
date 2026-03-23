@@ -1,8 +1,19 @@
-# Hooks 实时采集
+# Corivo 实时采集
 
-通过 Claude Code Hooks 系统实现对话的实时采集，无需轮询 `history.jsonl`。
+Corivo 支持多种实时采集方式，根据不同 AI 工具的特性选择最优方案。
 
-## 设计原理
+## 采集方式对比
+
+| 工具 | 采集方式 | 延迟 | 数据源 |
+|------|----------|------|--------|
+| Claude Code | Hooks 事件驱动 | 实时 | 会话事件 |
+| OpenClaw | 文件监听 | <500ms | gateway.log |
+
+---
+
+## Claude Code Hooks 采集
+
+### 设计原理
 
 **轮询 vs Hooks**：
 
@@ -112,3 +123,106 @@ echo '{"last_assistant_message":"回复内容"}' | \
 # 查看日志
 cat ~/.corivo/logs/hooks-ingest.log
 ```
+
+---
+
+## OpenClaw 文件监听采集
+
+### 设计原理
+
+OpenClaw 没有「用户输入」级别的 Hook 事件，只有命令级别的事件（`command:new`、`command:stop` 等）。因此采用**文件监听**方案：
+
+| 方式 | 优点 | 缺点 |
+|------|------|------|
+| 轮询 gateway.log | 实现简单 | 有延迟（60s），资源浪费 |
+| fs.watch 监听 | 实时响应，低资源消耗 | 依赖文件系统事件 |
+
+**防抖机制**：日志变化后 500ms 再采集，避免频繁写入时多次触发。
+
+### 实现方案
+
+```typescript
+// packages/cli/src/ingestors/openclaw-ingestor.ts
+
+class OpenClawIngestor {
+  private watcher: fs.FSWatcher | null = null;
+  private debounceTimer: NodeJS.Timeout | null = null;
+
+  async startWatching(db: CorivoDatabase): Promise<void> {
+    // 使用 fs.watch 监听日志文件
+    this.watcher = watch(this.gatewayLogPath, (eventType) => {
+      if (eventType === 'change') {
+        this.scheduleIngest();  // 防抖调度
+      }
+    });
+  }
+
+  private scheduleIngest(): void {
+    // 防抖：500ms 后执行采集
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(() => this.ingest(this.db), 500);
+  }
+}
+```
+
+### 采集规则
+
+**值得保存**：
+- 错误日志
+- 包含「决定/选择/采用」的决策类内容
+- 包含「记住/保存/记录」的记忆类内容
+- 问题句式（怎么/如何/?）
+- 飞书消息相关（>20字）
+- 长句子（>30字，>5个词）
+
+**过滤规则**：
+- 太短（<10字）
+- test/debug/ping/heartbeat
+- 纯标点数字
+
+### 降级方案
+
+如果 `fs.watch` 失败，自动回退到轮询模式：
+
+```typescript
+private startPolling(): void {
+  this.usePolling = true;
+  this.pollTimer = setInterval(() => this.ingest(this.db), 60000);
+}
+```
+
+### 心跳集成
+
+OpenClaw 采集器在心跳引擎启动时自动启动监听：
+
+```typescript
+// packages/cli/src/engine/heartbeat.ts
+
+async start(): Promise<void> {
+  // ...
+  this.openclawIngestor = new OpenClawIngestor();
+  await this.openclawIngestor.startWatching(this.db);
+}
+
+async stop(): Promise<void> {
+  // ...
+  await this.openclawIngestor.stop();
+}
+```
+
+### OpenClaw Hooks 参考
+
+OpenClaw 的 Hooks 是命令级别的，可用于其他扩展：
+
+| 事件 | 触发时机 |
+|------|----------|
+| `agent:bootstrap` | 工作区文件注入前 |
+| `command:new` | 发出 `/new` 命令 |
+| `command:reset` | 发出 `/reset` 命令 |
+| `command:stop` | 发出 `/stop` 命令 |
+| `gateway:startup` | Gateway 启动 |
+
+### 日志位置
+
+- OpenClaw 日志：`~/.openclaw/logs/gateway.log`
+- 采集器日志：`~/.corivo/logs/`（如需调试可添加）

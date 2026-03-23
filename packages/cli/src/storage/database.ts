@@ -888,6 +888,10 @@ export class CorivoDatabase {
       conditions.push('vitality >= ?');
       values.push(filter.minVitality);
     }
+    if (filter.source) {
+      conditions.push('source = ?');
+      values.push(filter.source);
+    }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     // 验证 limit 范围，防止极端值

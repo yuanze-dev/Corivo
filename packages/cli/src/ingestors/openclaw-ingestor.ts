@@ -6,7 +6,7 @@
  */
 
 import fs from 'node:fs/promises';
-import { watch, existsSync } from 'node:fs';
+import { watch, existsSync, type FSWatcher } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import type { CorivoDatabase } from '../storage/database.js';
@@ -56,7 +56,7 @@ export class OpenClawIngestor {
   private maxEntries: number;
   private debounceMs: number;
   private db: CorivoDatabase | null = null;
-  private watcher: fs.FSWatcher | null = null;
+  private watcher: FSWatcher | null = null;
   private debounceTimer: NodeJS.Timeout | null = null;
   private pollTimer: NodeJS.Timeout | null = null;
   private isWatching = false;

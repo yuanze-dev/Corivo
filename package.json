@@ -1,6 +1,6 @@
 {
   "name": "corivo",
-  "version": "0.10.7",
+  "version": "0.10.15",
   "private": true,
   "type": "module",
   "scripts": {

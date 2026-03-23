@@ -68,7 +68,37 @@ check_node() {
   log_info "Node.js $(node -v)"
 }
 
-# ── 2. 安装 Corivo CLI ────────────────────────────────────────────────────
+# ── 2. 安装构建依赖（better-sqlite3 需要 Python + gcc）──────────────────────
+install_build_deps() {
+  # 已有 python3 和 gcc 则跳过
+  if command -v python3 &>/dev/null && command -v gcc &>/dev/null; then
+    log_info "构建依赖已就绪"
+    return
+  fi
+
+  log_step "安装构建依赖（Python3 + gcc）..."
+
+  if command -v apt-get &>/dev/null; then
+    apt-get update -qq
+    apt-get install -y -qq python3 make g++ > /dev/null
+  elif command -v yum &>/dev/null; then
+    yum install -y -q python3 make gcc-c++ > /dev/null
+  elif command -v apk &>/dev/null; then
+    apk add --quiet python3 make g++ > /dev/null
+  elif command -v brew &>/dev/null; then
+    # macOS 上 Xcode Command Line Tools 提供 gcc，python3 用 brew 装
+    command -v python3 &>/dev/null || brew install python3 > /dev/null
+  else
+    log_warn "无法自动安装构建依赖，请手动安装 python3 和 gcc"
+    log_warn "Debian/Ubuntu: apt-get install python3 make g++"
+    log_warn "Alpine:        apk add python3 make g++"
+    log_warn "CentOS/RHEL:   yum install python3 make gcc-c++"
+  fi
+
+  log_info "构建依赖已就绪"
+}
+
+# ── 3. 安装 Corivo CLI ────────────────────────────────────────────────────
 install_corivo_cli() {
   log_step "安装 Corivo CLI..."
   npm install -g corivo
@@ -229,6 +259,7 @@ main() {
   echo ""
 
   check_node
+  install_build_deps
   install_corivo_cli
   init_corivo
 

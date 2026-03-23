@@ -15,6 +15,7 @@ import * as dockerComposeExtractor from './extractors/docker-compose.js';
 import * as currentProjectExtractor from './extractors/current-project.js';
 import * as claudeCodeExtractor from './extractors/claude-code.js';
 import * as cursorExtractor from './extractors/cursor.js';
+import * as openclawExtractor from './extractors/openclaw.js';
 
 /**
  * 所有扫描源注册表
@@ -37,6 +38,7 @@ const SCAN_SOURCES: ScanSource[] = [
   // === AI 工具配置 ===
   claudeCodeExtractor.source,
   cursorExtractor.source,
+  openclawExtractor.source,
   // 更多提取器待添加...
 ];
 

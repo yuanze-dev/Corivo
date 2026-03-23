@@ -12,6 +12,10 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/cli
+
     steps:
       - uses: actions/checkout@v6
 

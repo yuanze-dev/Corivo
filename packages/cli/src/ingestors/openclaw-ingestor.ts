@@ -1,10 +1,12 @@
 /**
  * OpenClaw 历史采集器 - 无感采集 OpenClaw 对话和活动记录
  *
- * 定期读取 ~/.openclaw/logs/gateway.log，提取有价值的信息自动保存到 Corivo
+ * 【事件驱动模式】监听 ~/.openclaw/logs/gateway.log 文件变化，实时采集
+ * 【降级模式】如果监听失败，回退到定时轮询
  */
 
 import fs from 'node:fs/promises';
+import { watch, existsSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import type { CorivoDatabase } from '../storage/database.js';
@@ -17,8 +19,10 @@ export interface OpenClawIngestorConfig {
   openclawConfigDir?: string;
   /** 每次采集的最大条数 */
   maxEntries?: number;
-  /** 采集间隔（毫秒），默认 60 秒 */
+  /** 采集间隔（毫秒），仅用于降级模式，默认 60 秒 */
   ingestInterval?: number;
+  /** 防抖延迟（毫秒），默认 500ms */
+  debounceMs?: number;
 }
 
 /**
@@ -50,20 +54,150 @@ export class OpenClawIngestor {
   private lastIngestPosition = 0; // 记录上次采集到第几行
   private lastIngestTime = 0; // 记录上次采集的时间戳
   private maxEntries: number;
+  private debounceMs: number;
+  private db: CorivoDatabase | null = null;
+  private watcher: fs.FSWatcher | null = null;
+  private debounceTimer: NodeJS.Timeout | null = null;
+  private pollTimer: NodeJS.Timeout | null = null;
+  private isWatching = false;
+  private usePolling = false; // 降级模式标记
 
   constructor(config: OpenClawIngestorConfig = {}) {
     this.openclawConfigDir = config.openclawConfigDir || path.join(os.homedir(), '.openclaw');
     this.gatewayLogPath = path.join(this.openclawConfigDir, 'logs', 'gateway.log');
     this.maxEntries = config.maxEntries || 50;
+    this.debounceMs = config.debounceMs || 500;
   }
 
   /**
-   * 采集新日志记录
+   * 启动监听（事件驱动模式）
+   */
+  async startWatching(database: CorivoDatabase): Promise<void> {
+    if (this.isWatching) {
+      console.log('[OpenClaw采集] 已在运行中');
+      return;
+    }
+
+    this.db = database;
+
+    // 检查日志文件是否存在
+    if (!existsSync(this.gatewayLogPath)) {
+      console.log('[OpenClaw采集] 日志文件不存在，等待文件创建...');
+      // 启动文件创建监听
+      this.watchForFileCreation();
+      return;
+    }
+
+    // 启动文件监听
+    try {
+      this.setupFileWatcher();
+    } catch (error) {
+      console.error('[OpenClaw采集] 监听启动失败，回退到轮询模式:', error);
+      this.startPolling();
+    }
+  }
+
+  /**
+   * 停止监听
+   */
+  async stop(): Promise<void> {
+    this.isWatching = false;
+
+    if (this.watcher) {
+      this.watcher.close();
+      this.watcher = null;
+    }
+
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+
+    console.log('[OpenClaw采集] 已停止');
+  }
+
+  /**
+   * 设置文件监听器
+   */
+  private setupFileWatcher(): void {
+    this.watcher = watch(this.gatewayLogPath, { persistent: false }, (eventType, filename) => {
+      if (eventType === 'change') {
+        this.scheduleIngest();
+      }
+    });
+
+    this.isWatching = true;
+    console.log('[OpenClaw采集] 文件监听已启动');
+
+    // 启动时执行一次初始采集
+    this.scheduleIngest();
+  }
+
+  /**
+   * 监听文件创建（用于日志文件尚不存在的情况）
+   */
+  private watchForFileCreation(): void {
+    // 使用轮询等待文件创建
+    const checkInterval = setInterval(async () => {
+      if (existsSync(this.gatewayLogPath)) {
+        clearInterval(checkInterval);
+        console.log('[OpenClaw采集] 日志文件已创建，启动监听');
+        this.setupFileWatcher();
+      }
+    }, 5000);
+
+    // 30分钟后停止等待
+    setTimeout(() => clearInterval(checkInterval), 30 * 60 * 1000);
+  }
+
+  /**
+   * 防抖调度采集
+   */
+  private scheduleIngest(): void {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
+
+    this.debounceTimer = setTimeout(async () => {
+      if (this.db) {
+        await this.ingest(this.db);
+      }
+    }, this.debounceMs);
+  }
+
+  /**
+   * 启动轮询模式（降级）
+   */
+  private startPolling(): void {
+    this.usePolling = true;
+    const interval = 60000; // 60秒
+
+    this.pollTimer = setInterval(async () => {
+      if (this.db) {
+        await this.ingest(this.db);
+      }
+    }, interval);
+
+    this.isWatching = true;
+    console.log(`[OpenClaw采集] 轮询模式已启动 (${interval}ms)`);
+  }
+
+  /**
+   * 采集新日志记录（兼容两种模式）
    *
    * @param db - 数据库实例
    * @returns 采集结果
    */
   async ingest(db: CorivoDatabase): Promise<IngestResult> {
+    // 如果是首次调用且未设置 db，保存引用
+    if (!this.db) {
+      this.db = db;
+    }
     const result: IngestResult = {
       processed: 0,
       saved: 0,
@@ -270,6 +404,9 @@ export class OpenClawIngestor {
     exists: boolean;
     size: number;
     lastModified: number | null;
+    isWatching: boolean;
+    mode: 'watch' | 'poll';
+    processedLines: number;
   }> {
     try {
       const stats = await fs.stat(this.gatewayLogPath);
@@ -277,12 +414,18 @@ export class OpenClawIngestor {
         exists: true,
         size: stats.size,
         lastModified: stats.mtimeMs,
+        isWatching: this.isWatching,
+        mode: this.usePolling ? 'poll' : 'watch',
+        processedLines: this.lastIngestPosition,
       };
     } catch {
       return {
         exists: false,
         size: 0,
         lastModified: null,
+        isWatching: this.isWatching,
+        mode: this.usePolling ? 'poll' : 'watch',
+        processedLines: this.lastIngestPosition,
       };
     }
   }

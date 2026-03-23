@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.1] - 2026-03-23
+
+### Changed
+- **OpenClaw 采集器** 从定时轮询改为文件监听模式
+  - 使用 `fs.watch` 监听 `gateway.log` 文件变化
+  - 添加 500ms 防抖机制，避免频繁触发
+  - 监听失败时自动回退到轮询模式
+  - 延迟从最多 60 秒降低到 <500ms
+- **BlockFilter** 接口新增 `source` 字段，支持按来源筛选
+- **文档**: 更新 `docs/hooks-ingestor.md`，添加 OpenClaw 采集器说明
+
+### Fixed
+- 类型检查错误：正确导入 `FSWatcher` 类型
+- `queryBlocks` 方法支持 `source` 参数过滤
+
 ## [0.12.0] - 2026-03-20
 
 ### Added

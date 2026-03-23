@@ -2,13 +2,6 @@
   "name": "@corivo/claude-code",
   "version": "0.11.0",
   "description": "Corivo Claude Code Plugin - 记忆存储与智能推送",
-  "type": "module",
-  "main": "dist/index.js",
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "test": "node --test"
-  },
   "keywords": [
     "claude-code",
     "memory",
@@ -17,17 +10,5 @@
     "plugin"
   ],
   "author": "xiaolin26",
-  "license": "MIT",
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "dependencies": {
-    "@corivo/shared": "workspace:*",
-    "better-sqlite3": "^9.4.3"
-  },
-  "devDependencies": {
-    "@types/node": "^20.19.37",
-    "@types/better-sqlite3": "^7.6.13",
-    "typescript": "^5.5.4"
-  }
+  "license": "MIT"
 }

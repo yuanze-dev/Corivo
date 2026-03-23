@@ -350,10 +350,34 @@ npx tsx src/cli/index.ts save --content "测试" --annotation "事实 · test"
 
 ## 最后更新
 
-- **日期**: 2026-03-20
-- **版本**: v0.11.0
+- **日期**: 2026-03-23
+- **版本**: v0.12.1
 - **更新人**: 晓力 + Claude Code
-- **内容**: 一次性安装流程 + 数据库持久化修复
+- **内容**: OpenClaw 采集器改为文件监听模式
+
+### 2026-03-23 - OpenClaw 采集器优化 (feature/openclaw-ingestor-v2)
+
+**改动**: OpenClaw 采集器从定时轮询改为文件监听模式
+
+| 项目 | 改动前 | 改动后 |
+|------|--------|--------|
+| 触发方式 | 定时轮询（60秒） | `fs.watch` 文件监听 |
+| 延迟 | 最多 60 秒 | <500ms（防抖） |
+| 降级方案 | 无 | 监听失败自动回退轮询 |
+
+**新增代码**:
+- `src/ingestors/openclaw-ingestor.ts`: 新增 `startWatching()`, `stop()`, `setupFileWatcher()` 等方法
+- `src/engine/heartbeat.ts`: 集成 OpenClaw 采集器，启动时自动开始监听
+- `src/models/block.ts`: `BlockFilter` 新增 `source` 字段
+- `src/storage/database.ts`: `queryBlocks` 支持 `source` 过滤
+- `docs/hooks-ingestor.md`: 更新文档，添加 OpenClaw 采集器说明
+
+**PR**: https://github.com/yuanze-dev/Corivo/pull/6
+
+**已知问题**:
+- ⚠️ macOS 25.3.0 + Xcode Tools 26.3.0 无法编译 better-sqlite3 (Node v127 兼容性)
+- 影响范围：无法运行 `corivo status` / `corivo save` 等命令
+- 临时方案：等待 better-sqlite3 更新或降级 Node.js
 
 ---
 

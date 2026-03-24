@@ -1,0 +1,1 @@
+{"version":3,"file":"useLogs.d.ts","sourceRoot":"","sources":["../../../src/tui/hooks/useLogs.ts"],"names":[],"mappings":"AAQA,MAAM,WAAW,OAAO;IACtB,EAAE,EAAE,MAAM,CAAC;IACX,IAAI,EAAE,MAAM,CAAC;CACd;AAED,wBAAgB,OAAO,CACrB,SAAS,EAAE,MAAM,EACjB,OAAO,EAAE,OAAO,GACf;IAAE,KAAK,EAAE,OAAO,EAAE,CAAC;IAAC,KAAK,EAAE,MAAM,GAAG,IAAI,CAAA;CAAE,CAyE5C"}

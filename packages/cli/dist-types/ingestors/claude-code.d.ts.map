@@ -1,0 +1,1 @@
+{"version":3,"file":"claude-code.d.ts","sourceRoot":"","sources":["../../src/ingestors/claude-code.ts"],"names":[],"mappings":"AAAA;;;;GAIG;AAMH,qBAAa,kBAAkB;IAC7B;;;;OAIG;IACG,WAAW,CAAC,WAAW,EAAE,MAAM,GAAG,OAAO,CAAC,IAAI,CAAC;IAyBrD;;OAEG;IACH,OAAO,CAAC,aAAa;IAkFrB;;OAEG;IACG,uBAAuB,IAAI,OAAO,CAAC,MAAM,EAAE,CAAC;CAInD"}

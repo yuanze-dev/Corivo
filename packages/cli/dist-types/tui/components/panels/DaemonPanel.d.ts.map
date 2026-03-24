@@ -1,0 +1,1 @@
+{"version":3,"file":"DaemonPanel.d.ts","sourceRoot":"","sources":["../../../../src/tui/components/panels/DaemonPanel.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,MAAM,OAAO,CAAC;AAE1B,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,0BAA0B,CAAC;AAE7D,UAAU,gBAAgB;IACxB,MAAM,EAAE,YAAY,CAAC;IACrB,YAAY,EAAE,MAAM,CAAC;IACrB,WAAW,EAAE,MAAM,CAAC;CACrB;AAsID,eAAO,MAAM,WAAW,8CAuCtB,CAAC"}

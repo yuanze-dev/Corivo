@@ -4,6 +4,7 @@
   "description": "你的硅基同事 — 它只为你活着",
   "type": "module",
   "main": "dist/index.js",
+  "types": "dist-types/index.d.ts",
   "bin": {
     "corivo": "bin/corivo.js"
   },

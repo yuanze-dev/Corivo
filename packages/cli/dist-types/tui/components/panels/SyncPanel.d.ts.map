@@ -1,0 +1,1 @@
+{"version":3,"file":"SyncPanel.d.ts","sourceRoot":"","sources":["../../../../src/tui/components/panels/SyncPanel.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,MAAM,OAAO,CAAC;AAE1B,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,oBAAoB,CAAC;AAEvD,UAAU,cAAc;IACtB,MAAM,EAAE,YAAY,GAAG,IAAI,CAAC;IAC5B,YAAY,EAAE,MAAM,CAAC;IACrB,WAAW,EAAE,MAAM,CAAC;CACrB;AA+FD,eAAO,MAAM,SAAS,4CAuCpB,CAAC"}

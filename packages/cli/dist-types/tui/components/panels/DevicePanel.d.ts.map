@@ -1,0 +1,1 @@
+{"version":3,"file":"DevicePanel.d.ts","sourceRoot":"","sources":["../../../../src/tui/components/panels/DevicePanel.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,MAAM,OAAO,CAAC;AAE1B,OAAO,KAAK,EAAE,UAAU,EAAE,MAAM,0BAA0B,CAAC;AAE3D,UAAU,gBAAgB;IACxB,MAAM,EAAE,UAAU,CAAC;IACnB,YAAY,EAAE,MAAM,CAAC;IACrB,WAAW,EAAE,MAAM,CAAC;CACrB;AAgHD,eAAO,MAAM,WAAW,8CA0CtB,CAAC"}

@@ -1,0 +1,1 @@
+{"version":3,"file":"TabBar.d.ts","sourceRoot":"","sources":["../../../src/tui/components/TabBar.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,MAAM,OAAO,CAAC;AAG1B,eAAO,MAAM,IAAI;;;;;;;;;;;;;;;;;;;;;;;;EAOP,CAAC;AAEX,MAAM,MAAM,KAAK,GAAG,CAAC,OAAO,IAAI,CAAC,CAAC,MAAM,CAAC,CAAC,IAAI,CAAC,CAAC;AAWhD,UAAU,WAAW;IACnB,MAAM,EAAE,KAAK,CAAC;CACf;AAGD,eAAO,MAAM,MAAM,yCAwBjB,CAAC"}

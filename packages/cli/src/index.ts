@@ -9,3 +9,4 @@ export * from './errors';
 export * from './crypto/keys';
 export * from './storage/database';
 export * from './engine/rules';
+export type { RealtimeIngestor, IngestorPlugin } from './ingestors/index.js';

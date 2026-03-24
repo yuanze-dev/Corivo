@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import { randomUUID } from 'node:crypto';
 import cors from '@fastify/cors';
 import { healthRoutes } from './routes/health.routes.js';
 import { authRoutes } from './routes/auth.routes.js';
@@ -8,6 +9,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 export async function buildServer() {
   const app = Fastify({
+    genReqId: () => randomUUID(),
     disableRequestLogging: true,
     logger: {
       level: isDev ? 'debug' : 'info',

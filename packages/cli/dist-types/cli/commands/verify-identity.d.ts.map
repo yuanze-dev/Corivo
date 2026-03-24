@@ -1,1 +1,0 @@
-{"version":3,"file":"verify-identity.d.ts","sourceRoot":"","sources":["../../../src/cli/commands/verify-identity.ts"],"names":[],"mappings":"AAAA;;;;GAIG;AAaH,UAAU,qBAAqB;IAC7B,QAAQ,CAAC,EAAE,MAAM,CAAC;IAClB,OAAO,CAAC,EAAE,OAAO,CAAC;CACnB;AAED,wBAAsB,qBAAqB,CAAC,OAAO,GAAE,qBAA0B,GAAG,OAAO,CAAC,IAAI,CAAC,CAsG9F"}

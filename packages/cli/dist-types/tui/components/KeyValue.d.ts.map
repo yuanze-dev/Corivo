@@ -1,1 +1,0 @@
-{"version":3,"file":"KeyValue.d.ts","sourceRoot":"","sources":["../../../src/tui/components/KeyValue.tsx"],"names":[],"mappings":"AAGA,UAAU,aAAa;IACrB,KAAK,EAAE,MAAM,CAAC;IACd,KAAK,EAAE,MAAM,CAAC;IACd,UAAU,CAAC,EAAE,MAAM,CAAC;IACpB,UAAU,CAAC,EAAE,MAAM,CAAC;CACrB;AAED,wBAAgB,QAAQ,CAAC,EAAE,KAAK,EAAE,KAAK,EAAE,UAAe,EAAE,UAAoB,EAAE,EAAE,aAAa,2CAQ9F"}

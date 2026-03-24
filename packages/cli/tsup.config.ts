@@ -2,6 +2,7 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: {
+    'index': 'src/index.ts',            // public types entry
     'cli/index': 'src/cli/index.ts',
     'engine/heartbeat': 'src/engine/heartbeat.ts',
     'service/index': 'src/service/index.ts',
@@ -16,6 +17,7 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   clean: true,
+  dts: true,
   external: ['better-sqlite3'],
   esbuildOptions(options) {
     options.jsx = 'automatic';

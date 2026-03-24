@@ -9,8 +9,6 @@ export default defineConfig({
     // Cold scan 模块
     'cold-scan/index': 'src/cold-scan/index.ts',
     'cold-scan/extractors/openclaw': 'src/cold-scan/extractors/openclaw.ts',
-    // Ingestors
-    'ingestors/openclaw-ingestor': 'src/ingestors/openclaw-ingestor.ts',
   },
   format: ['esm'],
   target: 'node18',

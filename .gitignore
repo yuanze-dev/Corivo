@@ -36,6 +36,8 @@ prebuilds/
 
 # ENV
 **/.env
+mise.toml
 
 # TypeScript build cache
 *.tsbuildinfo
+

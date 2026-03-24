@@ -879,6 +879,11 @@ export class CorivoDatabase {
     if (filter.annotation) {
       conditions.push('annotation = ?');
       values.push(filter.annotation);
+    } else if (filter.annotationPrefix) {
+      // 转义 LIKE 通配符，防止误匹配
+      const escaped = filter.annotationPrefix.replace(/%/g, '\\%').replace(/_/g, '\\_');
+      conditions.push("annotation LIKE ? ESCAPE '\\'");
+      values.push(`${escaped}%`);
     }
     if (filter.status) {
       conditions.push('status = ?');
@@ -898,8 +903,12 @@ export class CorivoDatabase {
     const limit = filter.limit ? Math.max(1, Math.min(filter.limit, 10000)) : null;
     const limitClause = limit ? `LIMIT ${limit}` : '';
 
+    // 排序：sortBy 和 sortOrder 均来自白名单，不存在 SQL 注入风险
+    const sortColumn = filter.sortBy === 'vitality' ? 'vitality' : 'updated_at';
+    const sortDirection = filter.sortOrder === 'ASC' ? 'ASC' : 'DESC';
+
     const stmt = this.db.prepare(`
-      SELECT * FROM blocks ${whereClause} ORDER BY updated_at DESC ${limitClause}
+      SELECT * FROM blocks ${whereClause} ORDER BY ${sortColumn} ${sortDirection} ${limitClause}
     `);
 
     try {

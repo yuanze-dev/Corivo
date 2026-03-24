@@ -72,8 +72,10 @@ export type UpdateBlockInput = Partial<
  * Block 查询过滤器
  */
 export interface BlockFilter {
-  /** 按标注筛选 */
+  /** 按标注筛选（精确匹配） */
   annotation?: string;
+  /** 按标注前缀筛选，如 "决策" 匹配所有 "决策 · ..." 标注（annotation 精确匹配优先） */
+  annotationPrefix?: string;
   /** 按状态筛选 */
   status?: BlockStatus;
   /** 最低生命力 */
@@ -82,6 +84,10 @@ export interface BlockFilter {
   limit?: number;
   /** 按来源筛选 */
   source?: string;
+  /** 排序字段（默认 updated_at） */
+  sortBy?: 'updated_at' | 'vitality';
+  /** 排序方向（默认 DESC） */
+  sortOrder?: 'ASC' | 'DESC';
 }
 
 /**

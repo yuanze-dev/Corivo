@@ -259,8 +259,11 @@ export class Heartbeat {
    * Public for testing.
    */
   async loadPlugin(plugin: IngestorPlugin): Promise<void> {
+    if (!this.db) {
+      throw new Error('[Heartbeat] loadPlugin called before database is initialized');
+    }
     const ingestor = plugin.create();
-    await ingestor.startWatching(this.db!);
+    await ingestor.startWatching(this.db);
     this.ingestors.push(ingestor);
     console.log(`[Heartbeat] 已加载 ingestor: ${plugin.name}`);
   }

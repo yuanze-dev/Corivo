@@ -282,20 +282,24 @@ describe('Heartbeat Integration', () => {
       ).resolves.not.toThrow();
     });
 
-    it('calls startWatching on a valid plugin via loadPlugin', async () => {
+    it('calls startWatching on a valid plugin via loadPlugin, and stop() cleans up', async () => {
       const heartbeat = new Heartbeat({ db });
 
       let watchingCalled = false;
+      let stopCalled = false;
       const mockPlugin: IngestorPlugin = {
         name: 'mock-ingestor',
         create: () => ({
           startWatching: async (_db: unknown) => { watchingCalled = true; },
-          stop: async () => {},
+          stop: async () => { stopCalled = true; },
         }),
       };
 
       await heartbeat.loadPlugin(mockPlugin);
       expect(watchingCalled).toBe(true);
+
+      await heartbeat.stop();
+      expect(stopCalled).toBe(true);
     });
   });
 });

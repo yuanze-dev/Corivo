@@ -5,7 +5,7 @@ interface PairingEntry {
   expiresAt: number;
 }
 
-const PAIRING_TTL_MS = 10 * 60 * 1000; // 10 分钟
+const PAIRING_TTL_MS = 24 * 60 * 60 * 1000; // 24 小时
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 去掉易混淆字符 0/O/I/1
 
 const pairingStore = new Map<string, PairingEntry>();

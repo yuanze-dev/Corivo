@@ -17,7 +17,10 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   clean: true,
-  dts: true,
+  dts: {
+    entry: { index: 'src/index.ts' },
+    resolve: true,
+  },
   external: ['better-sqlite3'],
   esbuildOptions(options) {
     options.jsx = 'automatic';

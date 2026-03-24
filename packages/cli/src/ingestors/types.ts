@@ -8,6 +8,10 @@ import type { CorivoDatabase } from '../storage/database.js';
 /** 实时采集器接口 */
 export interface RealtimeIngestor {
   startWatching(db: CorivoDatabase): Promise<void>;
+  /**
+   * 停止监听，释放资源。
+   * 幂等：允许在 startWatching 未调用时调用，不应抛出异常。
+   */
   stop(): Promise<void>;
 }
 

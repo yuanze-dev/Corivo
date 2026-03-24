@@ -41,6 +41,7 @@ import { firstRunCommand } from './commands/heartbeat-first-run.js';
 import { daemonCommand } from './commands/daemon.js';
 import { updateCommand } from './commands/update.js';
 import { createSyncCommand } from './commands/sync.js';
+import { listCommand } from './commands/list.js';
 
 const program = new Command();
 
@@ -146,6 +147,7 @@ program
   .option('-v, --verbose', '显示详细信息')
   .action((options) => verifyIdentityCommand(options));
 
+program.addCommand(listCommand);
 program.addCommand(coldScanCommand);
 program.addCommand(pushCommand);
 program.addCommand(pushQueueCommand);

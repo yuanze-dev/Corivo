@@ -16,7 +16,7 @@ import { FollowUpManager } from './follow-up.js';
 import { TriggerDecision } from './trigger-decision.js';
 import { PushQueue } from './push-queue.js';
 import { AutoSync } from './auto-sync.js';
-import { OpenClawIngestor } from '../ingestors/openclaw-ingestor.js';
+import type { RealtimeIngestor, IngestorPlugin } from '../ingestors/types.js';
 import { DatabaseError } from '../errors/index.js';
 import type { BlockStatus, Pattern } from '../models/index.js';
 import { vitalityToStatus } from '../models/block.js';
@@ -70,7 +70,7 @@ export class Heartbeat {
   private triggerDecision: TriggerDecision | null = null;
   private pushQueue: PushQueue | null = null;
   private autoSync: AutoSync | null = null;
-  private openclawIngestor: OpenClawIngestor | null = null;
+  private ingestors: RealtimeIngestor[] = [];
   private timeoutRef: NodeJS.Timeout | null = null;
   private lastHealthCheck = 0;
   private cycleCount = 0;
@@ -145,14 +145,13 @@ export class Heartbeat {
       this.pushQueue = new PushQueue();
       this.autoSync = new AutoSync(this.db);
 
-      // 初始化 OpenClaw 采集器（事件驱动模式）
-      this.openclawIngestor = new OpenClawIngestor();
-      await this.openclawIngestor.startWatching(this.db);
-
       // 从 config.json 读取同步间隔（生产路径；测试模式走构造函数注入，不会进入此块）
       const configDir = process.env.CORIVO_CONFIG_DIR || getConfigDir();
       const corivoConfig = await loadConfig(configDir);
       this.syncCycles = this.computeSyncCycles(corivoConfig?.settings?.syncIntervalSeconds);
+
+      // 动态加载插件 ingestors
+      await this.loadIngestors(corivoConfig?.ingestors ?? []);
 
       console.log(`心跳守护进程启动中... (规则: ${this.ruleEngine.ruleCount})`);
     }
@@ -235,6 +234,38 @@ export class Heartbeat {
   }
 
   /**
+   * 动态加载 ingestor 插件列表
+   *
+   * 依次 import 每个包名，失败则跳过，不中断其他 ingestor 和心跳主循环。
+   * 插件包需全局安装：npm install -g <package-name>
+   *
+   * Public for testing.
+   */
+  async loadIngestors(packageNames: string[]): Promise<void> {
+    for (const packageName of packageNames) {
+      try {
+        const mod = await import(packageName);
+        const plugin = (mod.default ?? mod) as IngestorPlugin;
+        await this.loadPlugin(plugin);
+      } catch (err) {
+        console.error(`[Heartbeat] 加载 ${packageName} 失败，跳过:`, err);
+      }
+    }
+  }
+
+  /**
+   * 初始化并注册单个 ingestor 插件
+   *
+   * Public for testing.
+   */
+  async loadPlugin(plugin: IngestorPlugin): Promise<void> {
+    const ingestor = plugin.create();
+    await ingestor.startWatching(this.db!);
+    this.ingestors.push(ingestor);
+    console.log(`[Heartbeat] 已加载 ingestor: ${plugin.name}`);
+  }
+
+  /**
    * 停止心跳
    */
   async stop(): Promise<void> {
@@ -245,11 +276,11 @@ export class Heartbeat {
       this.timeoutRef = null;
     }
 
-    // 停止 OpenClaw 采集器
-    if (this.openclawIngestor) {
-      await this.openclawIngestor.stop();
-      this.openclawIngestor = null;
+    // 停止所有 ingestor 插件
+    for (const ingestor of this.ingestors) {
+      await ingestor.stop();
     }
+    this.ingestors = [];
 
     if (this.db) {
       CorivoDatabase.closeAll();

@@ -10,6 +10,7 @@ import { KeyManager } from '../../src/crypto/keys';
 import { Heartbeat } from '../../src/engine/heartbeat';
 import { RuleEngine } from '../../src/engine/rules';
 import { TechChoiceRule } from '../../src/engine/rules/tech-choice';
+import type { IngestorPlugin } from '../../src/ingestors/types';
 
 describe('Heartbeat Integration', () => {
   let db: CorivoDatabase;
@@ -265,6 +266,36 @@ describe('Heartbeat Integration', () => {
       // 验证没有创建关联（无关内容不应该有关联）
       const associations = db.queryAssociations({ limit: 100 });
       expect(associations.length).toBe(0);
+    });
+  });
+
+  describe('Heartbeat.loadIngestors', () => {
+    it('does nothing when package list is empty', async () => {
+      const heartbeat = new Heartbeat({ db });
+      await expect(heartbeat.loadIngestors([])).resolves.not.toThrow();
+    });
+
+    it('swallows failed dynamic import and does not throw', async () => {
+      const heartbeat = new Heartbeat({ db });
+      await expect(
+        heartbeat.loadIngestors(['nonexistent-pkg-xyz-abc-12345'])
+      ).resolves.not.toThrow();
+    });
+
+    it('calls startWatching on a valid plugin via loadPlugin', async () => {
+      const heartbeat = new Heartbeat({ db });
+
+      let watchingCalled = false;
+      const mockPlugin: IngestorPlugin = {
+        name: 'mock-ingestor',
+        create: () => ({
+          startWatching: async (_db: unknown) => { watchingCalled = true; },
+          stop: async () => {},
+        }),
+      };
+
+      await heartbeat.loadPlugin(mockPlugin);
+      expect(watchingCalled).toBe(true);
     });
   });
 });

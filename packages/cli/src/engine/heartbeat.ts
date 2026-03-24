@@ -16,7 +16,7 @@ import { FollowUpManager } from './follow-up.js';
 import { TriggerDecision } from './trigger-decision.js';
 import { PushQueue } from './push-queue.js';
 import { AutoSync } from './auto-sync.js';
-import type { RealtimeIngestor, IngestorPlugin } from '../ingestors/types.js';
+import type { RealtimeCollector, CorivoPlugin } from '../ingestors/types.js';
 import { DatabaseError } from '../errors/index.js';
 import type { BlockStatus, Pattern } from '../models/index.js';
 import { vitalityToStatus } from '../models/block.js';
@@ -70,7 +70,7 @@ export class Heartbeat {
   private triggerDecision: TriggerDecision | null = null;
   private pushQueue: PushQueue | null = null;
   private autoSync: AutoSync | null = null;
-  private ingestors: RealtimeIngestor[] = [];
+  private plugins: RealtimeCollector[] = [];
   private timeoutRef: NodeJS.Timeout | null = null;
   private lastHealthCheck = 0;
   private cycleCount = 0;
@@ -150,8 +150,8 @@ export class Heartbeat {
       const corivoConfig = await loadConfig(configDir);
       this.syncCycles = this.computeSyncCycles(corivoConfig?.settings?.syncIntervalSeconds);
 
-      // 动态加载插件 ingestors
-      await this.loadIngestors(corivoConfig?.ingestors ?? []);
+      // 动态加载插件
+      await this.loadPlugins(corivoConfig?.plugins ?? []);
 
       console.log(`心跳守护进程启动中... (规则: ${this.ruleEngine.ruleCount})`);
     }
@@ -234,18 +234,18 @@ export class Heartbeat {
   }
 
   /**
-   * 动态加载 ingestor 插件列表
+   * 动态加载插件列表
    *
-   * 依次 import 每个包名，失败则跳过，不中断其他 ingestor 和心跳主循环。
+   * 依次 import 每个包名，失败则跳过，不中断其他插件和心跳主循环。
    * 插件包需全局安装：npm install -g <package-name>
    *
    * Public for testing.
    */
-  async loadIngestors(packageNames: string[]): Promise<void> {
+  async loadPlugins(packageNames: string[]): Promise<void> {
     for (const packageName of packageNames) {
       try {
         const mod = await import(packageName);
-        const plugin = (mod.default ?? mod) as IngestorPlugin;
+        const plugin = (mod.default ?? mod) as CorivoPlugin;
         await this.loadPlugin(plugin);
       } catch (err) {
         console.error(`[Heartbeat] 加载 ${packageName} 失败，跳过:`, err);
@@ -254,18 +254,18 @@ export class Heartbeat {
   }
 
   /**
-   * 初始化并注册单个 ingestor 插件
+   * 初始化并注册单个插件
    *
    * Public for testing.
    */
-  async loadPlugin(plugin: IngestorPlugin): Promise<void> {
+  async loadPlugin(plugin: CorivoPlugin): Promise<void> {
     if (!this.db) {
       throw new Error('[Heartbeat] loadPlugin called before database is initialized');
     }
-    const ingestor = plugin.create();
-    await ingestor.startWatching(this.db);
-    this.ingestors.push(ingestor);
-    console.log(`[Heartbeat] 已加载 ingestor: ${plugin.name}`);
+    const collector = plugin.create();
+    await collector.startWatching(this.db);
+    this.plugins.push(collector);
+    console.log(`[Heartbeat] 已加载插件: ${plugin.name}`);
   }
 
   /**
@@ -279,11 +279,11 @@ export class Heartbeat {
       this.timeoutRef = null;
     }
 
-    // 停止所有 ingestor 插件
-    for (const ingestor of this.ingestors) {
-      await ingestor.stop();
+    // 停止所有插件
+    for (const plugin of this.plugins) {
+      await plugin.stop();
     }
-    this.ingestors = [];
+    this.plugins = [];
 
     if (this.db) {
       CorivoDatabase.closeAll();

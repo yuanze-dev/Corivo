@@ -1,25 +1,25 @@
 import { describe, it, expectTypeOf } from 'vitest';
-import type { RealtimeIngestor, IngestorPlugin, CorivoDatabase } from '../../src/ingestors/index';
+import type { RealtimeCollector, CorivoPlugin, CorivoDatabase } from '../../src/ingestors/index';
 
-describe('IngestorPlugin interface', () => {
-  it('RealtimeIngestor.startWatching accepts CorivoDatabase and returns Promise<void>', () => {
-    type T = RealtimeIngestor;
+describe('CorivoPlugin interface', () => {
+  it('RealtimeCollector.startWatching accepts CorivoDatabase and returns Promise<void>', () => {
+    type T = RealtimeCollector;
     expectTypeOf<T['startWatching']>().parameters.toEqualTypeOf<[CorivoDatabase]>();
     expectTypeOf<T['startWatching']>().returns.toEqualTypeOf<Promise<void>>();
   });
 
-  it('RealtimeIngestor.stop returns Promise<void>', () => {
-    type T = RealtimeIngestor;
+  it('RealtimeCollector.stop returns Promise<void>', () => {
+    type T = RealtimeCollector;
     expectTypeOf<T['stop']>().returns.toEqualTypeOf<Promise<void>>();
   });
 
-  it('IngestorPlugin.name is string', () => {
-    type T = IngestorPlugin;
+  it('CorivoPlugin.name is string', () => {
+    type T = CorivoPlugin;
     expectTypeOf<T['name']>().toBeString();
   });
 
-  it('IngestorPlugin.create returns RealtimeIngestor', () => {
-    type T = IngestorPlugin;
-    expectTypeOf<T['create']>().returns.toEqualTypeOf<RealtimeIngestor>();
+  it('CorivoPlugin.create returns RealtimeCollector', () => {
+    type T = CorivoPlugin;
+    expectTypeOf<T['create']>().returns.toEqualTypeOf<RealtimeCollector>();
   });
 });

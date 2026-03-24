@@ -10,7 +10,7 @@ import { KeyManager } from '../../src/crypto/keys';
 import { Heartbeat } from '../../src/engine/heartbeat';
 import { RuleEngine } from '../../src/engine/rules';
 import { TechChoiceRule } from '../../src/engine/rules/tech-choice';
-import type { IngestorPlugin } from '../../src/ingestors/types';
+import type { CorivoPlugin } from '../../src/ingestors/types';
 
 describe('Heartbeat Integration', () => {
   let db: CorivoDatabase;
@@ -269,16 +269,16 @@ describe('Heartbeat Integration', () => {
     });
   });
 
-  describe('Heartbeat.loadIngestors', () => {
+  describe('Heartbeat.loadPlugins', () => {
     it('does nothing when package list is empty', async () => {
       const heartbeat = new Heartbeat({ db });
-      await expect(heartbeat.loadIngestors([])).resolves.not.toThrow();
+      await expect(heartbeat.loadPlugins([])).resolves.not.toThrow();
     });
 
     it('swallows failed dynamic import and does not throw', async () => {
       const heartbeat = new Heartbeat({ db });
       await expect(
-        heartbeat.loadIngestors(['nonexistent-pkg-xyz-abc-12345'])
+        heartbeat.loadPlugins(['nonexistent-pkg-xyz-abc-12345'])
       ).resolves.not.toThrow();
     });
 
@@ -287,8 +287,8 @@ describe('Heartbeat Integration', () => {
 
       let watchingCalled = false;
       let stopCalled = false;
-      const mockPlugin: IngestorPlugin = {
-        name: 'mock-ingestor',
+      const mockPlugin: CorivoPlugin = {
+        name: 'mock-plugin',
         create: () => ({
           startWatching: async (_db: unknown) => { watchingCalled = true; },
           stop: async () => { stopCalled = true; },

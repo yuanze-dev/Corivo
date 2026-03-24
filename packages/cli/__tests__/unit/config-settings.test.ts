@@ -26,24 +26,24 @@ describe('CorivoSettings', () => {
     expect(config.settings).toBeUndefined();
   });
 
-  it('accepts ingestors array in config', () => {
+  it('accepts plugins array in config', () => {
     const config: CorivoConfig = {
       version: '1',
       created_at: '2026-01-01',
       identity_id: 'test-id',
       db_key: 'dGVzdA==',
-      ingestors: ['@corivo/openclaw'],
+      plugins: ['@corivo/openclaw'],
     };
-    expect(config.ingestors).toEqual(['@corivo/openclaw']);
+    expect(config.plugins).toEqual(['@corivo/openclaw']);
   });
 
-  it('treats missing ingestors as undefined', () => {
+  it('treats missing plugins as undefined', () => {
     const config: CorivoConfig = {
       version: '1',
       created_at: '2026-01-01',
       identity_id: 'test-id',
       db_key: 'dGVzdA==',
     };
-    expect(config.ingestors).toBeUndefined();
+    expect(config.plugins).toBeUndefined();
   });
 });

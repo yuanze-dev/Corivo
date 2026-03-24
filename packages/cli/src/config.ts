@@ -65,8 +65,8 @@ export interface CorivoConfig {
   db_key: string;
   features?: CorivoFeatures;
   settings?: CorivoSettings;
-  /** 已启用的 ingestor npm 包名列表（需全局安装：npm install -g <pkg>） */
-  ingestors?: string[];
+  /** 已启用的插件 npm 包名列表（需全局安装：npm install -g <pkg>） */
+  plugins?: string[];
 }
 
 /**

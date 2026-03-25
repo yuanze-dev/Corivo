@@ -21,6 +21,7 @@ coverage/
 # Claude
 .gstack/
 .claude/
+.airbo/
 
 # Prebuild
 prebuilds/
@@ -40,4 +41,3 @@ mise.toml
 
 # TypeScript build cache
 *.tsbuildinfo
-

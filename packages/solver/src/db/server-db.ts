@@ -1,4 +1,6 @@
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { Database as SQLiteDatabase } from 'better-sqlite3';
 const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
@@ -15,6 +17,7 @@ let exitHooksRegistered = false;
 
 export function getServerDb(): SQLiteDatabase {
   if (!db) {
+    fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
     db = new Database(config.dbPath);
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');

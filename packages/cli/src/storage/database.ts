@@ -364,6 +364,19 @@ export class CorivoDatabase {
         CREATE INDEX IF NOT EXISTS idx_query_logs_timestamp ON query_logs(timestamp);
       `);
     }
+
+    // 迁移 M001：清理低质量摘要 block（由 heartbeat:consolidation 自动生成）
+    // createSummary 已移除，历史摘要 block 信息价值低，直接删除
+    // 用 PRAGMA user_version 记录已执行的迁移版本号（≥1 表示已执行 M001）
+    const userVersion = (this.db.pragma('user_version', { simple: true }) as number) ?? 0;
+    if (userVersion < 1) {
+      this.db.exec(`
+        DELETE FROM blocks
+        WHERE source = 'heartbeat:consolidation'
+          AND annotation LIKE '%摘要%'
+      `);
+      this.db.pragma('user_version = 1');
+    }
   }
 
   /**

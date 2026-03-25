@@ -720,18 +720,6 @@ export class Heartbeat {
         }
       }
 
-      // 提炼摘要
-      const summaryBlock = this.consolidationEngine.createSummary(activeBlocks);
-      if (summaryBlock) {
-        this.db.createBlock({
-          content: summaryBlock.content,
-          annotation: summaryBlock.annotation,
-          refs: summaryBlock.refs,
-          source: summaryBlock.source,
-        });
-        console.log(`[心跳] 整合: 创建了摘要 ${summaryBlock.id}`);
-      }
-
       // 补链：更新 refs
       const existingAssociations = this.db.queryAssociations({ limit: 100 });
       const missingLinks = this.consolidationEngine.findMissingLinks(

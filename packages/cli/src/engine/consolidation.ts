@@ -5,8 +5,7 @@
  * 模拟人脑在睡眠时整理记忆的过程
  */
 
-import type { Block, CreateBlockInput } from '../models/index.js';
-import { generateBlockId } from '../models/block.js';
+import type { Block } from '../models/index.js';
 import { AssociationType, AssociationDirection } from '../models/association.js';
 
 /**
@@ -14,7 +13,7 @@ import { AssociationType, AssociationDirection } from '../models/association.js'
  */
 export interface ConsolidationResult {
   /** 执行的操作类型 */
-  action: 'merged' | 'created_summary' | 'linked';
+  action: 'merged' | 'linked';
   /** 涉及的 block ID */
   blocks: string[];
   /** 结果 block（如果有） */
@@ -29,8 +28,6 @@ export interface ConsolidationResult {
 interface ConsolidationConfig {
   /** 相似度阈值（高于此值认为需要合并） */
   mergeThreshold: number;
-  /** 摘要最小关联数量 */
-  summaryMinRelated: number;
   /** 自动补链置信度阈值 */
   linkThreshold: number;
 }
@@ -44,7 +41,6 @@ export class ConsolidationEngine {
   constructor(config?: Partial<ConsolidationConfig>) {
     this.config = {
       mergeThreshold: 0.85,
-      summaryMinRelated: 3,
       linkThreshold: 0.7,
       ...config,
     };
@@ -82,64 +78,6 @@ export class ConsolidationEngine {
     }
 
     return results;
-  }
-
-  /**
-   * 提炼：为相关 block 创建摘要
-   *
-   * @param relatedBlocks - 相关的 block 列表
-   * @returns 摘要 block 或 null
-   */
-  createSummary(relatedBlocks: Block[]): Block | null {
-    if (relatedBlocks.length < this.config.summaryMinRelated) {
-      return null;
-    }
-
-    // 检查是否都来自同一领域
-    const domains = new Set(
-      relatedBlocks.map((b) => this.extractDomain(b.annotation))
-    );
-    if (domains.size > 1) {
-      return null; // 跨领域不创建摘要
-    }
-
-    // 提取共同关键词
-    const allKeywords = relatedBlocks.flatMap((b) => this.extractKeywords(b.content));
-    const keywordFreq = new Map<string, number>();
-    for (const kw of allKeywords) {
-      keywordFreq.set(kw, (keywordFreq.get(kw) || 0) + 1);
-    }
-
-    // 出现至少 2 次的关键词
-    const commonKeywords = [...keywordFreq.entries()]
-      .filter(([_, count]) => count >= 2)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([kw]) => kw);
-
-    if (commonKeywords.length === 0) {
-      return null;
-    }
-
-    // 生成摘要内容
-    const domain = [...domains][0];
-    const summaryContent = this.generateSummaryContent(relatedBlocks, commonKeywords);
-
-    const summaryBlock: Block = {
-      id: generateBlockId(),
-      content: summaryContent,
-      annotation: `知识 · ${domain} · 摘要`,
-      refs: relatedBlocks.map((b) => b.id),
-      source: 'heartbeat:consolidation',
-      vitality: 100,
-      status: 'active',
-      access_count: 0,
-      last_accessed: null,
-      created_at: Math.floor(Date.now() / 1000),
-      updated_at: Math.floor(Date.now() / 1000),
-    };
-
-    return summaryBlock;
   }
 
   /**
@@ -263,46 +201,6 @@ export class ConsolidationEngine {
   }
 
   /**
-   * 生成摘要内容
-   */
-  private generateSummaryContent(blocks: Block[], keywords: string[]): string {
-    const count = blocks.length;
-    const latest = blocks.sort((a, b) => b.created_at - a.created_at)[0];
-
-    // 提取各 block 的关键片段
-    const snippets = blocks
-      .slice(0, 3)
-      .map((b) => {
-        const snippet = b.content.length > 50
-          ? b.content.substring(0, 50) + '...'
-          : b.content;
-        return snippet;
-      });
-
-    return `[${count}条相关记录的摘要]\n\n关键词: ${keywords.join(', ')}\n\n相关内容:\n${snippets.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n最新更新: ${new Date(latest.created_at * 1000).toLocaleDateString('zh-CN')}`;
-  }
-
-  /**
-   * 提取文本中的关键词
-   */
-  private extractKeywords(text: string): string[] {
-    const words = this.extractWords(text);
-
-    const stopWords = new Set([
-      '的', '了', '是', '在', '有', '和', '就', '不', '人', '都',
-      '一', '一个', '上', '也', '很', '到', '说', '要', '去', '你',
-      '会', '着', '没有', '看', '好', '自己', '这', 'the', 'a', 'an',
-      'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has',
-      'had', 'do', 'does', 'did', 'will', 'would', 'should', 'could',
-      'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those',
-    ]);
-
-    return [...new Set(words)]
-      .filter((w) => w.length > 1 && !stopWords.has(w.toLowerCase()))
-      .slice(0, 10);
-  }
-
-  /**
    * 提取文本中的所有词语
    */
   private extractWords(text: string): string[] {
@@ -315,11 +213,4 @@ export class ConsolidationEngine {
     return [...chineseChars, ...englishWords];
   }
 
-  /**
-   * 从 annotation 中提取领域
-   */
-  private extractDomain(annotation: string): string {
-    const parts = annotation.split(' · ');
-    return parts.length >= 2 ? parts[1] : '';
-  }
 }

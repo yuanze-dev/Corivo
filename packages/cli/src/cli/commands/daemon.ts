@@ -8,8 +8,10 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { Command } from 'commander'
 import { getConfigDir } from '../../storage/database.js'
+import { createTimestampLogger } from '../../utils/logging.js'
 
 export const daemonCommand = new Command('daemon')
+const logger = createTimestampLogger()
 
 daemonCommand
   .description('内部使用，由 service manager 调用')
@@ -31,7 +33,7 @@ daemonCommand
       '../engine/heartbeat.js'
     )
 
-    console.log('[corivo] 后台心跳启动中...')
+    logger.log('[corivo] 后台心跳启动中...')
 
     // 以独立子进程启动 heartbeat，继承 launchd 注入的环境变量
     const child = spawn(process.execPath, [heartbeatPath], {
@@ -53,7 +55,7 @@ daemonCommand
     })
 
     child.once('error', async (err) => {
-      console.error('[corivo] 启动心跳子进程失败:', err)
+      logger.error('[corivo] 启动心跳子进程失败:', err)
       await fs.unlink(pidPath).catch(() => {})
       process.exit(1)
     })

@@ -21,11 +21,13 @@ import { DatabaseError } from '../errors/index.js';
 import type { BlockStatus, Pattern } from '../models/index.js';
 import { vitalityToStatus } from '../models/block.js';
 import { loadConfig } from '../config.js';
+import { createTimestampLogger } from '../utils/logging.js';
 
 const HEARTBEAT_INTERVAL = 5000; // 5 秒
 const PENDING_BATCH_SIZE = 10; // 每次处理的 pending 数量
 const HEALTH_CHECK_FILE = '.heartbeat-health'; // 健康检查文件
 const HEALTH_CHECK_INTERVAL = 30000; // 30 秒写入一次健康状态
+const logger = createTimestampLogger();
 
 /**
  * 心跳引擎配置
@@ -118,7 +120,7 @@ export class Heartbeat {
    */
   async start(): Promise<void> {
     if (this.running) {
-      console.log('心跳已在运行');
+      logger.log('心跳已在运行');
       return;
     }
 
@@ -153,7 +155,7 @@ export class Heartbeat {
       // 动态加载插件
       await this.loadPlugins(corivoConfig?.plugins ?? []);
 
-      console.log(`心跳守护进程启动中... (规则: ${this.ruleEngine.ruleCount})`);
+      logger.log(`心跳守护进程启动中... (规则: ${this.ruleEngine.ruleCount})`);
     }
 
     this.running = true;
@@ -213,9 +215,9 @@ export class Heartbeat {
         }
       } catch (error) {
         if (error instanceof DatabaseError) {
-          console.error('[心跳] 数据库错误:', error.message);
+          logger.error('[心跳] 数据库错误:', error.message);
         } else {
-          console.error('[心跳] 处理错误:', error);
+          logger.error('[心跳] 处理错误:', error);
         }
       }
 
@@ -228,7 +230,7 @@ export class Heartbeat {
       }
     }
 
-    console.log('心跳进程已停止');
+    logger.log('心跳进程已停止');
     // 清理健康文件
     await this.cleanupHealthCheck();
   }
@@ -248,7 +250,7 @@ export class Heartbeat {
         const plugin = (mod.default ?? mod) as CorivoPlugin;
         await this.loadPlugin(plugin);
       } catch (err) {
-        console.error(`[Heartbeat] 加载 ${packageName} 失败，跳过:`, err);
+        logger.error(`[Heartbeat] 加载 ${packageName} 失败，跳过:`, err);
       }
     }
   }
@@ -265,7 +267,7 @@ export class Heartbeat {
     const collector = plugin.create();
     await collector.startWatching(this.db);
     this.plugins.push(collector);
-    console.log(`[Heartbeat] 已加载插件: ${plugin.name}`);
+    logger.log(`[Heartbeat] 已加载插件: ${plugin.name}`);
   }
 
   /**
@@ -310,7 +312,7 @@ export class Heartbeat {
       skipColdZone = true,
     } = config;
 
-    console.log('[corivo] 正在认识你...');
+    logger.log('[corivo] 正在认识你...');
 
     const startTime = Date.now();
     let processedBlocks = 0;
@@ -347,7 +349,7 @@ export class Heartbeat {
       for (const block of pending) {
         // 检查时间限制
         if (Date.now() - startTime > timeLimit) {
-          console.log(`[corivo] 首次运行超时，已处理 ${processedBlocks}/${pending.length} 条`);
+          logger.log(`[corivo] 首次运行超时，已处理 ${processedBlocks}/${pending.length} 条`);
           break;
         }
 
@@ -383,12 +385,12 @@ export class Heartbeat {
       // 跳过衰减（首次运行没有历史数据）
 
     } catch (error) {
-      console.error('[corivo] 首次运行出错:', error);
+      logger.error('[corivo] 首次运行出错:', error);
     }
 
     const elapsedTime = Date.now() - startTime;
 
-    console.log(`[corivo] 首次运行完成，处理了 ${processedBlocks} 条信息`);
+    logger.log(`[corivo] 首次运行完成，处理了 ${processedBlocks} 条信息`);
 
     return { processedBlocks, elapsedTime };
   }
@@ -410,7 +412,7 @@ export class Heartbeat {
       await fs.writeFile(this.healthFilePath, JSON.stringify(healthData));
       this.lastHealthCheck = Date.now();
     } catch (error) {
-      console.error('[心跳] 更新健康状态失败:', error);
+      logger.error('[心跳] 更新健康状态失败:', error);
     }
   }
 
@@ -482,13 +484,13 @@ export class Heartbeat {
 
     if (pending.length === 0) return;
 
-    console.log(`[心跳] 处理 ${pending.length} 个待标注 block`);
+    logger.log(`[心跳] 处理 ${pending.length} 个待标注 block`);
 
     for (const block of pending) {
       try {
         // 跳过空内容
         if (!block.content || block.content.trim().length === 0) {
-          console.log(`  ${block.id}: 跳过空内容`);
+          logger.log(`  ${block.id}: 跳过空内容`);
           this.db!.updateBlock(block.id, {
             annotation: '知识 · knowledge · 空',
           });
@@ -503,9 +505,9 @@ export class Heartbeat {
           annotation,
           ...(pattern && { pattern }),
         });
-        console.log(`  ${block.id}: ${annotation}${pattern ? ` (${pattern.type})` : ''}`);
+        logger.log(`  ${block.id}: ${annotation}${pattern ? ` (${pattern.type})` : ''}`);
       } catch (error) {
-        console.error(`  ${block.id}: 标注失败`, error);
+        logger.error(`  ${block.id}: 标注失败`, error);
       }
     }
   }
@@ -643,7 +645,7 @@ export class Heartbeat {
     // 批量更新
     if (updates.length > 0) {
       const updatedCount = this.db.batchUpdateVitality(updates);
-      console.log(`[心跳] 衰减处理: ${updatedCount} 个更新, ${unchangedCount} 个不变`);
+      logger.log(`[心跳] 衰减处理: ${updatedCount} 个更新, ${unchangedCount} 个不变`);
     }
   }
 
@@ -672,10 +674,10 @@ export class Heartbeat {
       if (associations.length > 0) {
         // 批量保存关联
         this.db.batchCreateAssociations(associations);
-        console.log(`[心跳] 关联分析: 发现 ${associations.length} 个新关联`);
+        logger.log(`[心跳] 关联分析: 发现 ${associations.length} 个新关联`);
       }
     } catch (error) {
-      console.error('[心跳] 关联分析失败:', error);
+      logger.error('[心跳] 关联分析失败:', error);
     }
   }
 
@@ -716,7 +718,7 @@ export class Heartbeat {
             }
           }
 
-          console.log(`[心跳] 整合: 合并了 ${result.blocks.length} 个相似内容`);
+          logger.log(`[心跳] 整合: 合并了 ${result.blocks.length} 个相似内容`);
         }
       }
 
@@ -736,10 +738,10 @@ export class Heartbeat {
       }
 
       if (missingLinks.size > 0) {
-        console.log(`[心跳] 整合: 为 ${missingLinks.size} 个 block 补充了关联`);
+        logger.log(`[心跳] 整合: 为 ${missingLinks.size} 个 block 补充了关联`);
       }
     } catch (error) {
-      console.error('[心跳] 热区整合失败:', error);
+      logger.error('[心跳] 热区整合失败:', error);
     }
   }
 
@@ -759,10 +761,10 @@ export class Heartbeat {
 
       const summary = this.weeklySummary.generateSummary();
       if (summary) {
-        console.log(`\n${summary}\n`);
+        logger.log(`\n${summary}\n`);
       }
     } catch (error) {
-      console.error('[心跳] 周总结失败:', error);
+      logger.error('[心跳] 周总结失败:', error);
     }
   }
 
@@ -783,11 +785,11 @@ export class Heartbeat {
       const reminders = this.followUpManager.getWeeklyReminders();
       if (reminders.length > 0) {
         for (const reminder of reminders) {
-          console.log(`\n${reminder}\n`);
+          logger.log(`\n${reminder}\n`);
         }
       }
     } catch (error) {
-      console.error('[心跳] 进展提醒失败:', error);
+      logger.error('[心跳] 进展提醒失败:', error);
     }
   }
 
@@ -813,10 +815,10 @@ export class Heartbeat {
       // 添加到队列
       if (items.length > 0) {
         await this.pushQueue.addAll(items);
-        console.log(`[心跳] 触发决策: 生成了 ${items.length} 条推送`);
+        logger.log(`[心跳] 触发决策: 生成了 ${items.length} 条推送`);
       }
     } catch (error) {
-      console.error('[心跳] 触发决策失败:', error);
+      logger.error('[心跳] 触发决策失败:', error);
     }
   }
 
@@ -830,10 +832,10 @@ export class Heartbeat {
     try {
       const result = await this.autoSync.run();
       if (result) {
-        console.log(`[心跳] 自动同步: Push ${result.pushed}, Pull ${result.pulled}`);
+        logger.log(`[心跳] 自动同步: Push ${result.pushed}, Pull ${result.pulled}`);
       }
     } catch (error) {
-      console.error('[心跳] 自动同步失败:', error instanceof Error ? error.message : error);
+      logger.error('[心跳] 自动同步失败:', error instanceof Error ? error.message : error);
     }
   }
 
@@ -862,7 +864,7 @@ if (isDirectRun()) {
   const heartbeat = new Heartbeat();
 
   heartbeat.start().catch((error) => {
-    console.error('启动失败:', error);
+    logger.error('启动失败:', error);
     process.exit(1);
   });
 
@@ -872,13 +874,13 @@ if (isDirectRun()) {
    * Node.js 信号处理器不支持 async，使用包装函数确保清理完成
    */
   const gracefulShutdown = async (signal: string): Promise<void> => {
-    console.log(`\n收到 ${signal} 信号，正在停止...`);
+    logger.log(`\n收到 ${signal} 信号，正在停止...`);
     try {
       await heartbeat.stop();
-      console.log('清理完成，退出中...');
+      logger.log('清理完成，退出中...');
       process.exit(0);
     } catch (error) {
-      console.error('清理失败:', error);
+      logger.error('清理失败:', error);
       process.exit(1);
     }
   };

@@ -1,79 +1,64 @@
 /**
  * 版本检查器
- * 定期检查新版本并触发更新流程
+ * 通过 npm registry 检查并安装新版本
  */
 
 import fs from 'node:fs/promises';
-import path from 'node:path';
-import os from 'os';
+import { readFileSync } from 'node:fs';
+import path, { dirname } from 'node:path';
+import os from 'node:os';
 import https from 'node:https';
-import { SemVer, parseSemVer, compareSemVer } from '../utils/semver.js';
-import type { VersionInfo, UpdateStatus, UpdateConfig, Platform, BinaryInfo } from './types.js';
+import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
+import { compareSemVer } from '../utils/semver.js';
+import type { VersionInfo, UpdateStatus, UpdateConfig, Platform } from './types.js';
 
-const VERSION_URL = 'https://corivo.ai/version.json';
-const FALLBACK_VERSION_URL = 'https://raw.githubusercontent.com/xiaolin26/Corivo/main/version.json';
-const CHECK_INTERVAL = 6 * 60 * 60 * 1000; // 6 小时
-const REQUEST_TIMEOUT = 5000; // 5 秒
+const NPM_REGISTRY_URL = 'https://registry.npmjs.org/corivo';
+const CHECK_INTERVAL = 6 * 60 * 60 * 1000;
+const REQUEST_TIMEOUT = 5000;
+
+interface NpmRegistryMetadata {
+  'dist-tags'?: {
+    latest?: string;
+  };
+  time?: Record<string, string>;
+}
 
 /**
  * 获取当前版本
  */
 export function getCurrentVersion(): string {
+  if (process.env.CORIVO_CURRENT_VERSION) {
+    return process.env.CORIVO_CURRENT_VERSION;
+  }
+
   try {
-    const packagePath = path.join(process.cwd(), 'package.json');
-    // 如果在开发环境，尝试读取 package.json
-    // 否则使用版本常量
-    return '0.11.0'; // TODO: 从动态导入获取
+    const currentDir = dirname(fileURLToPath(import.meta.url));
+    const packagePath = path.join(currentDir, '../../package.json');
+    const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8')) as { version?: string };
+    return packageJson.version || '0.11.0';
   } catch {
-    return '0.11.0';
+    return process.env.npm_package_version || '0.11.0';
   }
 }
 
 /**
- * 获取版本信息（从远程）
+ * 获取版本信息（从 npm registry）
  */
 export async function fetchVersionInfo(): Promise<VersionInfo | null> {
-  const fetch = (url: string): Promise<VersionInfo | null> => {
-    return new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        resolve(null);
-      }, REQUEST_TIMEOUT);
+  const metadata = await fetchRegistryMetadata();
+  const latestVersion = metadata?.['dist-tags']?.latest;
 
-      https.get(url, (res) => {
-        clearTimeout(timeout);
-
-        if (res.statusCode !== 200) {
-          resolve(null);
-          return;
-        }
-
-        let data = '';
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-
-        res.on('end', () => {
-          try {
-            const json = JSON.parse(data) as VersionInfo;
-            resolve(json);
-          } catch {
-            resolve(null);
-          }
-        });
-      }).on('error', () => {
-        clearTimeout(timeout);
-        resolve(null);
-      });
-    });
-  };
-
-  // 先尝试主 URL，失败则尝试 fallback
-  let result = await fetch(VERSION_URL);
-  if (!result) {
-    result = await fetch(FALLBACK_VERSION_URL);
+  if (!latestVersion) {
+    return null;
   }
 
-  return result;
+  return {
+    version: latestVersion,
+    released_at: metadata?.time?.[latestVersion] || new Date().toISOString(),
+    breaking: false,
+    changelog: '',
+  };
 }
 
 /**
@@ -84,25 +69,17 @@ export async function checkForUpdate(config: UpdateConfig = {}): Promise<UpdateS
   const lastCheck = await getLastCheckTime();
   const now = Date.now();
 
-  // 检查是否需要跳过（固定版本范围）
-  if (config.pin) {
-    const pinnedRange = config.pin;
-    if (!isVersionInRange(currentVersion, pinnedRange)) {
-      // 当前版本不在固定范围内，允许更新
-    } else {
-      // 在固定范围内，不更新
-      return {
-        currentVersion,
-        latestVersion: currentVersion,
-        hasUpdate: false,
-        isBreaking: false,
-        lastCheck,
-        nextCheck: now + (config.checkInterval || CHECK_INTERVAL),
-      };
-    }
+  if (config.pin && isVersionInRange(currentVersion, config.pin)) {
+    return {
+      currentVersion,
+      latestVersion: currentVersion,
+      hasUpdate: false,
+      isBreaking: false,
+      lastCheck,
+      nextCheck: now + (config.checkInterval || CHECK_INTERVAL),
+    };
   }
 
-  // 获取最新版本信息
   const latestInfo = await fetchVersionInfo();
 
   if (!latestInfo) {
@@ -116,21 +93,15 @@ export async function checkForUpdate(config: UpdateConfig = {}): Promise<UpdateS
     };
   }
 
-  const latestVersion = latestInfo.version;
-  const hasUpdate = compareSemVer(latestVersion, currentVersion) > 0;
-  const isBreaking = latestInfo.breaking;
-
-  // 破坏性更新处理：如果用户禁用自动更新，则不触发自动更新
-  // 允许更新的条件：(1) 非破坏性更新 OR (2) 用户启用了自动更新
-  const shouldAutoUpdate = !isBreaking || config.auto !== false;
+  const hasUpdate = compareSemVer(latestInfo.version, currentVersion) > 0;
 
   await saveLastCheckTime(now);
 
   return {
     currentVersion,
-    latestVersion,
-    hasUpdate: hasUpdate && shouldAutoUpdate,
-    isBreaking,
+    latestVersion: latestInfo.version,
+    hasUpdate,
+    isBreaking: false,
     lastCheck: now,
     nextCheck: now + (config.checkInterval || CHECK_INTERVAL),
   };
@@ -141,40 +112,18 @@ export async function checkForUpdate(config: UpdateConfig = {}): Promise<UpdateS
  */
 export async function performUpdate(
   versionInfo: VersionInfo,
-  platform: Platform
+  _platform: Platform
 ): Promise<{ success: boolean; error?: string }> {
-  const binDir = path.join(os.homedir(), '.corivo', 'bin');
-  const currentBin = path.join(binDir, 'corivo');
-  const newBin = path.join(binDir, 'corivo.new');
-  const oldBin = path.join(binDir, 'corivo.old');
-
   try {
-    const binary = versionInfo.binaries[platform] as BinaryInfo | undefined;
-    if (!binary) {
-      return { success: false, error: `不支持的平台: ${platform}` };
-    }
+    execFileSync(
+      'npm',
+      ['install', '-g', `corivo@${versionInfo.version}`],
+      {
+        encoding: 'utf-8',
+        stdio: 'pipe',
+      }
+    );
 
-    // 下载新版本
-    const data = await downloadBinary(binary.url);
-
-    // 校验 checksum
-    const hash = await sha256(data);
-    if (hash !== binary.checksum.replace(/^sha256:/i, '')) {
-      return { success: false, error: `校验和不匹配: ${hash} !== ${binary.checksum}` };
-    }
-
-    // 写入临时文件
-    await fs.writeFile(newBin, data);
-    await fs.chmod(newBin, 0o755);
-
-    // 原子替换
-    if (await fileExists(oldBin)) {
-      await fs.unlink(oldBin);
-    }
-    await fs.rename(currentBin, oldBin);
-    await fs.rename(newBin, currentBin);
-
-    // 记录更新
     await saveUpdateRecord({
       from: getCurrentVersion(),
       to: versionInfo.version,
@@ -184,21 +133,10 @@ export async function performUpdate(
 
     return { success: true };
   } catch (error) {
-    // 尝试回滚
-    try {
-      if (await fileExists(newBin)) {
-        await fs.unlink(newBin);
-      }
-      if (!(await fileExists(currentBin)) && (await fileExists(oldBin))) {
-        await fs.rename(oldBin, currentBin);
-      }
-    } catch {
-      // 回滚也失败了
-    }
-
+    const message = extractCommandError(error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: message,
     };
   }
 }
@@ -207,8 +145,8 @@ export async function performUpdate(
  * 获取当前平台
  */
 export function getPlatform(): Platform {
-  const platform = os.platform() as string;
-  const arch = os.arch() as string;
+  const platform = os.platform();
+  const arch = os.arch();
 
   if (platform === 'darwin') {
     return arch === 'arm64' ? 'Darwin-arm64' : 'Darwin-x64';
@@ -218,53 +156,60 @@ export function getPlatform(): Platform {
     return 'Linux-x64';
   }
 
-  return 'Darwin-arm64'; // 默认
+  return 'Darwin-arm64';
 }
 
-/**
- * 下载二进制文件
- */
-async function downloadBinary(url: string): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
+async function fetchRegistryMetadata(): Promise<NpmRegistryMetadata | null> {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      resolve(null);
+    }, REQUEST_TIMEOUT);
+
+    const request = https.get(NPM_REGISTRY_URL, (res) => {
+      clearTimeout(timeout);
+
       if (res.statusCode !== 200) {
-        reject(new Error(`下载失败: ${res.statusCode}`));
+        resolve(null);
         return;
       }
 
-      const chunks: Buffer[] = [];
-      res.on('data', (chunk) => chunks.push(chunk));
-      res.on('end', () => resolve(Buffer.concat(chunks)));
-      res.on('error', reject);
-    }).on('error', reject);
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data) as NpmRegistryMetadata);
+        } catch {
+          resolve(null);
+        }
+      });
+    });
+
+    request.on('error', () => {
+      clearTimeout(timeout);
+      resolve(null);
+    });
   });
 }
 
-/**
- * 计算 SHA256
- */
-async function sha256(data: Buffer): Promise<string> {
-  const crypto = await import('node:crypto');
-  return crypto.createHash('sha256').update(data).digest('hex');
-}
-
-/**
- * 检查文件是否存在
- */
-async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
+function extractCommandError(error: unknown): string {
+  if (error instanceof Error) {
+    const withOutput = error as Error & { stderr?: string | Buffer; stdout?: string | Buffer };
+    if (withOutput.stderr) {
+      return String(withOutput.stderr).trim();
+    }
+    if (withOutput.stdout) {
+      return String(withOutput.stdout).trim();
+    }
+    return error.message;
   }
+
+  return String(error);
 }
 
-/**
- * 检查版本是否在范围内
- */
 function isVersionInRange(version: string, range: string): boolean {
-  // 简单实现：检查 "0.10.x" 这样的范围
   const parts = version.split('.');
   const rangeParts = range.split('.');
 
@@ -286,25 +231,19 @@ function isVersionInRange(version: string, range: string): boolean {
   return true;
 }
 
-/**
- * 获取上次检查时间
- */
 async function getLastCheckTime(): Promise<number | null> {
   try {
     const updateDir = path.join(os.homedir(), '.corivo');
     const lastUpdatePath = path.join(updateDir, 'last-update.json');
 
     const content = await fs.readFile(lastUpdatePath, 'utf-8');
-    const record = JSON.parse(content);
+    const record = JSON.parse(content) as { checked_at?: number };
     return record.checked_at || null;
   } catch {
     return null;
   }
 }
 
-/**
- * 保存上次检查时间
- */
 async function saveLastCheckTime(time: number): Promise<void> {
   try {
     const updateDir = path.join(os.homedir(), '.corivo');
@@ -320,9 +259,6 @@ async function saveLastCheckTime(time: number): Promise<void> {
   }
 }
 
-/**
- * 保存更新记录
- */
 async function saveUpdateRecord(record: {
   from: string;
   to: string;
@@ -340,9 +276,6 @@ async function saveUpdateRecord(record: {
   }
 }
 
-/**
- * 获取更新记录
- */
 export async function getUpdateRecord(): Promise<{
   from?: string;
   to?: string;

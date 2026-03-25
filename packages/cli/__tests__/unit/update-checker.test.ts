@@ -1,125 +1,132 @@
-/**
- * Update Checker 单元测试
- */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { EventEmitter } from 'node:events';
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { checkForUpdate, getCurrentVersion } from '../../src/update/checker';
+const httpsGetMock = vi.fn();
+const execFileSyncMock = vi.fn();
 
-describe('Update Checker', () => {
+vi.mock('node:https', () => ({
+  default: {
+    get: httpsGetMock,
+  },
+}));
+
+vi.mock('node:child_process', () => ({
+  execFileSync: execFileSyncMock,
+}));
+
+function mockRegistryResponse(statusCode: number, body: unknown) {
+  httpsGetMock.mockImplementationOnce((url: string, callback: (res: EventEmitter & { statusCode?: number }) => void) => {
+    const response = new EventEmitter() as EventEmitter & { statusCode?: number };
+    response.statusCode = statusCode;
+
+    queueMicrotask(() => {
+      callback(response);
+      if (statusCode === 200) {
+        response.emit('data', JSON.stringify(body));
+      }
+      response.emit('end');
+    });
+
+    return {
+      on: vi.fn().mockReturnThis(),
+    };
+  });
+}
+
+describe('update checker', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  describe('getCurrentVersion', () => {
-    it('should return current version', () => {
-      const version = getCurrentVersion();
-      expect(version).toBe('0.11.0');
-    });
+  it('returns the current package version', async () => {
+    const { getCurrentVersion } = await import('../../src/update/checker');
+
+    expect(getCurrentVersion()).toBe('0.12.1');
   });
 
-  describe('checkForUpdate - Breaking Update Logic', () => {
-    it('should NOT trigger auto-update when breaking=true and auto=false', async () => {
-      // Mock GITHUB_VERSION_URL env to point to a test server
-      vi.stubEnv('GITHUB_VERSION_URL', 'https://api.github.com/repos/test/corivo/version.json');
+  it('checks the latest version from npm registry metadata', async () => {
+    const { checkForUpdate } = await import('../../src/update/checker');
 
-      // Since we can't easily mock node:https in ESM, we'll test the logic directly
-      // by checking that a breaking update with auto=false returns hasUpdate=false
-      const status = await checkForUpdate({ auto: false });
-
-      // In a test environment without network, this should return no update
-      // The key assertion is that the code doesn't crash
-      expect(status).toBeDefined();
-      expect(typeof status.hasUpdate).toBe('boolean');
-      expect(typeof status.isBreaking).toBe('boolean');
+    mockRegistryResponse(200, {
+      'dist-tags': { latest: '0.12.1' },
+      time: {
+        '0.12.1': '2026-03-25T19:36:51.972Z',
+      },
     });
 
-    it('should trigger auto-update when breaking=true and auto=true', async () => {
-      const status = await checkForUpdate({ auto: true });
+    const status = await checkForUpdate();
 
-      expect(status).toBeDefined();
-      expect(typeof status.hasUpdate).toBe('boolean');
-    });
-
-    it('should trigger auto-update when breaking=false (normal update)', async () => {
-      const status = await checkForUpdate({ auto: false });
-
-      expect(status).toBeDefined();
-      expect(typeof status.hasUpdate).toBe('boolean');
-    });
-
-    it('should trigger auto-update when breaking=true and auto=undefined', async () => {
-      const status = await checkForUpdate({});
-
-      expect(status).toBeDefined();
-      expect(typeof status.hasUpdate).toBe('boolean');
-    });
+    expect(status.currentVersion).toBe('0.12.1');
+    expect(status.latestVersion).toBe('0.12.1');
+    expect(status.hasUpdate).toBe(false);
+    expect(status.isBreaking).toBe(false);
   });
 
-  describe('checkForUpdate - Version Comparison', () => {
-    it('should correctly compare version numbers', async () => {
-      const status = await checkForUpdate();
+  it('reports an available update from npm registry metadata', async () => {
+    vi.stubEnv('CORIVO_CURRENT_VERSION', '0.11.0');
+    const { checkForUpdate } = await import('../../src/update/checker');
 
-      expect(status).toBeDefined();
-      expect(status.currentVersion).toBeDefined();
-      expect(typeof status.latestVersion).toBe('object'); // can be null or string
-    }, 30000); // 30 second timeout for network requests
-
-    it('should identify when current version is latest', async () => {
-      const status = await checkForUpdate();
-
-      // In test environment, this should return the current version
-      expect(status.currentVersion).toBe('0.11.0');
+    mockRegistryResponse(200, {
+      'dist-tags': { latest: '0.12.1' },
+      time: {
+        '0.12.1': '2026-03-25T19:36:51.972Z',
+      },
     });
 
-    it('should handle nextCheck timestamp', async () => {
-      const before = Date.now();
-      const status = await checkForUpdate();
-      const after = Date.now();
+    const status = await checkForUpdate();
 
-      expect(status.nextCheck).toBeGreaterThanOrEqual(before + 1000 * 60 * 60); // At least 1 hour
-      expect(status.nextCheck).toBeLessThanOrEqual(after + 1000 * 60 * 60 * 24); // At most 24 hours
-    });
+    expect(status.currentVersion).toBe('0.11.0');
+    expect(status.latestVersion).toBe('0.12.1');
+    expect(status.hasUpdate).toBe(true);
   });
 
-  describe('checkForUpdate - Error Handling', () => {
-    it('should handle network errors gracefully', async () => {
-      // Force a network error by using an invalid URL
-      vi.stubEnv('GITHUB_VERSION_URL', 'https://this-domain-does-not-exist-12345.com/version.json');
+  it('runs npm global install for the requested version', async () => {
+    const { performUpdate } = await import('../../src/update/checker');
 
-      const status = await checkForUpdate();
+    const result = await performUpdate({
+      version: '0.12.1',
+      released_at: '2026-03-25T19:36:51.972Z',
+      breaking: false,
+      changelog: '',
+      binaries: {
+        'Darwin-arm64': { url: '', checksum: '' },
+        'Darwin-x64': { url: '', checksum: '' },
+        'Linux-x64': { url: '', checksum: '' },
+      },
+    }, 'Darwin-arm64');
 
-      // Should return hasUpdate=false on error
-      expect(status.hasUpdate).toBe(false);
-      expect(status.latestVersion).toBeNull();
-    }, 30000);
-
-    it('should handle invalid response format', async () => {
-      vi.stubEnv('GITHUB_VERSION_URL', 'https://httpbin.org/html');
-
-      const status = await checkForUpdate();
-
-      // Should not crash on invalid JSON
-      expect(status.hasUpdate).toBe(false);
-    }, 30000);
+    expect(execFileSyncMock).toHaveBeenCalledWith(
+      'npm',
+      ['install', '-g', 'corivo@0.12.1'],
+      expect.objectContaining({
+        encoding: 'utf-8',
+      })
+    );
+    expect(result.success).toBe(true);
   });
 
-  describe('checkForUpdate - Version Pinning', () => {
-    it('should respect pinned version from env', async () => {
-      vi.stubEnv('CORIVO_PINNED_VERSION', '0.10.0');
+  it('returns a graceful status when npm registry is unavailable', async () => {
+    const { checkForUpdate } = await import('../../src/update/checker');
 
-      const status = await checkForUpdate();
-
-      // Pinned version should prevent updates
-      expect(status.hasUpdate).toBe(false);
+    httpsGetMock.mockImplementationOnce((url: string, callback: (res: EventEmitter & { statusCode?: number }) => void) => {
+      const response = new EventEmitter() as EventEmitter & { statusCode?: number };
+      response.statusCode = 404;
+      queueMicrotask(() => {
+        callback(response);
+      });
+      return {
+        on: vi.fn().mockReturnThis(),
+      };
     });
 
-    it('should ignore updates when pinned version equals current', async () => {
-      vi.stubEnv('CORIVO_PINNED_VERSION', '0.11.0');
+    const status = await checkForUpdate();
 
-      const status = await checkForUpdate();
-
-      expect(status.hasUpdate).toBe(false);
-    });
+    expect(status.hasUpdate).toBe(false);
+    expect(status.latestVersion).toBeNull();
   });
 });

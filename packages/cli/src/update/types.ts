@@ -19,8 +19,8 @@ export interface VersionInfo {
   breaking: boolean;
   /** 更新日志 */
   changelog: string;
-  /** 各平台二进制包 */
-  binaries: Record<Platform, BinaryInfo>;
+  /** 各平台二进制包（旧二进制更新链路保留字段） */
+  binaries?: Record<Platform, BinaryInfo>;
 }
 
 /**
@@ -91,5 +91,5 @@ export interface VersionJson {
   released_at: string;
   breaking: boolean;
   changelog: string;
-  binaries: Record<Platform, BinaryInfo>;
+  binaries?: Record<Platform, BinaryInfo>;
 }

@@ -148,6 +148,40 @@ describe('CorivoDatabase', () => {
     });
   });
 
+  describe('upsertBlock', () => {
+    it('should create a block with a specified id when it does not exist', () => {
+      const block = db.upsertBlock({
+        id: 'blk_remote_1',
+        content: 'Remote content',
+        annotation: 'pending',
+      });
+
+      expect(block.id).toBe('blk_remote_1');
+      expect(db.getBlock('blk_remote_1')?.content).toBe('Remote content');
+    });
+
+    it('should update an existing block in place', () => {
+      db.upsertBlock({
+        id: 'blk_remote_1',
+        content: 'Old content',
+        annotation: 'pending',
+      });
+
+      const updated = db.upsertBlock({
+        id: 'blk_remote_1',
+        content: 'New content',
+        annotation: '事实 · project · sync',
+        vitality: 80,
+      });
+
+      expect(updated.id).toBe('blk_remote_1');
+      expect(updated.content).toBe('New content');
+      expect(updated.annotation).toBe('事实 · project · sync');
+      expect(updated.vitality).toBe(80);
+      expect(db.queryBlocks({ limit: 10 })).toHaveLength(1);
+    });
+  });
+
   describe('deleteBlock', () => {
     it('should delete an existing block', () => {
       const block = db.createBlock({ content: 'Test' });

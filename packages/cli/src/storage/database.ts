@@ -485,6 +485,83 @@ export class CorivoDatabase {
   }
 
   /**
+   * 以指定 ID 创建或更新 Block。
+   *
+   * 用于导入远端同步数据，避免 createBlock() 总是生成新 ID。
+   */
+  upsertBlock(input: CreateBlockInput & { id: string }): Block {
+    if (!input.id || input.id.trim().length === 0) {
+      throw new DatabaseError('Block ID 不能为空');
+    }
+    if (!input.content || input.content.trim().length === 0) {
+      throw new DatabaseError('Block 内容不能为空');
+    }
+    if (input.content.length > 1024 * 1024) {
+      throw new DatabaseError('Block 内容超出最大长度限制 (1MB)');
+    }
+
+    const existing = this.getBlock(input.id);
+    const now = Math.floor(Date.now() / 1000);
+    const contentToStore = (this.enableEncryption && !this.useSQLCipher)
+      ? KeyManager.encryptContent(input.content, this.config.key)
+      : input.content;
+
+    const merged: Block = {
+      id: input.id,
+      content: input.content,
+      annotation: input.annotation ?? existing?.annotation ?? 'pending',
+      refs: input.refs ?? existing?.refs ?? [],
+      source: input.source ?? existing?.source ?? 'sync',
+      vitality: input.vitality ?? existing?.vitality ?? 100,
+      status: input.status ?? existing?.status ?? 'active',
+      access_count: input.access_count ?? existing?.access_count ?? 0,
+      last_accessed: input.last_accessed ?? existing?.last_accessed ?? null,
+      pattern: input.pattern ?? existing?.pattern,
+      created_at: existing?.created_at ?? now,
+      updated_at: now,
+    };
+
+    const stmt = this.db.prepare(`
+      INSERT INTO blocks (
+        id, content, annotation, refs, source, vitality, status,
+        access_count, last_accessed, pattern, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        content = excluded.content,
+        annotation = excluded.annotation,
+        refs = excluded.refs,
+        source = excluded.source,
+        vitality = excluded.vitality,
+        status = excluded.status,
+        access_count = excluded.access_count,
+        last_accessed = excluded.last_accessed,
+        pattern = excluded.pattern,
+        updated_at = excluded.updated_at
+    `);
+
+    try {
+      stmt.run(
+        merged.id,
+        contentToStore,
+        merged.annotation,
+        JSON.stringify(merged.refs),
+        merged.source,
+        merged.vitality,
+        merged.status,
+        merged.access_count,
+        merged.last_accessed,
+        merged.pattern ? JSON.stringify(merged.pattern) : null,
+        merged.created_at,
+        merged.updated_at
+      );
+    } catch (error) {
+      throw new DatabaseError('导入 Block 失败', { cause: error, blockId: input.id });
+    }
+
+    return merged;
+  }
+
+  /**
    * 获取 Block
    *
    * @param id - Block ID

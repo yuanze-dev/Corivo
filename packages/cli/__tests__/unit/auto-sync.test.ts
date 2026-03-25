@@ -16,6 +16,16 @@ vi.mock('../../src/config', () => ({
 vi.mock('../../src/cli/commands/sync', () => ({
   authenticate: vi.fn(),
   post: vi.fn(),
+  applyPulledChangesets: vi.fn((db: { upsertBlock: (input: { id: string; content: string }) => void }, changesets: Array<{ table_name: string; pk: string; col_name: string | null; value: string | null }>) => {
+    let applied = 0;
+    for (const cs of changesets) {
+      if (cs.table_name === 'blocks' && cs.col_name === 'content' && cs.value != null) {
+        db.upsertBlock({ id: cs.pk, content: cs.value });
+        applied++;
+      }
+    }
+    return applied;
+  }),
 }));
 
 import { loadConfig, loadSolverConfig, saveSolverConfig } from '../../src/config';
@@ -30,6 +40,8 @@ const mockPost = post as ReturnType<typeof vi.fn>;
 // Mock CorivoDatabase
 const mockDb = {
   queryBlocks: vi.fn().mockReturnValue([]),
+  getBlock: vi.fn(),
+  upsertBlock: vi.fn(),
 } as unknown as import('../../src/storage/database').CorivoDatabase;
 
 const defaultConfig = {
@@ -107,7 +119,17 @@ describe('AutoSync', () => {
       // push 响应
       mockPost
         .mockResolvedValueOnce({ stored: 2 })        // push
-        .mockResolvedValueOnce({ changesets: [{}], current_version: 1 }); // pull
+        .mockResolvedValueOnce({
+          changesets: [
+            {
+              table_name: 'blocks',
+              pk: 'blk_remote_1',
+              col_name: 'content',
+              value: '远端内容',
+            },
+          ],
+          current_version: 1,
+        }); // pull
 
       const result = await autoSync.run();
 
@@ -128,6 +150,33 @@ describe('AutoSync', () => {
 
       expect(mockSaveSolverConfig).toHaveBeenCalledWith(
         expect.objectContaining({ last_pull_version: 10 })
+      );
+    });
+
+    it('pull 到 blocks changeset 时写入本地数据库', async () => {
+      (mockDb.queryBlocks as ReturnType<typeof vi.fn>).mockReturnValue([]);
+      (mockDb.getBlock as ReturnType<typeof vi.fn>).mockReturnValue(null);
+      mockPost.mockResolvedValue({
+        changesets: [
+          {
+            table_name: 'blocks',
+            pk: 'blk_remote_1',
+            col_name: 'content',
+            value: '远端记忆',
+            db_version: 1,
+            site_id: 'remote-site',
+          },
+        ],
+        current_version: 1,
+      });
+
+      await autoSync.run();
+
+      expect(mockDb.upsertBlock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'blk_remote_1',
+          content: '远端记忆',
+        })
       );
     });
   });

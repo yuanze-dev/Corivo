@@ -16,6 +16,16 @@ interface RegisterResponse {
   shared_secret: string;
 }
 
+export interface PulledChangeset {
+  table_name: string;
+  pk: string;
+  col_name: string | null;
+  col_version?: number;
+  db_version?: number;
+  value: string | null;
+  site_id?: string;
+}
+
 function buildDeviceName(): string {
   const platformNames: Record<string, string> = { darwin: 'Mac', win32: 'Windows', linux: 'Linux' };
   const name = platformNames[process.platform] || process.platform;
@@ -59,6 +69,25 @@ export async function authenticate(serverUrl: string, identityId: string, shared
     response,
   }) as { token: string };
   return token;
+}
+
+export function applyPulledChangesets(db: CorivoDatabase, changesets: PulledChangeset[]): number {
+  let applied = 0;
+
+  for (const cs of changesets) {
+    // 当前简化同步协议只同步 blocks.content。
+    if (cs.table_name !== 'blocks' || cs.col_name !== 'content' || !cs.pk || cs.value == null) {
+      continue;
+    }
+
+    db.upsertBlock({
+      id: cs.pk,
+      content: cs.value,
+    });
+    applied++;
+  }
+
+  return applied;
 }
 
 /**
@@ -256,9 +285,9 @@ export function createSyncCommand(): Command {
         `${server_url}/sync/pull`,
         { site_id, since_version: solverConfig.last_pull_version },
         token
-      ) as { changesets: unknown[]; current_version: number };
+      ) as { changesets: PulledChangeset[]; current_version: number };
 
-      pullCount = pullResult.changesets.length;
+      pullCount = applyPulledChangesets(db, pullResult.changesets);
 
       // 无论是否有数据，都更新版本（避免重复拉取）
       if (pullResult.current_version > solverConfig!.last_pull_version) {

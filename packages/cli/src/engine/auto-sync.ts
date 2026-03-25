@@ -6,7 +6,7 @@
  */
 
 import { loadConfig, loadSolverConfig, saveSolverConfig } from '../config.js';
-import { authenticate, post } from '../cli/commands/sync.js';
+import { authenticate, post, applyPulledChangesets } from '../cli/commands/sync.js';
 import type { CorivoDatabase } from '../storage/database.js';
 
 const TOKEN_TTL = 4 * 60 * 1000; // 4 分钟（服务端 TTL 5 分钟）
@@ -65,9 +65,9 @@ export class AutoSync {
         `${server_url}/sync/pull`,
         { site_id, since_version: solverConfig.last_pull_version },
         token
-      ) as { changesets: unknown[]; current_version: number };
+      ) as { changesets: import('../cli/commands/sync.js').PulledChangeset[]; current_version: number };
 
-      pulled = pullResult.changesets.length;
+      pulled = applyPulledChangesets(this.db, pullResult.changesets);
 
       if (pullResult.current_version > solverConfig.last_pull_version) {
         solverConfig.last_pull_version = pullResult.current_version;

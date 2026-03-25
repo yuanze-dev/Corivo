@@ -102,7 +102,7 @@ export function createSyncCommand(): Command {
   cmd.option('--register', '注册到 solver 服务器');
   cmd.option('--pair', '生成配对码，供新设备加入');
 
-  cmd.action(async (options) => {
+  cmd.action(async (options, command: Command) => {
     // --pair：生成配对码
     if (options.pair) {
       const config = await loadConfig();
@@ -115,18 +115,21 @@ export function createSyncCommand(): Command {
         console.error('未连接同步服务器，请先运行 corivo sync --register');
         process.exit(1);
       }
+      const pairServerUrl = command.getOptionValueSource('server') === 'cli'
+        ? options.server
+        : solverConfig.server_url;
       let token: string;
       try {
-        token = await authenticate(solverConfig.server_url, config.identity_id, solverConfig.shared_secret);
+        token = await authenticate(pairServerUrl, config.identity_id, solverConfig.shared_secret);
       } catch (err: unknown) {
         console.error('认证失败:', err instanceof Error ? err.message : String(err));
         process.exit(1);
       }
-      const result = await post(`${solverConfig.server_url}/auth/pair`, {}, token) as { pairing_code: string; expires_at: number };
+      const result = await post(`${pairServerUrl}/auth/pair`, {}, token) as { pairing_code: string; expires_at: number };
       const expiresIn = Math.round((result.expires_at - Date.now()) / 60000);
       console.log(`\n配对码: ${result.pairing_code}  (${expiresIn} 分钟内有效)\n`);
       console.log('在新设备上运行:');
-      console.log(`  corivo init --join ${result.pairing_code} --server ${solverConfig.server_url}\n`);
+      console.log(`  corivo init --join ${result.pairing_code} --server ${pairServerUrl}\n`);
       return;
     }
 

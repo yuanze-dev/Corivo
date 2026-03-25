@@ -132,8 +132,13 @@ describe('E2E: Solver 同步链路', () => {
     expect(row.cnt).toBeGreaterThan(0);
   });
 
-  it('设备 A: 生成配对码', () => {
-    const out = cli('sync --pair', DEVICE_A);
+  it('设备 A: 显式 --server 时生成配对码应忽略 solver.json 里的旧地址', () => {
+    const solverPath = path.join(DEVICE_A, '.corivo', 'solver.json');
+    const solverConfig = JSON.parse(fsSync.readFileSync(solverPath, 'utf-8'));
+    solverConfig.server_url = 'http://127.0.0.1:1';
+    fsSync.writeFileSync(solverPath, JSON.stringify(solverConfig, null, 2));
+
+    const out = cli(`sync --pair --server ${SOLVER_URL}`, DEVICE_A);
     const match = out.match(/配对码:\s*([A-Z2-9]{6})/);
     expect(match, '输出中应包含 "配对码: XXXXXX"').not.toBeNull();
     state.pairingCode = match![1];

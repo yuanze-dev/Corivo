@@ -30,7 +30,7 @@ export function pushChangesets(identityId: string, payload: PushPayload): { stor
   const stored = db.transaction((tx) => {
     let insertCount = 0;
     for (const cs of payload.changesets) {
-      tx.insert(changesets).values({
+      const result = tx.insert(changesets).values({
         identityId,
         siteId: cs.site_id || payload.site_id,
         tableName: cs.table_name,
@@ -41,7 +41,7 @@ export function pushChangesets(identityId: string, payload: PushPayload): { stor
         value: cs.value ?? null,
         createdAt: now,
       }).onConflictDoNothing().run();
-      insertCount++;
+      insertCount += result.changes;
     }
     return insertCount;
   });
@@ -56,6 +56,7 @@ export function pullChangesets(
   const db = getDb();
 
   const rows = db.select({
+    cursor: changesets.id,
     tableName: changesets.tableName,
     pk: changesets.pk,
     colName: changesets.colName,
@@ -67,10 +68,10 @@ export function pullChangesets(
     .from(changesets)
     .where(and(
       eq(changesets.identityId, identityId),
-      gt(changesets.dbVersion, payload.since_version),
+      gt(changesets.id, payload.since_version),
       ne(changesets.siteId, payload.site_id),
     ))
-    .orderBy(asc(changesets.dbVersion))
+    .orderBy(asc(changesets.id))
     .limit(1000)
     .all();
 
@@ -85,13 +86,14 @@ export function pullChangesets(
   }));
 
   // Fix 1: current_version = last row's db_version (not global max),
-  // so clients paginate correctly when LIMIT truncates the result.
-  // Only fall back to global max when there are no rows (i.e. fully caught up).
+  // The pull cursor must be a server-global monotonic sequence, not the client-provided
+  // per-site db_version. Each site starts db_version from 1, so comparing since_version
+  // against db_version causes later changes from another site to be skipped forever.
   let currentVersion: number;
   if (result.length > 0) {
-    currentVersion = result[result.length - 1].db_version;
+    currentVersion = rows[rows.length - 1].cursor;
   } else {
-    const versionRow = db.select({ maxVersion: max(changesets.dbVersion) })
+    const versionRow = db.select({ maxVersion: max(changesets.id) })
       .from(changesets)
       .where(eq(changesets.identityId, identityId))
       .get();

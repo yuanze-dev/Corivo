@@ -29,7 +29,7 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
         working-directory: .
-      - run: pnpm run build --if-present
+      - run: pnpm run --if-present build
       - run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

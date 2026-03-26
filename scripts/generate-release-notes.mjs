@@ -105,7 +105,7 @@ ${technicalBody}
       Authorization: `Bearer ${OPENROUTER_API_KEY}`,
     },
     body: JSON.stringify({
-      model: "anthropic/claude-sonnet-4",
+      model: "anthropic/claude-opus-4.6",
       max_tokens: 2000,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },

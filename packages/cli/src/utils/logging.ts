@@ -1,4 +1,9 @@
 type ConsoleMethod = (...args: unknown[]) => void;
+export type LogLevel = 'error' | 'info' | 'debug';
+type LogTarget = {
+  log: ConsoleMethod;
+  error: ConsoleMethod;
+};
 
 function pad(value: number): string {
   return String(value).padStart(2, '0');
@@ -37,9 +42,29 @@ export function formatLogLine(args: unknown[], date = new Date()): string {
 export function createTimestampLogger(target = console): {
   log: ConsoleMethod;
   error: ConsoleMethod;
+  debug: ConsoleMethod;
+  isDebugEnabled: () => boolean;
+};
+export function createTimestampLogger(target: LogTarget = console, level: LogLevel = 'info'): {
+  log: ConsoleMethod;
+  error: ConsoleMethod;
+  debug: ConsoleMethod;
+  isDebugEnabled: () => boolean;
 } {
   return {
     log: (...args: unknown[]) => target.log(formatLogLine(args)),
     error: (...args: unknown[]) => target.error(formatLogLine(args)),
+    debug: (...args: unknown[]) => {
+      if (level === 'debug') {
+        target.log(formatLogLine(args));
+      }
+    },
+    isDebugEnabled: () => level === 'debug',
   };
+}
+
+export function normalizeLogLevel(level?: string | null): LogLevel {
+  if (level === 'error') return 'error';
+  if (level === 'debug') return 'debug';
+  return 'info';
 }

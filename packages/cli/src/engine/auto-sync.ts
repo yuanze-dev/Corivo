@@ -6,8 +6,9 @@
  */
 
 import { loadConfig, loadSolverConfig, saveSolverConfig } from '../config.js';
-import { authenticate, post, applyPulledChangesets } from '../cli/commands/sync.js';
+import { applyPulledChangesets, authenticate, post } from '../cli/commands/sync.js';
 import type { CorivoDatabase } from '../storage/database.js';
+import { createTimestampLogger, normalizeLogLevel } from '../utils/logging.js';
 
 const TOKEN_TTL = 4 * 60 * 1000; // 4 分钟（服务端 TTL 5 分钟）
 
@@ -22,21 +23,27 @@ export class AutoSync {
    * @returns 同步结果计数，若未配置或出错则返回 null
    */
   async run(): Promise<{ pushed: number; pulled: number } | null> {
+    let logger = createTimestampLogger();
     try {
       const config = await loadConfig();
       if (!config) return null;
+      logger = createTimestampLogger(console, normalizeLogLevel(config.settings?.logLevel));
 
       const solverConfig = await loadSolverConfig();
       if (!solverConfig) return null;
 
       const { server_url, shared_secret, site_id } = solverConfig;
+      logger.debug(
+        `[sync:auto] 开始同步 server=${server_url} site=${site_id} lastPull=${solverConfig.last_pull_version} lastPush=${solverConfig.last_push_version}`
+      );
 
       // 确保 token 有效（缓存复用，过期重新获取）
-      const token = await this.ensureToken(server_url, config.identity_id, shared_secret);
+      const token = await this.ensureToken(server_url, config.identity_id, shared_secret, logger);
 
       // Push：全量 blocks（简化版，与 CLI sync 一致）
       let pushed = 0;
       const blocks = this.db.queryBlocks({ limit: 10000 });
+      logger.debug(`[sync:auto] 准备 push blocks=${blocks.length}`);
       if (blocks.length > 0) {
         const changesets = blocks.map((b, i) => ({
           table_name: 'blocks',
@@ -48,34 +55,50 @@ export class AutoSync {
           site_id,
         }));
 
-        const pushResult = await post(
+        const pushResult = (await post(
           `${server_url}/sync/push`,
           { site_id, db_version: changesets.length, changesets },
-          token
-        ) as { stored: number };
+          token,
+          logger,
+          'push'
+        )) as { stored: number };
         pushed = pushResult.stored;
+        logger.debug(`[sync:auto] push 完成 stored=${pushed} changesets=${changesets.length}`);
 
         solverConfig.last_push_version = blocks.length;
         await saveSolverConfig(solverConfig);
+        logger.debug(`[sync:auto] 已更新 last_push_version=${solverConfig.last_push_version}`);
       }
 
       // Pull：拉取服务端变更
       let pulled = 0;
-      const pullResult = await post(
+      const pullResult = (await post(
         `${server_url}/sync/pull`,
         { site_id, since_version: solverConfig.last_pull_version },
-        token
-      ) as { changesets: import('../cli/commands/sync.js').PulledChangeset[]; current_version: number };
+        token,
+        logger,
+        'pull'
+      )) as {
+        changesets: import('../cli/commands/sync.js').PulledChangeset[];
+        current_version: number;
+      };
+      logger.debug(
+        `[sync:auto] pull 完成 changesets=${pullResult.changesets.length} currentVersion=${pullResult.current_version} sinceVersion=${solverConfig.last_pull_version}`
+      );
 
-      pulled = applyPulledChangesets(this.db, pullResult.changesets);
+      pulled = applyPulledChangesets(this.db, pullResult.changesets, logger);
+      logger.debug(`[sync:auto] pull 已写库 applied=${pulled}`);
 
       if (pullResult.current_version > solverConfig.last_pull_version) {
         solverConfig.last_pull_version = pullResult.current_version;
         await saveSolverConfig(solverConfig);
+        logger.debug(`[sync:auto] 已更新 last_pull_version=${solverConfig.last_pull_version}`);
       }
 
+      logger.debug(`[sync:auto] 同步结束 push=${pushed} pull=${pulled}`);
       return { pushed, pulled };
     } catch (error) {
+      logger.error('[sync:auto] 同步失败:', error instanceof Error ? error.message : error);
       // 401 认证失败：清除缓存 token，下次重新获取
       if (error instanceof Error && error.message.includes('401')) {
         this.token = null;
@@ -85,11 +108,18 @@ export class AutoSync {
     }
   }
 
-  private async ensureToken(serverUrl: string, identityId: string, sharedSecret: string): Promise<string> {
+  private async ensureToken(
+    serverUrl: string,
+    identityId: string,
+    sharedSecret: string,
+    logger = createTimestampLogger()
+  ): Promise<string> {
     if (this.token && this.isTokenValid()) {
+      logger.debug('[sync:auto] 复用缓存 token');
       return this.token;
     }
-    this.token = await authenticate(serverUrl, identityId, sharedSecret);
+    logger.debug('[sync:auto] 重新获取 token');
+    this.token = await authenticate(serverUrl, identityId, sharedSecret, logger);
     this.tokenObtainedAt = Date.now();
     return this.token;
   }

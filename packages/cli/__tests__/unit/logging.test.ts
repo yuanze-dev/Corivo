@@ -1,20 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { formatLogLine } from '../../src/utils/logging.js';
+import { createTimestampLogger } from '../../src/utils/logging';
 
-describe('formatLogLine', () => {
-  it('prefixes log messages with a local timestamp', () => {
-    const date = new Date(2026, 2, 26, 9, 2, 3);
-
-    expect(formatLogLine(['[corivo] 后台心跳启动中...'], date)).toBe(
-      '[2026-03-26 09:02:03] [corivo] 后台心跳启动中...'
+describe('createTimestampLogger', () => {
+  it('debug 级别会输出 debug 日志', () => {
+    const logs: string[] = [];
+    const logger = createTimestampLogger(
+      {
+        log: (message: string) => logs.push(message),
+        error: () => {},
+      },
+      'debug'
     );
+
+    logger.debug('sync debug message');
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toContain('sync debug message');
   });
 
-  it('formats multiple console arguments into one line', () => {
-    const date = new Date(2026, 2, 26, 9, 2, 3);
-
-    expect(formatLogLine(['[心跳] 自动同步失败:', { message: 'boom' }], date)).toBe(
-      '[2026-03-26 09:02:03] [心跳] 自动同步失败: {"message":"boom"}'
+  it('info 级别不会输出 debug 日志', () => {
+    const logs: string[] = [];
+    const logger = createTimestampLogger(
+      {
+        log: (message: string) => logs.push(message),
+        error: () => {},
+      },
+      'info'
     );
+
+    logger.debug('sync debug message');
+
+    expect(logs).toEqual([]);
   });
 });

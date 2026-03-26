@@ -98,6 +98,29 @@ describe('AutoSync', () => {
       mockLoadSolverConfig.mockResolvedValue({ ...defaultSolverConfig });
     });
 
+    it('logLevel=debug 时输出同步阶段日志', async () => {
+      const logs: string[] = [];
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation((message?: unknown) => {
+        logs.push(String(message ?? ''));
+      });
+      mockLoadConfig.mockResolvedValue({
+        ...defaultConfig,
+        settings: { logLevel: 'debug' },
+      });
+      (mockDb.queryBlocks as ReturnType<typeof vi.fn>).mockReturnValue([]);
+      mockPost.mockResolvedValue({ changesets: [], current_version: 5 });
+
+      try {
+        await autoSync.run();
+      } finally {
+        consoleLogSpy.mockRestore();
+      }
+
+      expect(logs.join('\n')).toContain('[sync:auto] 开始同步');
+      expect(logs.join('\n')).toContain('[sync:auto] pull 完成');
+      expect(logs.join('\n')).toContain('currentVersion=5');
+    });
+
     it('无 blocks 时 push 0 条，返回计数', async () => {
       (mockDb.queryBlocks as ReturnType<typeof vi.fn>).mockReturnValue([]);
       mockPost.mockResolvedValue({ changesets: [], current_version: 5 });
@@ -136,7 +159,12 @@ describe('AutoSync', () => {
       expect(mockAuthenticate).toHaveBeenCalledWith(
         'http://localhost:3141',
         'test-identity-id',
-        'secret'
+        'secret',
+        expect.objectContaining({
+          debug: expect.any(Function),
+          error: expect.any(Function),
+          log: expect.any(Function),
+        })
       );
       expect(result?.pushed).toBe(2);
       expect(result?.pulled).toBe(1);

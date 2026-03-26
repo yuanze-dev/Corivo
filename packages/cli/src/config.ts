@@ -49,6 +49,8 @@ export interface CorivoFeatures {
 export interface CorivoSettings {
   /** 自动同步间隔（秒），默认 300（5 分钟） */
   syncIntervalSeconds?: number;
+  /** 日志级别 */
+  logLevel?: 'error' | 'info' | 'debug';
 }
 
 /**

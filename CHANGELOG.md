@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> 注：部分历史 tag（尤其是 `0.1.x` 与若干 `0.10.x` 补丁版）对应的是发布流程修正、版本对齐或重新打 tag。以下内容已按 git 历史补齐；若某个 tag 没有独立功能改动，会明确标注为“版本元数据发布”。
+
+## [0.12.3] - 2026-03-26
+
+### Added
+- **自动 Release Notes**: 新增 `.github/workflows/release-notes.yml` 与 `scripts/generate-release-notes.mjs`，支持自动生成并 AI 改写发布说明
+- **插件化采集架构**: 引入 `RealtimeIngestor / IngestorPlugin` 接口、`ingestors` 配置项，以及独立的 `@corivo/openclaw` 插件包
+- **CLI**: 新增 `corivo list` 命令
+- **同步能力增强**:
+  - Sync 增加 token-based auth 工具、脚本与测试
+  - solver 配对码有效期延长至 24 小时
+  - solver 请求增加基于 `randomUUID` 的请求 ID
+- **查询能力**: `BlockFilter` 新增 `annotationPrefix` 前缀匹配和排序选项
+
+### Changed
+- OpenClaw 从 CLI 内建 ingestor 迁移为插件加载器机制
+- 后台日志改为结构化输出，并增加日志级别与时间戳
+- 更新检查从 GitHub 发布源切换到 npm registry
+- 移除 consolidation 中自动摘要生成逻辑及相关数据库清理迁移
+
+### Fixed
+- sync pull 现在正确使用 server cursor 分页并写入远端拉取的 blocks
+- `corivo sync` 在 pairing 时正确尊重 `--server`
+- Linux systemd unit 增加日志重定向
+- solver 启动时自动创建数据库目录
+- `@corivo/openclaw` 类型声明与 `NodeNext` 构建解析问题得到修复
+
+## [0.10.24] - 2026-03-26
+
+### Fixed
+- 修正 `publish.yml` 中 pnpm build 的命令写法，避免发布流程执行失败
+
+## [0.10.23] - 2026-03-26
+
+### Changed
+- 发布工作流改为使用 pnpm 执行安装与构建步骤
+
+## [0.10.22] - 2026-03-26
+
+### Added
+- 为 sync 流程补充 token-based authentication 工具、脚本与测试
+
+### Changed
+- `better-sqlite3` 升级至 `12.8.0`
+
+## [0.12.2] - 2026-03-23
+
+### Fixed
+- CI 中移除不存在的 `test` 脚本调用，避免流水线误失败
+
+### Changed
+- 更新 `package-lock.json` 以匹配当前依赖状态
+
 ## [0.12.1] - 2026-03-23
 
 ### Changed
@@ -19,6 +72,121 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - 类型检查错误：正确导入 `FSWatcher` 类型
 - `queryBlocks` 方法支持 `source` 参数过滤
+
+## [0.10.21] - 2026-03-23
+
+### Changed
+- 版本元数据发布，无额外代码变更
+
+## [0.10.20] - 2026-03-23
+
+### Added
+- **OpenClaw 集成补丁线汇总**:
+  - 添加 OpenClaw 采集支持
+  - Claude Code 插件新增 Hooks 实时采集对话能力
+  - pnpm workspace 纳入 `plugins` 子目录
+
+### Changed
+- 发布流程继续收敛：移除旧 `release.yml`，并移除 `npm publish --provenance`
+
+### Fixed
+- CLI 包名对齐为 `corivo`
+- 修复 `shared` 包的 workspace 链接问题
+- `better-sqlite3` 升级到 `9.6.0`
+
+## [0.10.19] - 2026-03-23
+
+### Fixed
+- CLI 包名改为 `corivo`，与 npm 发布名称保持一致
+
+## [0.10.18] - 2026-03-23
+
+### Changed
+- 版本元数据发布，无额外代码变更
+
+## [0.10.17] - 2026-03-23
+
+### Fixed
+- 修复工作目录设置，确保相关命令在正确路径下运行
+
+## [0.10.16] - 2026-03-23
+
+### Changed
+- 版本对齐发布，承接此前发布流程与版本号修正
+
+## [0.10.15] - 2026-03-23
+
+### Changed
+- 更新 npm 发布命令，补充 `--access public`
+
+### Fixed
+- 调整发布用 Node.js 版本以适配当时的发布需求
+
+## [0.10.14] - 2026-03-23
+
+### Changed
+- 版本元数据发布，无额外代码变更
+
+## [0.10.13] - 2026-03-23
+
+### Changed
+- 版本元数据发布，无额外代码变更
+
+## [0.10.12] - 2026-03-23
+
+### Fixed
+- 包名改为 `corivo`，与 npm 包名称保持一致
+
+## [0.10.11] - 2026-03-23
+
+### Changed
+- 版本元数据发布，无额外代码变更
+
+## [0.10.10] - 2026-03-23
+
+### Fixed
+- 发布流程切换为 OIDC Trusted Publisher，移除 `NPM_TOKEN`
+
+## [0.10.9] - 2026-03-23
+
+### Changed
+- 版本元数据发布，无额外代码变更
+
+## [0.10.8] - 2026-03-23
+
+### Fixed
+- 修复 pnpm cache 路径错误指向仓库根目录 `pnpm-lock.yaml` 的问题
+
+## [0.10.7] - 2026-03-23
+
+### Changed
+- 更新发布工作流，移除旧 `release.yml` 并优化 `publish.yml`
+
+## [0.10.6] - 2026-03-23
+
+### Added
+- 安装与发布能力增强:
+  - 自动检测 Corivo CLI 安装状态
+  - 新增安装 / 卸载脚本
+  - 新增 GitHub Actions release pipeline
+- 首次使用体验增强:
+  - 新增 Cold Scan 初始画像提取框架
+  - 新增 First Push 与首轮 heartbeat 模式
+- 系统集成:
+  - 新增 macOS launchd 守护进程集成
+  - 新增自动更新系统
+  - 新增规则注入能力
+- 架构演进:
+  - 重构 Claude Code 插件架构
+  - 代码库重组为 monorepo
+  - 引入 solver 包并完成认证、同步 relay 与 CLI sync 集成
+  - 增加多平台支持方向（Codex / VS Code / shared）
+  - 引入主动提醒与上下文建议系统
+  - 增加 `corivo status --tui`、AutoSync 与 ServiceManager 体系
+
+### Fixed
+- 修复数据库持久化与 annotation 保留问题
+- 修复卸载脚本清理 CLAUDE.md、`--no-password`、加密模式搜索、launchd plist 路径等一批 CLI/守护进程问题
 
 ## [0.12.0] - 2026-03-20
 
@@ -56,6 +224,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Update Checker 破坏性更新逻辑反转的问题
 - 测试清理: 修复数据库单例模式导致的测试间干扰
+
+## [0.1.3] - 2026-03-23
+
+### Changed
+- 历史兼容 tag，未引入独立代码变更
+
+## [0.1.2] - 2026-03-23
+
+### Changed
+- 历史兼容 tag，未引入独立代码变更
+
+## [0.1.1] - 2026-03-23
+
+### Changed
+- 历史兼容 tag，未引入独立代码变更
 
 ## [0.10.5] - 2026-03-19
 

@@ -33,7 +33,7 @@ export function collectCandidates(db: RuntimeDatabase, queryPack: QueryPack): Ca
   const queries = [queryPack.anchorText, ...queryPack.anchorTerms].filter(Boolean);
   const directMatches = dedupeBlocks(
     queries.flatMap((query) => db.searchBlocks(query, 5)),
-  );
+  ).filter((block) => block.status !== 'archived');
 
   return directMatches.map((block) => ({
     block,

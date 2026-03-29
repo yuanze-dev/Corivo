@@ -17,12 +17,36 @@ export interface SuggestCommandOptions {
 
 export const suggestCommand = new Command('suggest');
 
+function hasObviousNextStep(message: string): boolean {
+  const lower = message.toLowerCase();
+
+  const signals = [
+    'bug.*fix',
+    '修复.*bug',
+    'fix.*完成',
+    '代码.*完成',
+    '写完了',
+    'implemented',
+    'done',
+    'finished',
+    'complete',
+    '测试.*通过',
+    'tests.*pass',
+  ];
+
+  return signals.some((signal) => new RegExp(signal, 'i').test(lower));
+}
+
 export async function runSuggestCommand(
   options: SuggestCommandOptions = {},
 ): Promise<string> {
   const context = options.context ?? 'session-start';
 
   if (context === 'post-request') {
+    if (options.lastMessage && hasObviousNextStep(options.lastMessage)) {
+      return '';
+    }
+
     return runReviewCommand({
       password: options.password,
       format: options.format,

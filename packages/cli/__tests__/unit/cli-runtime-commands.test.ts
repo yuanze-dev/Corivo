@@ -146,4 +146,23 @@ describe('runtime CLI command helpers', () => {
     expect(output).toContain('[corivo]');
     expect(output).toContain('日志归档');
   });
+
+  it('keeps suggest post-request empty when Claude already gave an obvious next step', async () => {
+    loadRuntimeDb.mockResolvedValue(createDb([
+      createBlock({
+        id: 'blk_logging',
+        content: '日志归档策略还没收尾，需要确认归档周期。',
+        annotation: '决策 · project · logging',
+      }),
+    ]));
+
+    const output = await runSuggestCommand({
+      password: false,
+      context: 'post-request',
+      format: 'text',
+      lastMessage: 'done, implemented and tests pass',
+    });
+
+    expect(output).toBe('');
+  });
 });

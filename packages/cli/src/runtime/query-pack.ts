@@ -51,11 +51,33 @@ function dedupeStrings(values: string[] = []): string[] {
   return [...new Set(values.filter(Boolean))];
 }
 
+function extractHanTerms(value: string): string[] {
+  const segments = value.match(/[\p{Script=Han}]{2,}/gu) ?? [];
+  const terms: string[] = [];
+
+  for (const segment of segments) {
+    for (let start = 0; start < segment.length; start++) {
+      for (let size = 2; size <= 4; size++) {
+        const term = segment.slice(start, start + size);
+        if (term.length >= 2) {
+          terms.push(term);
+        }
+      }
+    }
+  }
+
+  return terms;
+}
+
 function extractAnchorTerms(value: string): string[] {
-  const matches = value.toLowerCase().match(/[a-z0-9_]+/g) ?? [];
+  const asciiMatches = value.toLowerCase().match(/[a-z0-9_]+/g) ?? [];
+  const hanMatches = extractHanTerms(value);
 
   return dedupeStrings(
-    matches.filter((term) => term.length > 1 && !STOP_WORDS.has(term)),
+    [
+      ...asciiMatches.filter((term) => term.length > 1 && !STOP_WORDS.has(term)),
+      ...hanMatches,
+    ],
   );
 }
 

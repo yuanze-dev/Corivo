@@ -80,4 +80,24 @@ describe('generateReview', () => {
 
     expect(result).toBeNull();
   });
+
+  it('matches Chinese assistant text against Chinese unfinished memory', () => {
+    const db = createDb([
+      createBlock({
+        id: 'blk_logging',
+        content: '日志归档策略还没收尾，需要确认归档周期。',
+        annotation: '决策 · project · logging',
+      }),
+    ]);
+
+    const result = generateReview(
+      db,
+      createQueryPack({
+        assistantMessage: '我会继续处理日志归档策略。',
+      }),
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.memoryIds).toEqual(['blk_logging']);
+  });
 });

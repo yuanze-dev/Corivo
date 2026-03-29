@@ -151,6 +151,16 @@ The status bar shows:
 corivo: 42 blocks | 85% healthy | 38 active
 ```
 
+## Runtime Flow
+
+Claude Code integration now uses three visible memory runtime paths:
+
+- **Carry-over**: at session start, bring back one unfinished or recently shifted memory
+- **Recall**: on user prompt submit, try to surface historical context before Claude answers
+- **Review**: after Claude answers, optionally add a short follow-up or correction
+
+This keeps hook scripts thin and moves trigger / retrieval / ranking logic into the local `corivo` CLI.
+
 ## Skills
 
 ### corivo-save
@@ -169,13 +179,13 @@ Queries the Corivo memory database.
 - Full-text search across all memories
 - Filter by type (decision, fact, knowledge, instruction)
 
-### corivo-status
-Shows memory statistics in the status bar.
+### corivo runtime hooks
+Automatic lifecycle surfacing for Claude Code.
 
-**Display:**
-- Total memory count
-- Health percentage
-- Active/inactive distribution
+**Flow:**
+- `SessionStart` → status summary + carry-over
+- `UserPromptSubmit` → ingestion + recall
+- `Stop` → ingestion + review
 
 ## Configuration
 

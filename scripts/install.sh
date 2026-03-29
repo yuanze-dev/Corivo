@@ -165,7 +165,7 @@ install_hook_scripts() {
   log_step "安装 hook 脚本到 $CORIVO_HOOKS_DIR..."
   mkdir -p "$CORIVO_HOOKS_DIR"
 
-  for script in session-init.sh ingest-turn.sh stop-suggest.sh; do
+  for script in session-init.sh ingest-turn.sh session-carry-over.sh prompt-recall.sh stop-review.sh; do
     local dest="$CORIVO_HOOKS_DIR/$script"
     local src_url="$GITHUB_RAW/hooks/scripts/$script"
 
@@ -210,20 +210,26 @@ const merge = (event, newEntry) => {
   }
 };
 
-merge('SessionStart', {
-  hooks: [{ type: 'command', command: 'bash ${hooks_dir}/session-init.sh', timeout: 5 }]
-});
+  merge('SessionStart', {
+  hooks: [
+    { type: 'command', command: 'bash ${hooks_dir}/session-init.sh', timeout: 5 },
+    { type: 'command', command: 'bash ${hooks_dir}/session-carry-over.sh', timeout: 5 }
+  ]
+  });
 
-merge('UserPromptSubmit', {
-  hooks: [{ type: 'command', command: 'bash ${hooks_dir}/ingest-turn.sh user', timeout: 10 }]
-});
+  merge('UserPromptSubmit', {
+  hooks: [
+    { type: 'command', command: 'bash ${hooks_dir}/ingest-turn.sh user', timeout: 10 },
+    { type: 'command', command: 'bash ${hooks_dir}/prompt-recall.sh', timeout: 10 }
+  ]
+  });
 
-merge('Stop', {
+  merge('Stop', {
   hooks: [
     { type: 'command', command: 'bash ${hooks_dir}/ingest-turn.sh assistant', timeout: 10 },
-    { type: 'command', command: 'bash ${hooks_dir}/stop-suggest.sh', timeout: 5 }
+    { type: 'command', command: 'bash ${hooks_dir}/stop-review.sh', timeout: 5 }
   ]
-});
+  });
 
 fs.writeFileSync(path, JSON.stringify(settings, null, 2));
 console.log('hooks 已写入');

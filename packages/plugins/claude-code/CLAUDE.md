@@ -39,9 +39,12 @@ commands/
   info.md         /corivo:info 命令说明
 
 hooks/
-  hooks.json      hook 配置（SessionStart → session-init.sh）
+  hooks.json      hook 配置（SessionStart / UserPromptSubmit / Stop）
   scripts/
-    session-init.sh  会话启动时自动运行，输出记忆状态摘要
+    session-init.sh       会话启动时自动运行，输出记忆状态摘要
+    session-carry-over.sh 会话启动时带回未收尾记忆
+    prompt-recall.sh      用户提交输入后生成答前 recall
+    stop-review.sh        Claude 回复后生成答后 review
 
 skills/
   corivo-save/skill.md   保存记忆的 skill（Claude 读取并执行）
@@ -74,16 +77,26 @@ corivo.getStats()
 
 ## Session Hook
 
-每次 Claude Code 会话启动时，`hooks/hooks.json` 触发 `session-init.sh`：
+Claude Code 的 hook 生命周期现在分成三条明确的运行时路径：
 
 ```
-SessionStart → session-init.sh
-  ├── 检查 corivo CLI 是否存在（which corivo）
-  ├── 检查数据库是否初始化（corivo status）
-  └── 输出摘要：[corivo] {total} blocks | {health}% active
+SessionStart
+  ├── session-init.sh        → 状态摘要
+  └── session-carry-over.sh  → carry-over（带回未收尾记忆）
+
+UserPromptSubmit
+  ├── ingest-turn.sh user    → 保存用户输入
+  └── prompt-recall.sh       → recall（答前上下文）
+
+Stop
+  ├── ingest-turn.sh assistant → 保存 Claude 回复
+  └── stop-review.sh           → review（答后补充/纠偏）
 ```
 
-输出会显示在 Claude Code 的会话上下文中，让 Claude 知晓记忆库当前状态。
+设计原则：
+- shell 脚本只做 JSON 解析和 CLI 调用
+- 触发、检索、模式选择都放在 `corivo` CLI/runtime 内
+- `UserPromptSubmit` 是主 recall 触发点，`Stop` 只负责 review
 
 ---
 
@@ -108,4 +121,4 @@ Skills 是 Markdown 文件，Claude Code 在执行相关操作时读取并遵循
 
 **新增 skill**：在 `skills/` 下新建 `<name>/skill.md`，格式参考现有 skill 文件的 frontmatter（`description`、`allowed-tools`）。
 
-**修改 hook**：`hooks/hooks.json` 格式遵循 Claude Code 插件规范，`timeout` 单位为秒。`session-init.sh` 需保持幂等且快速（≤5 秒），不能阻塞会话启动。
+**修改 hook**：`hooks/hooks.json` 格式遵循 Claude Code 插件规范，`timeout` 单位为秒。所有 hook 脚本都应保持幂等且快速，业务逻辑应留在 CLI/runtime 层而不是 shell 层。

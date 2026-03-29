@@ -153,4 +153,44 @@ describe('generateRecall', () => {
     expect(result?.mode).toBe('challenge');
     expect(result?.memoryIds).toEqual(['blk_cache']);
   });
+
+  it('matches Chinese prompts against Chinese memory content', () => {
+    const db = createDb([
+      createBlock({
+        id: 'blk_cn',
+        content: '日志归档策略还没收尾，需要确认归档周期。',
+        annotation: '决策 · project · logging',
+      }),
+    ]);
+
+    const result = generateRecall(
+      db,
+      createQueryPack({
+        prompt: '继续处理日志归档策略',
+      }),
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.memoryIds).toEqual(['blk_cn']);
+  });
+
+  it('does not surface archived memories', () => {
+    const db = createDb([
+      createBlock({
+        id: 'blk_archived',
+        content: '归档的旧缓存决策：切换到 Memcached。',
+        annotation: '决策 · project · cache',
+        status: 'archived',
+      }),
+    ]);
+
+    const result = generateRecall(
+      db,
+      createQueryPack({
+        prompt: '我们要不要切到 Memcached？',
+      }),
+    );
+
+    expect(result).toBeNull();
+  });
 });

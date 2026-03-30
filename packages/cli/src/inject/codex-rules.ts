@@ -195,7 +195,7 @@ function upsertSandboxWritableRoot(content: string, rootPath: string): string {
 
   if (!rootsMatch) {
     const updatedSection = `${section.trimEnd()}\n${line}\n`;
-    return content.replace(sectionRegex, updatedSection);
+    return normalizedContent.replace(sectionRegex, updatedSection);
   }
 
   const roots = Array.from(rootsMatch[1].matchAll(/"((?:\\"|[^"])*)"/g)).map((item) =>

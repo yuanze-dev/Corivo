@@ -116,4 +116,28 @@ describe('OpenCode Corivo adapter', () => {
       'hook-text',
     ]);
   });
+
+  it('runs review on assistant message.updated without waiting for idle', async () => {
+    const hooks = createOpencodeCorivoHooks(deps);
+
+    await hooks.event?.({
+      event: {
+        type: 'message.updated',
+        properties: {
+          sessionID: 'ses_4',
+          info: {
+            role: 'assistant',
+          },
+        },
+      } as any,
+    });
+
+    expect(getLatestAssistantMessage).toHaveBeenCalledWith('ses_4');
+    expect(runCorivo).toHaveBeenCalledWith('review', [
+      '--last-message',
+      'latest assistant answer',
+      '--format',
+      'hook-text',
+    ]);
+  });
 });

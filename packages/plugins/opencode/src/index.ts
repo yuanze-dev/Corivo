@@ -1,7 +1,8 @@
 import { promisify } from 'node:util';
 import { execFile } from 'node:child_process';
-import type { Plugin } from '@opencode-ai/plugin';
 import { createOpencodeCorivoHooks } from './adapter.js';
+
+type OpencodePlugin = (input: { client: unknown }) => Promise<any>;
 
 const execFileAsync = promisify(execFile);
 
@@ -54,9 +55,9 @@ async function getLatestAssistantMessage(client: any, sessionID: string): Promis
   return null;
 }
 
-const plugin: Plugin = async (input) => createOpencodeCorivoHooks({
+const plugin: OpencodePlugin = async (input) => createOpencodeCorivoHooks({
   runCorivo,
-  getLatestAssistantMessage: (sessionID) => getLatestAssistantMessage(input.client, sessionID),
+  getLatestAssistantMessage: (sessionID) => getLatestAssistantMessage((input as any).client, sessionID),
 });
 
 export default {

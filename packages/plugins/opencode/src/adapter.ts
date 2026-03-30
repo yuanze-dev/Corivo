@@ -55,8 +55,12 @@ export function createOpencodeCorivoHooks(
         }
       }
 
-      if (event?.type === 'session.idle') {
+      if (event?.type === 'session.idle' || event?.type === 'message.updated') {
+        const assistantRole = event?.properties?.info?.role;
         const sessionID = event.properties?.sessionID;
+        if (event?.type === 'message.updated' && assistantRole !== 'assistant') {
+          return;
+        }
         if (!sessionID || !deps.getLatestAssistantMessage) {
           return;
         }

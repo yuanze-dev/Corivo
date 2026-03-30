@@ -21,7 +21,13 @@ log_corivo(){ echo -e "${CYAN}[corivo]${NC} $1"; }
 # ── 配置 ───────────────────────────────────────────────────────────────────
 CORIVO_CONFIG_DIR="$HOME/.corivo"
 CORIVO_HOOKS_DIR="$CORIVO_CONFIG_DIR/hooks"
-GITHUB_RAW="https://raw.githubusercontent.com/yuanze-dev/Corivo/main/packages/plugins/claude-code"
+GITHUB_RAW_CLAUDE="https://raw.githubusercontent.com/yuanze-dev/Corivo/main/packages/plugins/claude-code"
+GITHUB_RAW_CODEX="https://raw.githubusercontent.com/yuanze-dev/Corivo/main/packages/plugins/codex"
+CODEX_CONFIG_DIR="$HOME/.codex"
+CODEX_PLUGINS_DIR="$HOME/plugins"
+CODEX_MARKETPLACE_DIR="$HOME/.agents/plugins"
+CODEX_PLUGIN_DIR="$CODEX_PLUGINS_DIR/corivo"
+CODEX_HOOKS_FILE="$CODEX_CONFIG_DIR/hooks.json"
 
 # ── 1. 安装 Node.js（如未安装）────────────────────────────────────────────
 install_node_via_nvm() {
@@ -150,7 +156,7 @@ install_skills() {
   for skill in corivo-save corivo-query; do
     mkdir -p "$skills_dir/$skill"
     local dest="$skills_dir/$skill/SKILL.md"
-    local src_url="$GITHUB_RAW/skills/$skill/skill.md"
+    local src_url="$GITHUB_RAW_CLAUDE/skills/$skill/skill.md"
 
     if curl -fsSL --connect-timeout 10 "$src_url" -o "$dest"; then
       log_info "skill 已安装: $skill"
@@ -167,7 +173,7 @@ install_hook_scripts() {
 
   for script in session-init.sh ingest-turn.sh session-carry-over.sh prompt-recall.sh stop-review.sh; do
     local dest="$CORIVO_HOOKS_DIR/$script"
-    local src_url="$GITHUB_RAW/hooks/scripts/$script"
+    local src_url="$GITHUB_RAW_CLAUDE/hooks/scripts/$script"
 
     if curl -fsSL --connect-timeout 10 "$src_url" -o "$dest"; then
       chmod +x "$dest"
@@ -238,7 +244,281 @@ EOF
   log_info "hooks 已配置: $settings_file"
 }
 
-# ── 8. 检查 Claude Code 进程 ───────────────────────────────────────────────
+# ── 8. 安装 Codex 插件文件 ─────────────────────────────────────────────────
+install_codex_plugin_files() {
+  log_step "安装 Codex 插件文件..."
+
+  mkdir -p "$CODEX_PLUGIN_DIR/.codex-plugin"
+  mkdir -p "$CODEX_PLUGIN_DIR/skills/corivo"
+  mkdir -p "$CODEX_PLUGIN_DIR/skills/corivo-save"
+  mkdir -p "$CODEX_PLUGIN_DIR/skills/corivo-query"
+  mkdir -p "$CODEX_PLUGIN_DIR/assets"
+  mkdir -p "$CODEX_PLUGIN_DIR/hooks/scripts"
+
+  local files="
+.codex-plugin/plugin.json
+skills/corivo/SKILL.md
+skills/corivo-save/SKILL.md
+skills/corivo-query/SKILL.md
+assets/corivo-icon.svg
+assets/corivo-logo.svg
+hooks/hooks.json
+hooks/scripts/ingest-turn.sh
+hooks/scripts/session-init.sh
+hooks/scripts/user-prompt-submit.sh
+hooks/scripts/stop.sh
+README.md
+"
+
+  while IFS= read -r file; do
+    [ -z "$file" ] && continue
+    local dest="$CODEX_PLUGIN_DIR/$file"
+    local src_url="$GITHUB_RAW_CODEX/$file"
+    mkdir -p "$(dirname "$dest")"
+
+    if curl -fsSL --connect-timeout 10 "$src_url" -o "$dest"; then
+      case "$file" in
+        hooks/scripts/*.sh)
+          chmod +x "$dest"
+          ;;
+      esac
+      log_info "Codex 文件已安装: $file"
+    else
+      log_warn "Codex 文件下载失败: $file"
+    fi
+  done <<EOF
+$files
+EOF
+}
+
+install_codex_marketplace() {
+  log_step "配置 Codex 本地 marketplace..."
+  mkdir -p "$CODEX_MARKETPLACE_DIR" "$CODEX_PLUGINS_DIR"
+
+  local marketplace_file="$CODEX_MARKETPLACE_DIR/marketplace.json"
+
+  if [ ! -f "$marketplace_file" ]; then
+    cat > "$marketplace_file" <<'EOF'
+{
+  "name": "local-plugins",
+  "interface": {
+    "displayName": "Local Plugins"
+  },
+  "plugins": []
+}
+EOF
+  fi
+
+  node - <<EOF
+const fs = require('fs');
+const path = '$marketplace_file';
+const raw = fs.readFileSync(path, 'utf-8');
+const data = JSON.parse(raw);
+
+if (!Array.isArray(data.plugins)) data.plugins = [];
+if (!data.interface || typeof data.interface !== 'object') data.interface = {};
+if (!data.interface.displayName) data.interface.displayName = 'Local Plugins';
+if (!data.name) data.name = 'local-plugins';
+
+const entry = {
+  name: 'corivo',
+  source: {
+    source: 'local',
+    path: './plugins/corivo'
+  },
+  policy: {
+    installation: 'AVAILABLE',
+    authentication: 'ON_INSTALL'
+  },
+  category: 'Productivity'
+};
+
+const existingIndex = data.plugins.findIndex((plugin) => plugin && plugin.name === 'corivo');
+if (existingIndex >= 0) {
+  data.plugins[existingIndex] = { ...data.plugins[existingIndex], ...entry };
+} else {
+  data.plugins.push(entry);
+}
+
+fs.writeFileSync(path, JSON.stringify(data, null, 2));
+console.log('codex marketplace 已写入');
+EOF
+
+  log_info "Codex marketplace 已配置: $marketplace_file"
+}
+
+enable_codex_plugins_feature() {
+  local config_file="$CODEX_CONFIG_DIR/config.toml"
+  mkdir -p "$CODEX_CONFIG_DIR"
+
+  if [ ! -f "$config_file" ]; then
+    cat > "$config_file" <<'EOF'
+[features]
+plugins = true
+codex_hooks = true
+EOF
+    log_info "已创建 Codex 配置并启用 plugins/codex_hooks"
+    return
+  fi
+
+  node - <<EOF
+const fs = require('fs');
+const path = '$config_file';
+const lines = fs.readFileSync(path, 'utf-8').split(/\r?\n/);
+const out = [];
+let inFeatures = false;
+let sawFeatures = false;
+let sawPlugins = false;
+let sawHooks = false;
+
+for (let i = 0; i < lines.length; i++) {
+  const line = lines[i];
+  const trimmed = line.trim();
+
+  if (/^\[.*\]$/.test(trimmed)) {
+    if (inFeatures) {
+      if (!sawPlugins) out.push('plugins = true');
+      if (!sawHooks) out.push('codex_hooks = true');
+    }
+    inFeatures = trimmed === '[features]';
+    if (inFeatures) {
+      sawFeatures = true;
+    }
+    out.push(line);
+    continue;
+  }
+
+  if (inFeatures && /^\s*plugins\s*=/.test(line)) {
+    out.push('plugins = true');
+    sawPlugins = true;
+    continue;
+  }
+
+  if (inFeatures && /^\s*codex_hooks\s*=/.test(line)) {
+    out.push('codex_hooks = true');
+    sawHooks = true;
+    continue;
+  }
+
+  out.push(line);
+}
+
+if (inFeatures) {
+  if (!sawPlugins) out.push('plugins = true');
+  if (!sawHooks) out.push('codex_hooks = true');
+}
+
+if (!sawFeatures) {
+  if (out.length > 0 && out[out.length - 1] !== '') out.push('');
+  out.push('[features]');
+  out.push('plugins = true');
+  out.push('codex_hooks = true');
+}
+
+fs.writeFileSync(path, out.join('\n'));
+EOF
+
+  log_info "已启用 Codex plugins/codex_hooks"
+}
+
+install_codex_hooks_config() {
+  log_step "配置全局 Codex hooks..."
+  mkdir -p "$CODEX_CONFIG_DIR"
+
+  if [ ! -f "$CODEX_HOOKS_FILE" ]; then
+    cat > "$CODEX_HOOKS_FILE" <<'EOF'
+{
+  "hooks": {}
+}
+EOF
+  fi
+
+  local hooks_dir="$CODEX_PLUGIN_DIR/hooks/scripts"
+
+  node - <<EOF
+const fs = require('fs');
+const path = '$CODEX_HOOKS_FILE';
+const raw = fs.readFileSync(path, 'utf-8');
+const config = JSON.parse(raw);
+const hooksDir = '$hooks_dir';
+
+if (!config.hooks || typeof config.hooks !== 'object') config.hooks = {};
+
+const containsCorivoHook = (entry) => {
+  return Array.isArray(entry?.hooks) && entry.hooks.some((hook) =>
+    typeof hook?.command === 'string' && hook.command.includes('/plugins/corivo/hooks/scripts/')
+  );
+};
+
+const ensureEvent = (eventName, newEntry) => {
+  if (!Array.isArray(config.hooks[eventName])) config.hooks[eventName] = [];
+  const existing = config.hooks[eventName];
+  if (!existing.some(containsCorivoHook)) {
+    existing.push(newEntry);
+  }
+};
+
+ensureEvent('SessionStart', {
+  matcher: 'startup|resume',
+  hooks: [
+    {
+      type: 'command',
+      command: `bash "${hooksDir}/session-init.sh"`,
+      statusMessage: 'Loading Corivo memory',
+      timeout: 5
+    }
+  ]
+});
+
+ensureEvent('UserPromptSubmit', {
+  hooks: [
+    {
+      type: 'command',
+      command: `bash "${hooksDir}/ingest-turn.sh" user`,
+      statusMessage: 'Saving Corivo memory',
+      timeout: 10
+    },
+    {
+      type: 'command',
+      command: `bash "${hooksDir}/user-prompt-submit.sh"`,
+      statusMessage: 'Checking Corivo recall',
+      timeout: 10
+    }
+  ]
+});
+
+ensureEvent('Stop', {
+  hooks: [
+    {
+      type: 'command',
+      command: `bash "${hooksDir}/ingest-turn.sh" assistant`,
+      statusMessage: 'Saving Corivo response',
+      timeout: 10
+    },
+    {
+      type: 'command',
+      command: `bash "${hooksDir}/stop.sh"`,
+      statusMessage: 'Reviewing Corivo follow-up',
+      timeout: 10
+    }
+  ]
+});
+
+fs.writeFileSync(path, JSON.stringify(config, null, 2));
+console.log('codex hooks 已写入');
+EOF
+
+  log_info "Codex hooks 已配置: $CODEX_HOOKS_FILE"
+}
+
+install_codex_plugin() {
+  install_codex_plugin_files
+  install_codex_marketplace
+  enable_codex_plugins_feature
+  install_codex_hooks_config
+}
+
+# ── 9. 检查 Claude Code 进程 ───────────────────────────────────────────────
 check_claude_process() {
   if pgrep -f "claude" &>/dev/null; then
     echo ""
@@ -248,6 +528,20 @@ check_claude_process() {
     echo ""
     echo "  Skills 和 Hooks 已安装，但需要重启 Claude Code 才能生效。"
     echo "  请关闭并重新打开 Claude Code。"
+    echo ""
+  fi
+}
+
+# ── 10. 检查 Codex 进程 ───────────────────────────────────────────────────
+check_codex_process() {
+  if pgrep -f "codex" &>/dev/null; then
+    echo ""
+    echo -e "${YELLOW}══════════════════════════════════════════${NC}"
+    echo -e "${YELLOW}  ⚠️  检测到 Codex 正在运行                ${NC}"
+    echo -e "${YELLOW}══════════════════════════════════════════${NC}"
+    echo ""
+    echo "  Corivo Codex 插件和 hooks 已安装，但需要重启 Codex 才能生效。"
+    echo "  请关闭并重新打开 Codex。"
     echo ""
   fi
 }
@@ -265,6 +559,7 @@ show_success() {
   echo "  corivo status          # 查看状态"
   echo "  corivo query \"关键词\"  # 回忆记忆"
   echo "  corivo save --content \"内容\" --annotation \"类型 · 领域\""
+  echo "  Codex 重启后可在 Local Plugins 中看到 Corivo"
   echo ""
 }
 
@@ -287,6 +582,9 @@ main() {
     install_hooks_config
     check_claude_process
   fi
+
+  install_codex_plugin
+  check_codex_process
 
   show_success
 }

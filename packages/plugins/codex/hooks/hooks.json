@@ -1,0 +1,53 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/packages/plugins/codex/hooks/scripts/session-init.sh\"",
+            "statusMessage": "Loading Corivo memory",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/packages/plugins/codex/hooks/scripts/ingest-turn.sh\" user",
+            "statusMessage": "Saving Corivo memory",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/packages/plugins/codex/hooks/scripts/user-prompt-submit.sh\"",
+            "statusMessage": "Checking Corivo recall",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/packages/plugins/codex/hooks/scripts/ingest-turn.sh\" assistant",
+            "statusMessage": "Saving Corivo response",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/packages/plugins/codex/hooks/scripts/stop.sh\"",
+            "statusMessage": "Reviewing Corivo follow-up",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

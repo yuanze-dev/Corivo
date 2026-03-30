@@ -17,7 +17,7 @@ INPUT=$(cat)
 # 日志文件（用于调试）
 LOG_DIR="$HOME/.corivo/logs"
 mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/hooks-ingest.log"
+LOG_FILE="$LOG_DIR/hooks-claude-ingest.log"
 
 # 记录原始输入（调试用，仅保留最近 100 行）
 {

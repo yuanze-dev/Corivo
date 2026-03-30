@@ -1,5 +1,5 @@
 import { describe, it, expectTypeOf } from 'vitest';
-import type { RealtimeCollector, CorivoPlugin, CorivoDatabase } from '../../src/ingestors/index';
+import type { RealtimeCollector, CorivoPlugin, CorivoDatabase } from '../../src/ingestors/index.js';
 
 describe('CorivoPlugin interface', () => {
   it('RealtimeCollector.startWatching accepts CorivoDatabase and returns Promise<void>', () => {

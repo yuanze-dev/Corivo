@@ -5,9 +5,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import Database from 'better-sqlite3';
-import { CorivoDatabase } from '../../src/storage/database';
-import { KeyManager } from '../../src/crypto/keys';
-import { ContextPusher } from '../../src/push/context';
+import { CorivoDatabase } from '../../src/storage/database.js';
+import { KeyManager } from '../../src/crypto/keys.js';
+import { ContextPusher } from '../../src/push/context.js';
 
 describe('ContextPusher', () => {
   let db: CorivoDatabase;

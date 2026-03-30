@@ -1,16 +1,16 @@
 <h1 align="center">Corivo</h1>
 
 <p align="center">
-  <strong>你的 AI 工作流记忆层</strong><br/>
-  <sub>住在 Claude Code、Cursor 和飞书里，记住你说过的每一句话</sub>
+  <strong>融入 AI 工作流的长期记忆伙伴</strong><br/>
+  <sub>Corivo 在后台持续整理对话中的关键信息，并在需要时把上下文带回来。</sub>
 </p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/corivo"><img src="https://img.shields.io/npm/v/corivo?color=d97706&label=npm" alt="npm version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-d97706" alt="MIT License" /></a>
-  <img src="https://img.shields.io/badge/platform-macOS%20arm64-lightgrey" alt="macOS arm64" />
+  <img src="https://img.shields.io/badge/platform-macOS%20arm64-lightgrey" alt="平台支持" />
   <img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen" alt="Node.js >= 18" />
-  <img src="https://img.shields.io/badge/status-内测中-orange" alt="Beta" />
+  <img src="https://img.shields.io/badge/status-beta-orange" alt="Beta 状态" />
 </p>
 
 <p align="center">
@@ -18,251 +18,171 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/readme-hero-img.jpeg" alt="Corivo — 你的硅基同事" width="100%" />
+  <img src="docs/images/readme-hero-img.jpeg" alt="Corivo 头图" width="100%" />
 </p>
 
 ---
 
-## Corivo 是什么？
+## Corivo 是什么
 
-Corivo 是一个**后台记忆伙伴**，寄生在你已有的工具里——Claude Code、Cursor、飞书。它悄悄倾听你和 AI 的每一次对话，记住重要的事，在恰当的时机为你提示上下文。
+Corivo 不是一个需要你切换过去使用的新 App，而是一层“寄生”在现有 AI 工作流中的后台服务。
 
-不需要学习新界面，不需要改变任何习惯，它就这样自然地运行。
+它会从持续对话里捕捉决策、事实和偏好，落到本地记忆系统里，再在后续时机通过 `[corivo]` 形式主动补充上下文。
 
+```text
+你：    记住，后端服务默认优先 TypeScript。
+Agent:  [corivo] 已保存。
+
+...两周后...
+
+你：    这个服务应该用什么语言？
+Agent:  [corivo] 你之前对后端服务的偏好是 TypeScript。
 ```
-你：    记住，我更喜欢 TypeScript。
-Claude: [corivo] 已记住。
 
-— 三周后 —
+目前最成熟的使用路径仍然是本地 `corivo` CLI 加 Claude Code 集成。仓库里的其他集成包大多还处于早期或实验阶段。
 
-你：    这个新模块用什么语言好？
-Claude: [corivo] 你之前说过更喜欢 TypeScript。
-```
+## 当前状态
 
----
+Corivo 目前处于活跃迭代期的 beta 阶段，可用但仍在快速演进。
 
-## 核心特性
-
-| | |
+| 模块 | 状态 |
 |---|---|
-| **被动倾听** | 自动从 AI 对话中捕捉决策、事实与偏好 |
-| **结构化记忆** | 将记忆分类为*决策*、*事实*、*知识*、*偏好* |
-| **生命力衰减** | 记忆自然老化——重大决策衰减最慢，碎片知识最快消退 |
-| **关联引擎** | 自动发现记忆间的关系（相似、冲突、覆盖…） |
-| **全文搜索** | FTS5 即时检索，中文场景优雅降级为 LIKE 搜索 |
-| **端对端加密** | 所有数据本地存储于 `~/.corivo/`，可选 SQLCipher 加密 |
-| **多设备同步** | 基于 CRDT 的同步服务器，无缝跨机器共享记忆 |
-| **CLI 优先** | 所有功能通过简洁的命令行接口访问 |
-
----
+| `corivo` CLI（`packages/cli`） | Beta，可作为主入口使用 |
+| 本地记忆引擎（SQLite + heartbeat） | 可用 |
+| Claude Code 集成 | 可用 |
+| 同步中继（`packages/solver`） | 早期阶段 |
+| Codex / OpenClaw 插件包 | 实验性能力面 |
+| 官方支持平台 | 以 macOS arm64 为主 |
 
 ## 快速开始
 
-### 一句话安装
-
-```bash
-curl -fsSL https://corivo.ai | sh
-```
-
-安装后 Corivo 会自动：
-1. 全局安装 `corivo` CLI
-2. 扫描你的工作环境（Git 配置、项目设置、AI 工具配置）
-3. 生成初始记忆画像
-4. 启动后台心跳进程
-5. 将 Corivo 规则注入 Claude Code
-
-### 或使用 npm 安装
+使用 npm 安装：
 
 ```bash
 npm install -g corivo
 corivo init
 ```
 
-### 注入到项目
+常用起步命令：
 
 ```bash
-cd 你的项目
-corivo inject   # 将 Corivo 规则写入 .claude/CLAUDE.md
-```
-
----
-
-## 使用方式
-
-### 在对话中（Claude Code）
-
-```
-你：    记住，Sarah 是我们的后端负责人。
-Claude: [corivo] 已记录。
-
-你：    后端是谁负责？
-Claude: [corivo] Sarah——她是你们的后端负责人。
-```
-
-```
-你：    我们决定用 React 而不是 Vue。
-Claude: [corivo] 已记录：前端框架 → React
-
-你：    为什么选 React 来着？
-Claude: [corivo] 因为团队更熟悉 React。
-```
-
-### 命令行
-
-```bash
-# 记住一件事
-corivo save --content "主数据库用 PostgreSQL" \
-            --annotation "决策 · project · database"
-
-# 查询记忆
-corivo query "数据库"
-
-# 查看记忆状态
 corivo status
-
-# 向 AI 会话推送上下文
-corivo push
-
-# 查看守护进程日志
-corivo logs
+corivo save --content "计费模块用 PostgreSQL" --annotation "决策 · project · database"
+corivo query "database"
+corivo inject
 ```
 
----
+说明：
+- `corivo inject` 会把规则写入当前项目的 `.claude/CLAUDE.md`。
+- 路线图中的部分集成还在推进中，暂不承诺全量可用。
 
-## 记忆类型
+## 为什么会有 Corivo
 
-| 类型 | 说明 | 示例 |
-|------|------|------|
-| **决策** | 你做过的选择 | "用 PostgreSQL"、"选 TypeScript" |
-| **事实** | 关于人或项目的事实 | "Sarah 是后端负责人" |
-| **知识** | 你学到的知识 | "React hooks 用法"、"部署流程" |
-| **偏好** | 你的习惯与风格 | "2 空格缩进"、"简洁代码风格" |
+AI 很擅长当前这一轮对话，但不擅长长期连续性。
 
-每条记忆都有一个 **生命力值**（0–100），随时间自然衰减。决策衰减最慢，碎片知识最快消退。状态流转：`active → cooling → cold → archived`。
+Corivo 想补的正是这个空缺：你反复说过的偏好、已经做出的决策、不该在下个会话里消失的事实，以及那些本应该在你再次提问前就出现的项目上下文。
 
----
+## 工作方式
 
-## 架构
-
-```
-Claude Code / Cursor / 飞书
-        │
-        ▼
-  Ingestors / Cold Scan          ← 采集原始信号
-        │
-        ▼
-  CorivoDatabase                 ← better-sqlite3，~/.corivo/corivo.db
-  (Blocks · Associations · Query Logs)
-        │
-        ▼
-  心跳引擎（每 5 秒）
-  ├── processPendingBlocks   → RuleEngine 标注
-  ├── processVitalityDecay   → 按类型差异化衰减
-  ├── processAssociations    → 关联发现（每 30s）
-  └── processConsolidation   → 去重 + 摘要（每 1min）
-        │
-        ▼
-  CLI 命令 · CRDT 同步服务器
+```text
+AI 工具（Claude Code / others）
+        |
+        v
+采集器 + 冷启动扫描
+        |
+        v
+Corivo 数据库（~/.corivo/corivo.db）
+Blocks + associations + query logs
+        |
+        v
+Heartbeat 引擎
+- 标注
+- 生命力衰减
+- 关联发现
+- 整理归并
+        |
+        v
+CLI 命令与可选同步能力
 ```
 
-### 包结构
+记忆以 block 为核心，并带有生命力状态（`active -> cooling -> cold -> archived`）。重大决策衰减更慢，确保长期项目约束更容易被找回。
 
-| 包 | 说明 |
-|----|------|
-| [`@corivo/cli`](packages/cli) | 核心 CLI、本地数据库、心跳引擎 |
-| [`@corivo/solver`](packages/solver) | CRDT 同步中继服务器（Fastify v5） |
-| [`@corivo/claude-code`](packages/plugins/claude-code) | Claude Code 插件集成 |
+## 仓库地图
 
----
+本仓库是 pnpm workspace monorepo。
+
+| 路径 | 包名 | 作用 |
+|---|---|---|
+| [`packages/cli`](packages/cli) | `corivo` | 核心 CLI、本地存储、heartbeat 引擎 |
+| [`packages/solver`](packages/solver) | `@corivo/solver` | 同步中继服务包 |
+| [`packages/shared`](packages/shared) | `@corivo/shared` | 共享 API 与类型定义 |
+| [`packages/plugins/claude-code`](packages/plugins/claude-code) | `@corivo/claude-code` | Claude Code 插件资产 |
+| [`packages/plugins/codex`](packages/plugins/codex) | `@corivo/codex` | 面向 Codex 的插件资产 |
+| [`packages/plugins/openclaw`](packages/plugins/openclaw) | `@corivo/openclaw` | OpenClaw 实时采集插件包 |
+
+仓库里所有对外可见的 package 现在都有各自的 README，贡献者不需要再自己猜目录含义。
 
 ## 数据与隐私
 
-- 所有数据存储在你自己机器的 **`~/.corivo/`** 目录下
-- SQLite 数据库，可选 **SQLCipher** 加密；SQLCipher 不可用时自动降级为应用层加密（`KeyManager`）
-- 无遥测、无分析、无云端——除非你主动开启多设备同步
+Corivo 默认本地优先。
 
-```
-~/.corivo/
-├── corivo.db       # 加密记忆存储
-├── config.json     # 你的配置
-└── identity.json   # 设备指纹（无需密码）
-```
+- 数据存放在你机器上的 `~/.corivo/`。
+- 持久化使用 SQLite，可选 SQLCipher，不可用时可回退到应用层加密。
+- 核心本地能力不依赖遥测上报。
+- 网络行为主要来自你主动启用的同步流程。
 
----
-
-## 本地开发
+## 开发
 
 ```bash
 git clone https://github.com/xiaolin26/Corivo.git
 cd Corivo
-npm install
-
-# 构建所有包
-npm run build
-
-# 开发单个包
-cd packages/cli
-npm run dev          # 监听模式
-
-# 运行测试（cli 包）
-cd packages/cli
-node --test          # 全部测试
-node --test __tests__/unit/database.test.ts
+pnpm install
+pnpm build
 ```
 
-### 技术栈
+常用 workspace 命令：
 
-- **运行时**: Node.js ≥ 18，纯 ESM TypeScript（ES2022）
-- **数据库**: better-sqlite3（WAL 模式，FTS5）
-- **同步服务器**: Fastify v5，CRDT changeset
-- **认证**: Challenge-Response + Bearer Token
-- **ORM**: Drizzle ORM（类型安全查询）
-- **守护进程**: macOS launchd
+```bash
+pnpm dev
+pnpm lint
+pnpm test
+```
 
----
+包级示例：
 
-## 路线图
+```bash
+cd packages/cli
+npm run build
+node --test
 
-- [x] Claude Code 集成
-- [x] 本地 SQLite 记忆 + 生命力衰减
-- [x] 关联引擎
-- [x] CRDT 同步服务器
-- [x] Drizzle ORM 类型安全 Schema
-- [ ] Cursor 集成
-- [ ] 飞书集成
-- [ ] Linux & Windows 支持
-- [ ] Web 面板
-- [ ] 团队 / 企业版功能
+cd ../solver
+npm run dev
+```
 
----
+## 贡献与社区
 
-## 内测计划
+- 贡献指南：[CONTRIBUTING.md](CONTRIBUTING.md)
+- 社区行为准则：[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- 安全策略：[SECURITY.md](SECURITY.md)
+- 变更记录：[CHANGELOG.md](CHANGELOG.md)
+- Beta 说明：[BETA.md](BETA.md)
+- 问题反馈：[github.com/xiaolin26/Corivo/issues](https://github.com/xiaolin26/Corivo/issues)
 
-Corivo v0.11 正在 **macOS arm64** 上小范围内测中。
+欢迎提交高质量 Bug 报告、文档改进、测试补齐和新集成支持。
 
-[加入内测 →](BETA.md) · [提交反馈 →](https://github.com/Principle-Labs/Corivo/issues)
+## 路线图快照
 
----
-
-## 参与贡献
-
-欢迎提交 Pull Request！请先开 Issue 讨论你想做的改动。
-
-1. Fork 本仓库
-2. 创建分支：`git checkout -b feature/你的功能`
-3. 按照 [conventional commits](https://www.conventionalcommits.org) 规范提交
-4. Push 并向 `main` 开 PR
-
----
+- 提升插件稳定性与跨工具采集覆盖
+- 拓展 macOS arm64 之外的平台支持
+- 继续增强同步链路可靠性与运维文档
+- 打磨更清晰的外部 API 与生态接入方式
 
 ## License
 
-Corivo Core 使用 **[MIT 协议](LICENSE)** 开源。
-
-团队版与企业版功能（计划中）将以商业许可发布。
+Corivo 采用 [MIT License](LICENSE) 开源。
 
 ---
 
 <p align="center">
-  <sub>为每天与 AI 协作的人而生 · v0.11.0</sub>
+  <sub>为每天与 AI 协作的人而做。</sub>
 </p>

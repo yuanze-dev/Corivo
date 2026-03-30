@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 120" role="img" aria-labelledby="title">
+  <title>Corivo logo</title>
+  <rect width="420" height="120" rx="24" fill="#1a1915"/>
+  <g transform="translate(18 12)">
+    <rect width="96" height="96" rx="22" fill="#25241d"/>
+    <path d="M47 18C32 18 18 30 18 48c0 18 14 31 30 31 7 0 13-2 18-6l16 16c3 3 8 3 11 0 3-3 3-8 0-11L77 62c4-6 6-12 6-19 0-15-10-25-22-25-6 0-11 2-14 6Z" fill="#d97706"/>
+    <path d="M62 24c9 0 15 7 15 18 0 14-10 25-25 25-16 0-28-11-28-24 0-13 10-19 17-19 0 12 9 22 21 22 3 0 6-1 9-2 0-14-4-20-9-20Z" fill="#f3ead8"/>
+  </g>
+  <text x="138" y="73" fill="#f3ead8" font-size="42" font-family="Georgia, 'Times New Roman', serif">Corivo</text>
+  <text x="140" y="96" fill="#a8a498" font-size="16" font-family="'Helvetica Neue', Arial, sans-serif">persistent memory for Codex</text>
+</svg>

@@ -18,7 +18,7 @@ Corivo 是一个活在你工作流中的**硅基同事**，不是工具。
 ## 安装方式
 
 ```bash
-curl -fsSL https://i.corivo.ai/install.sh | sh
+curl -fsSL https://i.corivo.ai/install.sh | bash
 ```
 
 安装后说「记住...」就行，它会记住你和 AI 的所有对话。

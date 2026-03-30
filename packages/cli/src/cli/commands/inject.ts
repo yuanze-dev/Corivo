@@ -7,6 +7,7 @@
 import path from 'node:path';
 import chalk from 'chalk';
 import { injectRules, ejectRules as ejectClaudeRules, injectGlobalRules, injectProjectRules, hasCorivoRules } from '../../inject/claude-rules.js';
+import { injectGlobalClaudeCodeHost } from '../../inject/claude-host.js';
 import { injectGlobalCodexRules } from '../../inject/codex-rules.js';
 import { injectGlobalCursorRules } from '../../inject/cursor-rules.js';
 import { injectGlobalOpencodePlugin } from '../../inject/opencode-plugin.js';
@@ -16,6 +17,7 @@ export async function injectCommand(options: {
   eject?: boolean;
   global?: boolean;
   force?: boolean;
+  claudeCode?: boolean;
   codex?: boolean;
   cursor?: boolean;
   opencode?: boolean;
@@ -27,6 +29,29 @@ export async function injectCommand(options: {
   }
 
   if (options.global) {
+    if (options.claudeCode) {
+      console.log('');
+      console.log(chalk.cyan('══════════════════════════════════════════'));
+      console.log(chalk.cyan('     安装全局 Claude Code 适配器         '));
+      console.log(chalk.cyan('══════════════════════════════════════════'));
+      console.log('');
+
+      const result = await injectGlobalClaudeCodeHost();
+
+      if (result.success) {
+        console.log(chalk.green('✔ Claude Code 已配置到:'));
+        console.log(`  ${result.path}`);
+        console.log('');
+        console.log(chalk.gray('Claude Code 现在会自动使用 Corivo 主动记忆流程'));
+        console.log('');
+      } else {
+        console.log(chalk.red('✖ 安装失败:'), result.error);
+        console.log('');
+      }
+
+      return;
+    }
+
     if (options.codex) {
       console.log('');
       console.log(chalk.cyan('══════════════════════════════════════════'));

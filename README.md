@@ -75,7 +75,7 @@ corivo inject
 Notes:
 - `corivo inject` writes Corivo rules into `.claude/CLAUDE.md` in your current project.
 - The local CLI is the main product surface today.
-- `scripts/install.sh` now installs the Codex local plugin entry as well, including marketplace registration and enabling the `plugins` feature in `~/.codex/config.toml`.
+- `scripts/install.sh` is being upgraded into a host-aware installer that can prepare Claude Code, Codex, Cursor, and OpenCode on the same machine.
 - Some integrations shown in the repository are still in progress or experimental.
 
 ## Why It Exists

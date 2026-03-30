@@ -105,6 +105,7 @@ export default async function corivoPlugin(input: any) {
       for (const value of [state.carryOver, state.recall, state.review]) {
         if (value) output.system.push(value)
       }
+      state.carryOver = undefined
       state.recall = undefined
       state.review = undefined
     },

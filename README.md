@@ -173,6 +173,9 @@ Claude Code / Cursor / Feishu
 | [`@corivo/cli`](packages/cli) | Core CLI, local database, heartbeat engine |
 | [`@corivo/solver`](packages/solver) | CRDT sync relay server (Fastify v5) |
 | [`@corivo/claude-code`](packages/plugins/claude-code) | Claude Code plugin integration |
+| [`@corivo/cursor`](packages/plugins/cursor) | Cursor hook adapter for active memory |
+| [`@corivo/opencode`](packages/plugins/opencode) | OpenCode plugin adapter for active memory |
+| [`@corivo/codex`](packages/plugins/codex) | Codex instruction-driven active memory integration |
 
 ---
 

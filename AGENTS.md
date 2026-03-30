@@ -19,6 +19,8 @@ Corivo 是一个融入用户已有工作流的赛博**伙伴**。它不是一个
 - [`packages/cli/AGENTS.md`](./packages/cli/AGENTS.md) — CLI 工具、数据库、心跳引擎
 - [`packages/solver/AGENTS.md`](./packages/solver/AGENTS.md) — CRDT 同步服务器
 - [`packages/plugins/Codex/AGENTS.md`](./packages/plugins/Codex/AGENTS.md) — Codex 插件
+- `packages/plugins/cursor` — Cursor 主动记忆适配
+- `packages/plugins/opencode` — OpenCode 主动记忆适配
 
 **进入某个 package 工作时，优先阅读该 package 的 AGENTS.md。**
 
@@ -153,17 +155,32 @@ Changeset 存储于服务端 SQLite（`src/db/server-db.ts`），每条记录按
 
 ---
 
-### packages/plugins/Codex（`@corivo/Codex`）
+### packages/plugins/codex（`@corivo/codex`）
 
-Codex 插件包，让 AI 工具能读写 Corivo 记忆。
+Codex 主动记忆适配包。当前以技能、指令模板和 notify 适配器为主。
 
 **组成：**
 
 - `src/api.ts`：`CorivoAPI` 类，通过 `execSync('corivo ...')` 调用本地 CLI
-- `skills/corivo-save/skill.md`：教 Codex 如何保存记忆
-- `skills/corivo-query/skill.md`：教 Codex 如何查询记忆
-- `hooks/hooks.json`：Codex hook 配置（session-init 等）
-- `.Codex-plugin/`：插件元数据与市场信息
+- `skills/`：Codex 保存/查询相关技能
+- `templates/AGENTS.codex.md`：Codex 全局指令模板
+- `adapters/notify-review.sh`：Codex notify 适配器
+
+### packages/plugins/cursor（`@corivo/cursor`）
+
+Cursor 的主动记忆 hook 适配包。目标是与 Claude Code 保持相同生命周期：
+
+- `SessionStart`
+- `UserPromptSubmit`
+- `Stop`
+
+### packages/plugins/opencode（`@corivo/opencode`）
+
+OpenCode 的主动记忆插件适配包。通过原生 plugin/event API 接入：
+
+- `session.created`
+- `chat.message`
+- `session.idle`
 
 ---
 

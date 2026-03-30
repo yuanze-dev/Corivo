@@ -22,6 +22,29 @@ export interface CorivoSurfaceItem {
   suggestedAction?: string;
 }
 
+export const HOST_ADAPTER_CAPABILITIES = [
+  'full-hook',
+  'plugin-transform',
+  'instruction-driven',
+] as const;
+
+export type HostAdapterCapability = (typeof HOST_ADAPTER_CAPABILITIES)[number];
+
+export const HOST_LIFECYCLE_EVENTS = [
+  'session-start',
+  'prompt-submit',
+  'response-done',
+] as const;
+
+export type HostLifecycleEvent = (typeof HOST_LIFECYCLE_EVENTS)[number];
+
+export interface HostAdapterLifecyclePayload {
+  capability: HostAdapterCapability;
+  event: HostLifecycleEvent;
+  runtimeCommand: 'carry-over' | 'recall' | 'review';
+  outputFormat: 'text' | 'json' | 'hook-text';
+}
+
 export function isCorivoSurfaceMode(value: string): value is CorivoSurfaceMode {
   return CORIVO_SURFACE_MODES.includes(value as CorivoSurfaceMode);
 }

@@ -275,6 +275,7 @@ export class FingerprintCollector {
    */
   static async getCodexFingerprint(): Promise<Fingerprint | null> {
     const configPaths = [
+      path.join(process.env.HOME || '', '.codex', 'config.toml'),
       path.join(process.env.HOME || '', '.codex', 'config.json'),
       path.join(process.env.HOME || '', '.config', 'Codex', 'config.json'),
     ];
@@ -282,7 +283,9 @@ export class FingerprintCollector {
     for (const configPath of configPaths) {
       try {
         const content = await fs.readFile(configPath, 'utf-8');
-        const config = JSON.parse(content);
+        const config = configPath.endsWith('.toml')
+          ? parseTomlLike(content)
+          : JSON.parse(content);
 
         const userId = config.user_id || config.userId || config.token;
         if (userId) {
@@ -307,6 +310,7 @@ export class FingerprintCollector {
    */
   static async getOpenCodeFingerprint(): Promise<Fingerprint | null> {
     const configPaths = [
+      path.join(process.env.HOME || '', '.config', 'opencode', 'opencode.json'),
       path.join(process.env.HOME || '', '.opencode', 'config.json'),
       path.join(process.env.HOME || '', '.config', 'OpenCode', 'config.json'),
     ];
@@ -711,6 +715,26 @@ export class FingerprintCollector {
       confidence: 'medium',
     };
   }
+}
+
+function parseTomlLike(content: string): Record<string, string> {
+  const result: Record<string, string> = {};
+
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('[')) {
+      continue;
+    }
+
+    const match = trimmed.match(/^([A-Za-z0-9_.-]+)\s*=\s*\"?(.+?)\"?$/);
+    if (!match) {
+      continue;
+    }
+
+    result[match[1]] = match[2].replace(/^\"|\"$/g, '');
+  }
+
+  return result;
 }
 
 /**

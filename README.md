@@ -109,18 +109,14 @@ CLI commands and optional sync
 
 Memory is modeled as blocks with vitality (`active -> cooling -> cold -> archived`). Decisions decay slower than lightweight knowledge, so long-lived project choices remain easier to recover.
 
-## Repository Map
-
-This is a monorepo managed with pnpm workspaces.
-
-| Path | Package | Purpose |
-|---|---|---|
-| [`packages/cli`](packages/cli) | `corivo` | Core CLI, local storage, heartbeat engine |
-| [`packages/solver`](packages/solver) | `@corivo/solver` | Sync relay server package |
-| [`packages/shared`](packages/shared) | `@corivo/shared` | Shared APIs and types |
-| [`packages/plugins/claude-code`](packages/plugins/claude-code) | `@corivo/claude-code` | Claude Code plugin assets |
-| [`packages/plugins/codex`](packages/plugins/codex) | `@corivo/codex` | Codex-oriented plugin assets |
-| [`packages/plugins/openclaw`](packages/plugins/openclaw) | `@corivo/openclaw` | OpenClaw ingestor plugin package |
+| Package | Description |
+|---------|-------------|
+| [`@corivo/cli`](packages/cli) | Core CLI, local database, heartbeat engine |
+| [`@corivo/solver`](packages/solver) | CRDT sync relay server (Fastify v5) |
+| [`@corivo/claude-code`](packages/plugins/claude-code) | Claude Code plugin integration |
+| [`@corivo/cursor`](packages/plugins/cursor) | Cursor hook adapter for active memory |
+| [`@corivo/opencode`](packages/plugins/opencode) | OpenCode plugin adapter for active memory |
+| [`@corivo/codex`](packages/plugins/codex) | Codex instruction-driven active memory integration |
 
 Each public-facing package now has its own README so contributors can orient themselves without reverse-engineering the tree.
 

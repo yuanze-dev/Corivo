@@ -7,12 +7,18 @@
 import path from 'node:path';
 import chalk from 'chalk';
 import { injectRules, ejectRules as ejectClaudeRules, injectGlobalRules, injectProjectRules, hasCorivoRules } from '../../inject/claude-rules.js';
+import { injectGlobalCodexRules } from '../../inject/codex-rules.js';
+import { injectGlobalCursorRules } from '../../inject/cursor-rules.js';
+import { injectGlobalOpencodePlugin } from '../../inject/opencode-plugin.js';
 
 export async function injectCommand(options: {
   target?: string;
   eject?: boolean;
   global?: boolean;
   force?: boolean;
+  codex?: boolean;
+  cursor?: boolean;
+  opencode?: boolean;
 }): Promise<void> {
   if (options.eject) {
     // 移除规则
@@ -21,6 +27,75 @@ export async function injectCommand(options: {
   }
 
   if (options.global) {
+    if (options.codex) {
+      console.log('');
+      console.log(chalk.cyan('══════════════════════════════════════════'));
+      console.log(chalk.cyan('     注入全局 Codex 规则                 '));
+      console.log(chalk.cyan('══════════════════════════════════════════'));
+      console.log('');
+
+      const result = await injectGlobalCodexRules();
+
+      if (result.success) {
+        console.log(chalk.green('✔ 规则已注入到:'));
+        console.log(`  ${result.path}`);
+        console.log('');
+        console.log(chalk.gray('Codex 现在会自动使用 Corivo 主动记忆流程'));
+        console.log('');
+      } else {
+        console.log(chalk.red('✖ 注入失败:'), result.error);
+        console.log('');
+      }
+
+      return;
+    }
+
+    if (options.cursor) {
+      console.log('');
+      console.log(chalk.cyan('══════════════════════════════════════════'));
+      console.log(chalk.cyan('     注入全局 Cursor 规则                '));
+      console.log(chalk.cyan('══════════════════════════════════════════'));
+      console.log('');
+
+      const result = await injectGlobalCursorRules();
+
+      if (result.success) {
+        console.log(chalk.green('✔ 规则已注入到:'));
+        console.log(`  ${result.path}`);
+        console.log('');
+        console.log(chalk.gray('Cursor 现在会自动使用 Corivo 主动记忆规则'));
+        console.log('');
+      } else {
+        console.log(chalk.red('✖ 注入失败:'), result.error);
+        console.log('');
+      }
+
+      return;
+    }
+
+    if (options.opencode) {
+      console.log('');
+      console.log(chalk.cyan('══════════════════════════════════════════'));
+      console.log(chalk.cyan('     安装全局 OpenCode 插件              '));
+      console.log(chalk.cyan('══════════════════════════════════════════'));
+      console.log('');
+
+      const result = await injectGlobalOpencodePlugin();
+
+      if (result.success) {
+        console.log(chalk.green('✔ 插件已安装到:'));
+        console.log(`  ${result.path}`);
+        console.log('');
+        console.log(chalk.gray('OpenCode 现在会自动加载 Corivo 主动记忆插件'));
+        console.log('');
+      } else {
+        console.log(chalk.red('✖ 安装失败:'), result.error);
+        console.log('');
+      }
+
+      return;
+    }
+
     // 注入到全局 CLAUDE.md
     console.log('');
     console.log(chalk.cyan('══════════════════════════════════════════'));

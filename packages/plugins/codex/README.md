@@ -1,52 +1,27 @@
-# Corivo for OpenAI Codex
+# @corivo/codex
 
-Your Cyber Partner — Persistent memory for Codex CLI.
+Codex-oriented plugin assets for Corivo. This package currently contains the prompt and skill content used to save to and query from the local Corivo memory runtime during Codex sessions.
 
-## Installation
+## Stability
 
-### Prerequisites
+- Status: `experimental`
+- Scope: optional integration package
+- Maturity notes: packaging and installation flow may continue to change as Codex plugin conventions evolve
 
-```bash
-npm install -g corivo
-corivo init
-```
+## What Is In This Package
 
-### Install Skills
+- Codex-facing save/query skill content
+- Documentation and prompt assets for connecting Codex to local Corivo memory
 
-```bash
-# 使用 Codex skill installer
-$skill-installer corivo
+## Local Development
 
-# 或手动复制到 ~/.codex/skills/corivo/
-```
+This package is currently markdown-first and does not define a dedicated build script.
 
-### Configure
+- Edit the package files directly
+- Validate behavior through a local Codex setup plus the main `corivo` CLI runtime
 
-Add to `~/.codex/config.toml`:
+## Where To Look Next
 
-```toml
-[[skills.config]]
-path = "~/.codex/skills/corivo/SKILL.md"
-enabled = true
-```
-
-## Usage
-
-### Save
-
-```
-You: Remember that I prefer 2-space indentation
-Codex: [corivo] 已记录：代码风格偏好
-```
-
-### Query
-
-```
-You: What did I say about code style?
-Codex: [corivo] 找到 1 条相关记忆:
-       你喜欢 2 空格缩进
-```
-
-## License
-
-MIT
+- Package metadata: `package.json`
+- Skill content: `skills/SAVE.md`, `skills/QUERY.md`
+- Repository-level setup and context: root `README.md`

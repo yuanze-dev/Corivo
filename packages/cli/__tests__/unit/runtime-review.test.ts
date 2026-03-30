@@ -100,4 +100,24 @@ describe('generateReview', () => {
     expect(result).not.toBeNull();
     expect(result?.memoryIds).toEqual(['blk_logging']);
   });
+
+  it('does not treat an already-made decision with empty refs as unfinished by default', () => {
+    const db = createDb([
+      createBlock({
+        id: 'blk_cache',
+        content: '缓存方案已经确定：继续使用 Redis。',
+        annotation: '决策 · project · cache',
+        refs: [],
+      }),
+    ]);
+
+    const result = generateReview(
+      db,
+      createQueryPack({
+        assistantMessage: 'We should keep the Redis cache decision in place.',
+      }),
+    );
+
+    expect(result).toBeNull();
+  });
 });

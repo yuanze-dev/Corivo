@@ -19,6 +19,7 @@ interface SessionMemoryState {
   carryOver?: string;
   recall?: string;
   review?: string;
+  lastReviewedMessage?: string;
 }
 
 function getTextFromParts(parts: Array<{ type?: string; text?: string }>): string {
@@ -70,6 +71,11 @@ export function createOpencodeCorivoHooks(
           return;
         }
 
+        const state = getState(sessionID);
+        if (state.lastReviewedMessage === lastAssistantMessage) {
+          return;
+        }
+
         const output = await deps.runCorivo('review', [
           '--last-message',
           lastAssistantMessage,
@@ -78,7 +84,8 @@ export function createOpencodeCorivoHooks(
         ]);
 
         if (output) {
-          getState(sessionID).review = output;
+          state.review = output;
+          state.lastReviewedMessage = lastAssistantMessage;
         }
       }
     },

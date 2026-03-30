@@ -21,7 +21,7 @@ export function hasChangeIntent(queryPack: QueryPack): boolean {
 }
 
 export function isUnfinishedBlock(block: Block): boolean {
-  return UNFINISHED_PATTERNS.test(block.content) || block.refs.length === 0 && isDecisionBlock(block);
+  return UNFINISHED_PATTERNS.test(block.content);
 }
 
 export function scoreCarryOverBlock(block: Block, now?: number): number {

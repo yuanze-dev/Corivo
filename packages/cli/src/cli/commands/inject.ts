@@ -9,6 +9,7 @@ import chalk from 'chalk';
 import { injectRules, ejectRules as ejectClaudeRules, injectGlobalRules, injectProjectRules, hasCorivoRules } from '../../inject/claude-rules.js';
 import { injectGlobalCodexRules } from '../../inject/codex-rules.js';
 import { injectGlobalCursorRules } from '../../inject/cursor-rules.js';
+import { injectGlobalOpencodePlugin } from '../../inject/opencode-plugin.js';
 
 export async function injectCommand(options: {
   target?: string;
@@ -17,6 +18,7 @@ export async function injectCommand(options: {
   force?: boolean;
   codex?: boolean;
   cursor?: boolean;
+  opencode?: boolean;
 }): Promise<void> {
   if (options.eject) {
     // 移除规则
@@ -65,6 +67,29 @@ export async function injectCommand(options: {
         console.log('');
       } else {
         console.log(chalk.red('✖ 注入失败:'), result.error);
+        console.log('');
+      }
+
+      return;
+    }
+
+    if (options.opencode) {
+      console.log('');
+      console.log(chalk.cyan('══════════════════════════════════════════'));
+      console.log(chalk.cyan('     安装全局 OpenCode 插件              '));
+      console.log(chalk.cyan('══════════════════════════════════════════'));
+      console.log('');
+
+      const result = await injectGlobalOpencodePlugin();
+
+      if (result.success) {
+        console.log(chalk.green('✔ 插件已安装到:'));
+        console.log(`  ${result.path}`);
+        console.log('');
+        console.log(chalk.gray('OpenCode 现在会自动加载 Corivo 主动记忆插件'));
+        console.log('');
+      } else {
+        console.log(chalk.red('✖ 安装失败:'), result.error);
         console.log('');
       }
 

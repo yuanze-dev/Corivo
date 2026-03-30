@@ -145,4 +145,82 @@ describe('OpenCode Corivo adapter', () => {
       'hook-text',
     ]);
   });
+
+  it('does not rerun review for the same assistant message on idle after message.updated', async () => {
+    const hooks = createOpencodeCorivoHooks(deps);
+
+    await hooks.event?.({
+      event: {
+        type: 'message.updated',
+        properties: {
+          sessionID: 'ses_5',
+          info: {
+            role: 'assistant',
+          },
+        },
+      } as any,
+    });
+
+    await hooks.event?.({
+      event: {
+        type: 'session.idle',
+        properties: {
+          sessionID: 'ses_5',
+        },
+      } as any,
+    });
+
+    expect(
+      runCorivo.mock.calls.filter(([command]) => command === 'review')
+    ).toHaveLength(1);
+  });
+
+  it('retries review on idle if the earlier message.updated review returned empty output', async () => {
+    let reviewAttempts = 0;
+    runCorivo = vi.fn(async (command: string) => {
+      if (command === 'carry-over') {
+        return '[corivo] carry-over context';
+      }
+      if (command === 'recall') {
+        return '[corivo] recall context';
+      }
+      if (command === 'review') {
+        reviewAttempts += 1;
+        return reviewAttempts === 1 ? '' : '[corivo] review context';
+      }
+      return '';
+    });
+
+    deps = {
+      runCorivo,
+      getLatestAssistantMessage,
+    };
+
+    const hooks = createOpencodeCorivoHooks(deps);
+
+    await hooks.event?.({
+      event: {
+        type: 'message.updated',
+        properties: {
+          sessionID: 'ses_6',
+          info: {
+            role: 'assistant',
+          },
+        },
+      } as any,
+    });
+
+    await hooks.event?.({
+      event: {
+        type: 'session.idle',
+        properties: {
+          sessionID: 'ses_6',
+        },
+      } as any,
+    });
+
+    expect(
+      runCorivo.mock.calls.filter(([command]) => command === 'review')
+    ).toHaveLength(2);
+  });
 });

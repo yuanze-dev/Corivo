@@ -14,19 +14,22 @@
 
 ### Cursor
 
-定位：`full-hook` host
+定位：`full-hook` + `instruction-driven` hybrid host
 
 原因：
 
-- 本机 Cursor 侧已经暴露出 Claude 风格 hook 生命周期
-- 可以直接映射到：
+- 本机 Cursor 侧可以承载 Claude 风格 hook 生命周期
+- 但为了降低静默失效风险，同时注入全局规则文件
+- 目标仍然是：
   - `SessionStart`
   - `UserPromptSubmit`
   - `Stop`
 
 策略：
 
-- 直接复用 Claude Code 的 hook 形态
+- 安装 Cursor 全局规则文件
+- 安装本机 hook 脚本并写入 `~/.cursor/settings.json`
+- 允许 Cursor CLI 运行 `corivo`
 - carry-over / recall / review 都由 Corivo CLI runtime 决定
 
 ### OpenCode
@@ -43,7 +46,8 @@
 - 用原生 plugin 适配器
 - `session.created` -> carry-over
 - `chat.message` -> recall
-- `session.idle` -> review
+- `message.updated` / `session.idle` -> review
+- 对相同 assistant 文本做 review 去重，避免重复触发
 
 ### Codex
 

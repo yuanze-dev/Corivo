@@ -122,6 +122,7 @@ program
   .option('-g, --global', '注入到全局 CLAUDE.md')
   .option('--codex', '以 Codex 规则模板注入')
   .option('--cursor', '以 Cursor 规则模板注入')
+  .option('--opencode', '安装 OpenCode 主动记忆插件')
   .option('--eject', '移除已注入的规则')
   .option('--force', '强制替换已存在的规则')
   .action((options) => injectCommand(options));

@@ -136,7 +136,7 @@ Observed local facts:
 - OpenCode has a real plugin API via `@opencode-ai/plugin`.
 - It exposes:
   - `chat.message`
-  - `experimental.chat.messages.transform`
+  - `experimental.chat.system.transform`
   - generic `event`
   - event types including `session.created`, `session.idle`, `message.updated`
 
@@ -149,24 +149,24 @@ Conclusion:
 
 ```mermaid
 flowchart TD
-    A["session.created / session.updated"] --> B["carry-over plugin path"]
+    A["session.created"] --> B["carry-over plugin path"]
     C["chat.message (user)"] --> D["recall plugin path"]
-    E["message.updated (assistant complete)"] --> F["review plugin path"]
+    E["message.updated / session.idle"] --> F["review plugin path"]
 
     B --> G["corivo carry-over"]
     D --> H["corivo recall"]
     F --> I["corivo review"]
 
-    H --> J["messages.transform injects Corivo context"]
-    I --> K["post-answer surfaced review"]
+    H --> J["system.transform injects Corivo context"]
+    I --> K["next-turn review staging (deduped)"]
 ```
 
 Design details:
 
 - Use an OpenCode plugin package to call Corivo runtime.
-- Use `experimental.chat.messages.transform` to inject recall context before the model answers.
+- Use `experimental.chat.system.transform` to inject recall context before the model answers.
 - Use session events for carry-over.
-- Use assistant message completion events for review.
+- Use assistant update / idle events for review, with dedupe by assistant text.
 
 ### Cursor
 
@@ -180,21 +180,23 @@ Observed local facts:
 
 Conclusion:
 
-- Cursor is a **full hook host** for this integration style.
+- Cursor is a **hybrid hook + instruction host** for this integration style.
 - It is the closest to Claude Code structurally.
 
 #### Cursor adapter design
 
 ```mermaid
 flowchart TD
-    A["SessionStart"] --> B["session-carry-over"]
-    C["UserPromptSubmit"] --> D["prompt-recall"]
-    E["Stop"] --> F["stop-review"]
+    A["Global Cursor rules"] --> B["model-driven carry-over / recall / review"]
+    C["SessionStart"] --> D["session-carry-over"]
+    E["UserPromptSubmit"] --> F["prompt-recall"]
+    G["Stop"] --> H["stop-review"]
 ```
 
 Design details:
 
-- Reuse the same shell adapter pattern as Claude Code.
+- Install a global Cursor rule file for instruction-driven fallback and attribution guidance.
+- Install Cursor-specific shell adapters into `~/.cursor/corivo/`.
 - Write Cursor-specific settings injection for the same three lifecycle hooks.
 - Reuse the same Corivo CLI runtime commands.
 

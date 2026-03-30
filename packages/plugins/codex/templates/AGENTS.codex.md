@@ -15,7 +15,7 @@ corivo carry-over --format text --no-password
 当用户问题可能涉及历史决策、偏好、上下文、项目约定时，先运行：
 
 ```bash
-corivo recall --prompt "<用户问题>" --format hook-text --no-password
+corivo recall --prompt "<用户问题>" --format text --no-password
 ```
 
 如果你采纳了这条来自 Corivo 的记忆，请在回答中明确说“根据 Corivo 的记忆”或“从 Corivo 中查到”。
@@ -25,7 +25,7 @@ corivo recall --prompt "<用户问题>" --format hook-text --no-password
 在给出一段 substantive answer 或做出决策后，运行：
 
 ```bash
-corivo review --last-message "<你的回答摘要>" --format hook-text --no-password
+corivo review --last-message "<你的回答摘要>" --format text --no-password
 ```
 
 ### 保存记忆

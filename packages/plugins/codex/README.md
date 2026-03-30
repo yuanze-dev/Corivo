@@ -11,36 +11,18 @@ npm install -g corivo
 corivo init
 ```
 
-### Install Skills
-
-```bash
-# 使用 Codex skill installer
-$skill-installer corivo
-
-# 或手动复制到 ~/.codex/skills/corivo/
-```
-
-### Configure
-
-Add to `~/.codex/config.toml`:
-
-```toml
-[[skills.config]]
-path = "~/.codex/skills/corivo/SKILL.md"
-enabled = true
-```
-
-For active-memory parity, also inject Corivo instructions into Codex global agents:
+### Install Active Memory
 
 ```bash
 corivo inject --global --codex
 ```
 
-Optional post-response adapter:
+The global Codex injector also installs the Corivo notify adapters into `~/.codex/corivo/`
+and rewires `notify` through a dispatch script so Corivo can participate in post-response review
+without clobbering your existing notifier.
 
-```toml
-notify = ["bash", "~/.codex/skills/corivo/adapters/notify-review.sh"]
-```
+Codex active memory is instruction-driven plus notify-assisted; there is no separate packaged
+`SKILL.md` install target in this package.
 
 ## Usage
 

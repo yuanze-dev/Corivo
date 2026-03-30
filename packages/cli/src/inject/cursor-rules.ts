@@ -2,6 +2,71 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+const SESSION_CARRY_OVER_SCRIPT = `
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v corivo &>/dev/null; then
+  exit 0
+fi
+
+OUTPUT=$(corivo carry-over --format hook-text --no-password 2>/dev/null || true)
+
+if [ -n "$OUTPUT" ]; then
+  echo "$OUTPUT"
+fi
+
+exit 0
+`.trimStart();
+
+const PROMPT_RECALL_SCRIPT = `
+#!/usr/bin/env bash
+set -euo pipefail
+
+INPUT=$(cat)
+PROMPT=$(echo "$INPUT" | jq -r '.prompt // empty' 2>/dev/null || echo "")
+
+if [ -z "$PROMPT" ]; then
+  exit 0
+fi
+
+if ! command -v corivo &>/dev/null; then
+  exit 0
+fi
+
+OUTPUT=$(corivo recall --prompt "$PROMPT" --format hook-text --no-password 2>/dev/null || true)
+
+if [ -n "$OUTPUT" ]; then
+  jq -n --arg suggestion "$OUTPUT" '{"additionalContext": $suggestion}' 2>/dev/null || echo ""
+fi
+
+exit 0
+`.trimStart();
+
+const STOP_REVIEW_SCRIPT = `
+#!/usr/bin/env bash
+set -euo pipefail
+
+INPUT=$(cat)
+LAST_MESSAGE=$(echo "$INPUT" | jq -r '.last_assistant_message // empty' 2>/dev/null || echo "")
+
+if [ -z "$LAST_MESSAGE" ]; then
+  exit 0
+fi
+
+if ! command -v corivo &>/dev/null; then
+  exit 0
+fi
+
+OUTPUT=$(corivo review --last-message "$LAST_MESSAGE" --format hook-text --no-password 2>/dev/null || true)
+
+if [ -n "$OUTPUT" ]; then
+  jq -n --arg suggestion "$OUTPUT" '{"additionalContext": $suggestion}' 2>/dev/null || echo ""
+fi
+
+exit 0
+`.trimStart();
+
 const TEMPLATE_TEXT = `
 ---
 description: Corivo active memory integration
@@ -53,12 +118,19 @@ export async function injectGlobalCursorRules(): Promise<{
   error?: string;
 }> {
   const home = process.env.HOME || os.homedir();
+  const cursorDir = path.join(home, '.cursor');
   const rulesDir = path.join(home, '.cursor', 'rules');
   const filePath = path.join(rulesDir, 'corivo.mdc');
+  const cliConfigPath = path.join(cursorDir, 'cli-config.json');
+  const settingsPath = path.join(cursorDir, 'settings.json');
+  const adapterDir = path.join(cursorDir, 'corivo');
 
   try {
     await fs.mkdir(rulesDir, { recursive: true });
     await fs.writeFile(filePath, TEMPLATE_TEXT, 'utf8');
+    await installCursorHookScripts(adapterDir);
+    await ensureCursorCliPermissions(cliConfigPath);
+    await ensureCursorHooks(settingsPath, adapterDir);
     return { success: true, path: filePath };
   } catch (error) {
     return {
@@ -69,3 +141,116 @@ export async function injectGlobalCursorRules(): Promise<{
 }
 
 export const CURSOR_RULE_TEMPLATE = TEMPLATE_TEXT;
+
+async function ensureCursorCliPermissions(cliConfigPath: string): Promise<void> {
+  let config: {
+    version?: number;
+    permissions?: {
+      allow?: string[];
+      deny?: string[];
+    };
+    [key: string]: unknown;
+  } = {};
+
+  try {
+    const content = await fs.readFile(cliConfigPath, 'utf8');
+    config = JSON.parse(content);
+  } catch {
+    config = {
+      version: 1,
+      editor: {
+        vimMode: false,
+      },
+      hasChangedDefaultModel: false,
+    };
+  }
+
+  const allow = new Set(config.permissions?.allow ?? []);
+  allow.add('Shell(corivo)');
+
+  config.permissions = {
+    allow: Array.from(allow),
+    deny: config.permissions?.deny ?? [],
+  };
+
+  if (!('editor' in config) || typeof config.editor !== 'object' || config.editor === null) {
+    config.editor = {
+      vimMode: false,
+    };
+  }
+
+  if (typeof (config.editor as { vimMode?: unknown }).vimMode !== 'boolean') {
+    (config.editor as { vimMode: boolean }).vimMode = false;
+  }
+
+  if (typeof config.hasChangedDefaultModel !== 'boolean') {
+    config.hasChangedDefaultModel = false;
+  }
+
+  await fs.mkdir(path.dirname(cliConfigPath), { recursive: true });
+  await fs.writeFile(cliConfigPath, JSON.stringify(config, null, 2), 'utf8');
+}
+
+async function installCursorHookScripts(adapterDir: string): Promise<void> {
+  await fs.mkdir(adapterDir, { recursive: true });
+
+  const files: Array<[string, string]> = [
+    ['session-carry-over.sh', SESSION_CARRY_OVER_SCRIPT],
+    ['prompt-recall.sh', PROMPT_RECALL_SCRIPT],
+    ['stop-review.sh', STOP_REVIEW_SCRIPT],
+  ];
+
+  for (const [fileName, content] of files) {
+    const filePath = path.join(adapterDir, fileName);
+    await fs.writeFile(filePath, content, 'utf8');
+    await fs.chmod(filePath, 0o755);
+  }
+}
+
+async function ensureCursorHooks(settingsPath: string, adapterDir: string): Promise<void> {
+  let settings: {
+    hooks?: Record<string, Array<{ hooks?: Array<{ type: string; command: string; timeout: number }> }>>;
+    [key: string]: unknown;
+  } = {};
+
+  try {
+    const content = await fs.readFile(settingsPath, 'utf8');
+    settings = JSON.parse(content);
+  } catch {
+    settings = {};
+  }
+
+  if (!settings.hooks) {
+    settings.hooks = {};
+  }
+
+  upsertHookCommand(settings.hooks, 'SessionStart', `bash ${path.join(adapterDir, 'session-carry-over.sh')}`, 5);
+  upsertHookCommand(settings.hooks, 'UserPromptSubmit', `bash ${path.join(adapterDir, 'prompt-recall.sh')}`, 10);
+  upsertHookCommand(settings.hooks, 'Stop', `bash ${path.join(adapterDir, 'stop-review.sh')}`, 5);
+
+  await fs.mkdir(path.dirname(settingsPath), { recursive: true });
+  await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+}
+
+function upsertHookCommand(
+  hooks: Record<string, Array<{ hooks?: Array<{ type: string; command: string; timeout: number }> }>>,
+  event: string,
+  command: string,
+  timeout: number,
+): void {
+  const groups = hooks[event] ?? [{ hooks: [] }];
+  const firstGroup = groups[0] ?? { hooks: [] };
+  const commands = firstGroup.hooks ?? [];
+
+  if (!commands.some((hook) => hook.command === command)) {
+    commands.push({
+      type: 'command',
+      command,
+      timeout,
+    });
+  }
+
+  firstGroup.hooks = commands;
+  groups[0] = firstGroup;
+  hooks[event] = groups;
+}

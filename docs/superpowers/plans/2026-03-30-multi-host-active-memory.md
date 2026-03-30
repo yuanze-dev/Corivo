@@ -106,7 +106,7 @@ git commit -m "feat: add cursor active memory hooks"
 
 Cover:
 - `chat.message` user prompts trigger recall path
-- `experimental.chat.messages.transform` can inject hook-text context
+- `experimental.chat.system.transform` can inject hook-text context
 - session events trigger carry-over path
 - assistant message completion triggers review path
 

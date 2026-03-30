@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const repoRoot = '/Users/liuzhengyanshuo/workspace/yuanze/02 研发管理/15-corivo/Corivo';
 const installLibPath = path.join(repoRoot, 'scripts', 'install-lib.sh');
+const installScriptPath = path.join(repoRoot, 'scripts', 'install.sh');
 
 function bashEval(script: string, env: NodeJS.ProcessEnv = {}) {
   return execFileSync('bash', ['-lc', `source "${installLibPath}"; ${script}`], {
@@ -77,5 +78,12 @@ describe('install-lib', () => {
     expect(output).toContain('codex');
     expect(output).toContain('cursor');
     expect(output).toContain('opencode');
+  });
+
+  it('documents bash as the public installer entrypoint', async () => {
+    const content = await fs.readFile(installScriptPath, 'utf8');
+
+    expect(content).toContain('curl -fsSL https://i.corivo.ai/install.sh | bash');
+    expect(content).not.toContain('curl -fsSL https://i.corivo.ai/install.sh | sh');
   });
 });

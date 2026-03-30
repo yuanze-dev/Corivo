@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Corivo 安装脚本
-# 用法: curl -fsSL https://i.corivo.ai/install.sh | sh
-#      curl -fsSL https://i.corivo.ai/install.sh | sh -s -- --lang en
+# 用法: curl -fsSL https://i.corivo.ai/install.sh | bash
+#      curl -fsSL https://i.corivo.ai/install.sh | bash -s -- --lang en
 
 set -e
 

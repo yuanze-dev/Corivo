@@ -39,4 +39,8 @@ describe('OpenCode Corivo integration', () => {
     expect(content).toContain('experimental.chat.system.transform');
     expect(content).toContain("runCorivo('recall'");
   });
+
+  it('clears carry-over after the first system transform injection', () => {
+    expect(OPENCODE_PLUGIN_TEMPLATE).toContain('state.carryOver = undefined');
+  });
 });

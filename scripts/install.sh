@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Corivo 安装脚本
-# 用法: curl -fsSL https://get.corivo.ai | sh
+# 用法: curl -fsSL https://i.corivo.ai/install.sh | sh
 
 set -e
 
@@ -21,8 +21,8 @@ log_corivo(){ echo -e "${CYAN}[corivo]${NC} $1"; }
 # ── 配置 ───────────────────────────────────────────────────────────────────
 CORIVO_CONFIG_DIR="$HOME/.corivo"
 CORIVO_HOOKS_DIR="$CORIVO_CONFIG_DIR/hooks"
-GITHUB_RAW_CLAUDE="https://raw.githubusercontent.com/yuanze-dev/Corivo/main/packages/plugins/claude-code"
-GITHUB_RAW_CODEX="https://raw.githubusercontent.com/yuanze-dev/Corivo/main/packages/plugins/codex"
+GITHUB_RAW_CLAUDE="https://raw.githubusercontent.com/Principle-Labs/Corivo/main/packages/plugins/claude-code"
+GITHUB_RAW_CODEX="https://raw.githubusercontent.com/Principle-Labs/Corivo/main/packages/plugins/codex"
 CODEX_CONFIG_DIR="$HOME/.codex"
 CODEX_PLUGINS_DIR="$HOME/plugins"
 CODEX_MARKETPLACE_DIR="$HOME/.agents/plugins"

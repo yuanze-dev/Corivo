@@ -24,6 +24,7 @@ describe('Cursor Corivo integration', () => {
     expect(CURSOR_RULE_TEMPLATE).toContain('corivo recall');
     expect(CURSOR_RULE_TEMPLATE).toContain('corivo review');
     expect(CURSOR_RULE_TEMPLATE).toContain('根据 Corivo 的记忆');
+    expect(CURSOR_RULE_TEMPLATE).toContain('# Corivo 记忆层（Cursor）');
   });
 
   it('writes a global Cursor rule file', async () => {

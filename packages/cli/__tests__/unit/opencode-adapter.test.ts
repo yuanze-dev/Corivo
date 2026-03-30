@@ -3,6 +3,7 @@ import {
   createOpencodeCorivoHooks,
   type OpencodeAdapterDeps,
 } from '../../../plugins/opencode/src/adapter.js';
+import opencodePlugin from '../../../plugins/opencode/src/index.js';
 
 describe('OpenCode Corivo adapter', () => {
   let deps: OpencodeAdapterDeps;
@@ -29,6 +30,10 @@ describe('OpenCode Corivo adapter', () => {
       runCorivo,
       getLatestAssistantMessage,
     };
+  });
+
+  it('exports a plugin function as the default module export', () => {
+    expect(typeof opencodePlugin).toBe('function');
   });
 
   it('loads carry-over on session.created and injects it into system transform', async () => {

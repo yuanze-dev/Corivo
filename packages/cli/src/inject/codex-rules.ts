@@ -104,11 +104,15 @@ export async function injectGlobalCodexRules(): Promise<{
     const existingConfig = await readFileIfExists(configPath);
     const existingNotify = extractNotifyCommand(existingConfig);
     const wrappedNotify = shouldWrapNotify(existingNotify, dispatchPath) ? existingNotify : null;
+    const existingDispatch = await readFileIfExists(dispatchPath);
 
     await fs.writeFile(reviewPath, REVIEW_SCRIPT_TEXT, 'utf8');
     await fs.chmod(reviewPath, 0o755);
 
-    await fs.writeFile(dispatchPath, buildDispatchScript(wrappedNotify), 'utf8');
+    const dispatchContent = wrappedNotify
+      ? buildDispatchScript(wrappedNotify)
+      : (existingDispatch || buildDispatchScript(null));
+    await fs.writeFile(dispatchPath, dispatchContent, 'utf8');
     await fs.chmod(dispatchPath, 0o755);
 
     let updatedConfig = upsertNotifyCommand(existingConfig, ['bash', dispatchPath]);
@@ -177,12 +181,13 @@ function upsertNotifyCommand(content: string, command: string[]): string {
 
 function upsertSandboxWritableRoot(content: string, rootPath: string): string {
   const line = `writable_roots = [ "${rootPath}" ]`;
-  const sectionRegex = /\[sandbox_workspace_write\]([\s\S]*?)(?=\n\[|$)/m;
-  const sectionMatch = content.match(sectionRegex);
+  const normalizedContent = stripWritableRoots(content).replace(/\n{3,}/g, '\n\n');
+  const sectionRegex = /\[sandbox_workspace_write\]([\s\S]*?)(?=\n\[|$)/;
+  const sectionMatch = normalizedContent.match(sectionRegex);
 
   if (!sectionMatch) {
     const block = `[sandbox_workspace_write]\n${line}\n`;
-    return content.endsWith('\n') ? `${content}${block}` : `${content}\n${block}`;
+    return normalizedContent.endsWith('\n') ? `${normalizedContent}${block}` : `${normalizedContent}\n${block}`;
   }
 
   const section = sectionMatch[0];
@@ -202,8 +207,56 @@ function upsertSandboxWritableRoot(content: string, rootPath: string): string {
   }
 
   const updatedRootsLine = `writable_roots = [ ${roots.map((value) => `"${value}"`).join(', ')} ]`;
-  const updatedSection = section.replace(/writable_roots\s*=\s*\[[\s\S]*?\]/m, updatedRootsLine);
-  return content.replace(sectionRegex, updatedSection);
+  const bodyLines = section
+    .split('\n')
+    .slice(1)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim() && !line.trimStart().startsWith('writable_roots'));
+  const updatedSection = ['[sandbox_workspace_write]', updatedRootsLine, ...bodyLines].join('\n') + '\n';
+  return dedupeWritableRootLines(normalizedContent.replace(sectionRegex, updatedSection));
+}
+
+function stripWritableRoots(content: string): string {
+  const kept: string[] = [];
+  let skipping = false;
+
+  for (const line of content.split('\n')) {
+    if (!skipping && /^\s*writable_roots\s*=/.test(line)) {
+      skipping = !line.includes(']');
+      continue;
+    }
+
+    if (skipping) {
+      if (line.includes(']')) {
+        skipping = false;
+      }
+      continue;
+    }
+
+    kept.push(line);
+  }
+
+  return kept.join('\n');
+}
+
+function dedupeWritableRootLines(content: string): string {
+  let seen = false;
+
+  return content
+    .split('\n')
+    .filter((line) => {
+      if (!/^\s*writable_roots\s*=/.test(line)) {
+        return true;
+      }
+
+      if (seen) {
+        return false;
+      }
+
+      seen = true;
+      return true;
+    })
+    .join('\n');
 }
 
 function buildDispatchScript(existingNotify: string[] | null): string {

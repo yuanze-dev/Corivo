@@ -54,6 +54,7 @@ describe('Codex Corivo integration', () => {
         'utf8'
       );
 
+      await injectGlobalCodexRules();
       const result = await injectGlobalCodexRules();
       const updatedConfig = await fs.readFile(configPath, 'utf8');
       const dispatchPath = path.join(tempHome, '.codex', 'corivo', 'notify-dispatch.sh');
@@ -68,6 +69,7 @@ describe('Codex Corivo integration', () => {
       expect(updatedConfig).toContain(dispatchPath);
       expect(updatedConfig).toContain('[sandbox_workspace_write]');
       expect(updatedConfig).toContain(path.join(tempHome, '.corivo'));
+      expect(updatedConfig.match(/writable_roots/g)).toHaveLength(1);
       expect(dispatchContent).toContain('/tmp/existing-notify.sh');
       expect(reviewContent).toContain('corivo review');
       expect(reviewContent).not.toContain('session-start');

@@ -7,12 +7,14 @@
 import path from 'node:path';
 import chalk from 'chalk';
 import { injectRules, ejectRules as ejectClaudeRules, injectGlobalRules, injectProjectRules, hasCorivoRules } from '../../inject/claude-rules.js';
+import { injectGlobalCodexRules } from '../../inject/codex-rules.js';
 
 export async function injectCommand(options: {
   target?: string;
   eject?: boolean;
   global?: boolean;
   force?: boolean;
+  codex?: boolean;
 }): Promise<void> {
   if (options.eject) {
     // 移除规则
@@ -21,6 +23,29 @@ export async function injectCommand(options: {
   }
 
   if (options.global) {
+    if (options.codex) {
+      console.log('');
+      console.log(chalk.cyan('══════════════════════════════════════════'));
+      console.log(chalk.cyan('     注入全局 Codex 规则                 '));
+      console.log(chalk.cyan('══════════════════════════════════════════'));
+      console.log('');
+
+      const result = await injectGlobalCodexRules();
+
+      if (result.success) {
+        console.log(chalk.green('✔ 规则已注入到:'));
+        console.log(`  ${result.path}`);
+        console.log('');
+        console.log(chalk.gray('Codex 现在会自动使用 Corivo 主动记忆流程'));
+        console.log('');
+      } else {
+        console.log(chalk.red('✖ 注入失败:'), result.error);
+        console.log('');
+      }
+
+      return;
+    }
+
     // 注入到全局 CLAUDE.md
     console.log('');
     console.log(chalk.cyan('══════════════════════════════════════════'));

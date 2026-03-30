@@ -602,13 +602,14 @@ main() {
   log_step "$(msg detect_hosts)"
   detect_hosts
 
-  if find_claude_dir_silent; then
-    log_info "$(msg host_claude)"
-    install_skills
-    install_hook_scripts
-    install_hooks_config
-    check_claude_process
-    record_host_result "claude-code" "ready"
+  if printf '%s\n' "${DETECTED_HOSTS[@]}" | grep -qx 'claude-code'; then
+    log_step "$(msg install_claude_host)"
+    if corivo inject --global --claude-code >/dev/null 2>&1; then
+      check_claude_process
+      record_host_result "claude-code" "ready"
+    else
+      record_host_result "claude-code" "blocked" "$(msg host_install_failed)"
+    fi
   else
     record_host_result "claude-code" "skipped"
   fi

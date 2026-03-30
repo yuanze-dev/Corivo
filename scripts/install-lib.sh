@@ -142,6 +142,8 @@ msg() {
     en:configure_claude_hooks) echo "Configuring Claude Code hooks..." ;;
     zh:install_codex_host) echo "安装 Codex 主动记忆适配器..." ;;
     en:install_codex_host) echo "Installing the Codex active-memory adapter..." ;;
+    zh:install_claude_host) echo "安装 Claude Code 主动记忆适配器..." ;;
+    en:install_claude_host) echo "Installing the Claude Code active-memory adapter..." ;;
     zh:install_cursor_host) echo "安装 Cursor 主动记忆适配器..." ;;
     en:install_cursor_host) echo "Installing the Cursor active-memory adapter..." ;;
     zh:install_opencode_host) echo "安装 OpenCode 主动记忆适配器..." ;;

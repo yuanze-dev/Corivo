@@ -120,6 +120,7 @@ program
   .description('注入 Corivo 规则到项目')
   .option('-t, --target <path>', '目标项目路径')
   .option('-g, --global', '注入到全局 CLAUDE.md')
+  .option('--claude-code', '安装 Claude Code 主动记忆适配器')
   .option('--codex', '以 Codex 规则模板注入')
   .option('--cursor', '以 Cursor 规则模板注入')
   .option('--opencode', '安装 OpenCode 主动记忆插件')

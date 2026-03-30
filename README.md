@@ -1,16 +1,16 @@
 <h1 align="center">Corivo</h1>
 
 <p align="center">
-  <strong>The memory layer for your AI-assisted workflow</strong><br/>
-  <sub>Lives inside Claude Code, Cursor, and Feishu — remembers everything you say</sub>
+  <strong>A memory companion that lives in your AI workflow</strong><br/>
+  <sub>Corivo listens quietly, organizes what matters, and brings context back when it is useful.</sub>
 </p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/corivo"><img src="https://img.shields.io/npm/v/corivo?color=d97706&label=npm" alt="npm version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-d97706" alt="MIT License" /></a>
-  <img src="https://img.shields.io/badge/platform-macOS%20arm64-lightgrey" alt="macOS" />
+  <img src="https://img.shields.io/badge/platform-macOS%20arm64-lightgrey" alt="Platform support" />
   <img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen" alt="Node.js >= 18" />
-  <img src="https://img.shields.io/badge/status-beta-orange" alt="Beta" />
+  <img src="https://img.shields.io/badge/status-beta-orange" alt="Beta status" />
 </p>
 
 <p align="center">
@@ -18,252 +18,172 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/readme-hero-img.jpeg" alt="Corivo — Your Silicon Colleague" width="100%" />
+  <img src="docs/images/readme-hero-img.jpeg" alt="Corivo hero image" width="100%" />
 </p>
 
-
 ---
 
-## What is Corivo?
+## What Corivo Is
 
-Corivo is a **background memory companion** that lives inside the tools you already use — Claude Code, Cursor, and Feishu. It quietly listens to your AI conversations, remembers what matters, and surfaces relevant context at the right moment.
+Corivo is not another standalone app. It is a background service for people who already work inside AI tools and want continuity across conversations.
 
-No new app to learn. No workflow to change. It just works.
+It captures decisions, facts, and preferences from ongoing sessions, stores them locally, and surfaces them later with `[corivo]` context prompts.
 
+```text
+You:    Remember we prefer TypeScript for backend services.
+Agent:  [corivo] Saved.
+
+...two weeks later...
+
+You:    What should we use for this service?
+Agent:  [corivo] You previously chose TypeScript for backend services.
 ```
-You:    Remember, I prefer TypeScript over JavaScript.
-Claude: [corivo] Got it.
 
-— 3 weeks later —
+Today, the strongest supported path is the local `corivo` CLI plus the Claude Code integration. Other integrations in this repository are either early-stage or experimental.
 
-You:    What language should I use for this new module?
-Claude: [corivo] You've mentioned preferring TypeScript before.
-```
+## Current Status
 
----
+Corivo is in active beta. The project is usable today, but still evolving quickly.
 
-## Features
-
-| | |
+| Area | Status |
 |---|---|
-| **Passive Listening** | Captures decisions, facts, and preferences from your AI conversations automatically |
-| **Structured Memory** | Classifies memories into *decisions*, *facts*, *knowledge*, and *preferences* |
-| **Vitality Decay** | Memories age naturally — critical decisions fade slower than casual notes |
-| **Association Engine** | Discovers relationships between memories (similar, conflicts, supersedes…) |
-| **Full-Text Search** | Instant recall with FTS5; graceful fallback to LIKE-search for CJK text |
-| **End-to-End Encrypted** | All data stored locally in `~/.corivo/` with optional SQLCipher encryption |
-| **Multi-Device Sync** | CRDT-based sync server for seamless cross-machine memory |
-| **CLI First** | Every feature accessible via a clean command-line interface |
-
----
+| `corivo` CLI (`packages/cli`) | Beta, primary entry point |
+| Local memory engine (SQLite + heartbeat) | Available |
+| Claude Code integration | Available |
+| Sync relay (`packages/solver`) | Early-stage package |
+| Codex / OpenClaw plugin packages | Experimental package surface |
+| Official platform support | macOS arm64 first |
 
 ## Quick Start
 
-### One-line install
-
-```bash
-curl -fsSL https://corivo.ai | sh
-```
-
-This will:
-1. Install the `corivo` CLI globally
-2. Scan your environment (Git config, project settings, AI tool configuration)
-3. Build your initial memory profile
-4. Start the background heartbeat daemon
-5. Inject Corivo rules into Claude Code
-
-### Or via npm
+Install with npm:
 
 ```bash
 npm install -g corivo
 corivo init
 ```
 
-### Inject into your project
+Typical first commands:
 
 ```bash
-cd your-project
-corivo inject   # writes Corivo rules into .claude/CLAUDE.md
-```
-
----
-
-## Usage
-
-### In conversation (Claude Code)
-
-```
-You:    Remember, Sarah is our backend lead.
-Claude: [corivo] Saved.
-
-You:    Who's handling the backend?
-Claude: [corivo] Sarah — she's your backend lead.
-```
-
-```
-You:    We decided to go with React instead of Vue.
-Claude: [corivo] Recorded: frontend framework → React
-
-You:    Why did we pick React again?
-Claude: [corivo] Your team has more React experience.
-```
-
-### CLI
-
-```bash
-# Save a memory
-corivo save --content "Use PostgreSQL for the main DB" \
-            --annotation "决策 · project · database"
-
-# Query your memories
-corivo query "database"
-
-# Check memory status
 corivo status
-
-# Push context to AI session
-corivo push
-
-# View daemon logs
-corivo logs
+corivo save --content "Use PostgreSQL for billing" --annotation "决策 · project · database"
+corivo query "database"
+corivo inject
 ```
 
----
+Notes:
+- `corivo inject` writes Corivo rules into `.claude/CLAUDE.md` in your current project.
+- The local CLI is the main product surface today.
+- Some integrations shown in the repository are still in progress or experimental.
 
-## Memory Types
+## Why It Exists
 
-| Type | Description | Example |
-|------|-------------|---------|
-| **Decision** | Choices you've made | "We use PostgreSQL", "TypeScript over JS" |
-| **Fact** | Facts about people or projects | "Sarah is the backend lead" |
-| **Knowledge** | Things you've learned | "React hooks pattern", "Deployment flow" |
-| **Preference** | Your habits and style | "2-space indent", "concise code" |
+AI tools are good at the current conversation and bad at continuity.
 
-Memories carry a **vitality score** (0–100) that decays over time. Decisions decay slowest; casual knowledge fades faster. Status cycles: `active → cooling → cold → archived`.
+Corivo is built for the gap in between: the preferences you repeat, the decisions you already made, the facts that should not vanish between sessions, and the project context that should come back before you ask for it again.
 
----
+## How It Works
 
-## Architecture
-
-```
-Claude Code / Cursor / Feishu
-        │
-        ▼
-  Ingestors / Cold Scan          ← harvest raw signals
-        │
-        ▼
-  CorivoDatabase                 ← better-sqlite3, ~/.corivo/corivo.db
-  (Blocks · Associations · Query Logs)
-        │
-        ▼
-  Heartbeat Engine (every 5s)
-  ├── processPendingBlocks   → RuleEngine annotation
-  ├── processVitalityDecay   → type-aware decay
-  ├── processAssociations    → link discovery (every 30s)
-  └── processConsolidation   → dedup + summarize (every 1min)
-        │
-        ▼
-  CLI Commands · CRDT Sync Server
+```text
+AI tools (Claude Code / others)
+        |
+        v
+Ingestors + cold scan
+        |
+        v
+Corivo database (~/.corivo/corivo.db)
+Blocks + associations + query logs
+        |
+        v
+Heartbeat engine
+- annotation
+- vitality decay
+- association discovery
+- consolidation
+        |
+        v
+CLI commands and optional sync
 ```
 
-### Packages
+Memory is modeled as blocks with vitality (`active -> cooling -> cold -> archived`). Decisions decay slower than lightweight knowledge, so long-lived project choices remain easier to recover.
 
-| Package | Description |
-|---------|-------------|
-| [`@corivo/cli`](packages/cli) | Core CLI, local database, heartbeat engine |
-| [`@corivo/solver`](packages/solver) | CRDT sync relay server (Fastify v5) |
-| [`@corivo/claude-code`](packages/plugins/claude-code) | Claude Code plugin integration |
+## Repository Map
 
----
+This is a monorepo managed with pnpm workspaces.
 
-## Data & Privacy
+| Path | Package | Purpose |
+|---|---|---|
+| [`packages/cli`](packages/cli) | `corivo` | Core CLI, local storage, heartbeat engine |
+| [`packages/solver`](packages/solver) | `@corivo/solver` | Sync relay server package |
+| [`packages/shared`](packages/shared) | `@corivo/shared` | Shared APIs and types |
+| [`packages/plugins/claude-code`](packages/plugins/claude-code) | `@corivo/claude-code` | Claude Code plugin assets |
+| [`packages/plugins/codex`](packages/plugins/codex) | `@corivo/codex` | Codex-oriented plugin assets |
+| [`packages/plugins/openclaw`](packages/plugins/openclaw) | `@corivo/openclaw` | OpenClaw ingestor plugin package |
 
-- All data lives in **`~/.corivo/`** on your own machine
-- SQLite database with optional **SQLCipher** encryption; falls back to application-layer encryption (`KeyManager`) if SQLCipher is unavailable
-- No telemetry, no analytics, no cloud — unless you opt in to multi-device sync
+Each public-facing package now has its own README so contributors can orient themselves without reverse-engineering the tree.
 
-```
-~/.corivo/
-├── corivo.db       # encrypted memory store
-├── config.json     # your settings
-└── identity.json   # device fingerprint (no password required)
-```
+## Privacy and Data Ownership
 
----
+Corivo is local-first by default.
+
+- Data is stored in `~/.corivo/` on your machine.
+- SQLite is used for persistence, with optional SQLCipher and fallback application-layer encryption.
+- No telemetry pipeline is required for core local usage.
+- Network behavior is mainly tied to optional sync workflows.
 
 ## Development
 
 ```bash
 git clone https://github.com/xiaolin26/Corivo.git
 cd Corivo
-npm install
-
-# Build all packages
-npm run build
-
-# Work on a specific package
-cd packages/cli
-npm run dev          # watch mode
-
-# Run tests (cli package)
-cd packages/cli
-node --test          # all tests
-node --test __tests__/unit/database.test.ts
+pnpm install
+pnpm build
 ```
 
-### Tech Stack
+Useful workspace commands:
 
-- **Runtime**: Node.js ≥ 18, pure ESM TypeScript (ES2022)
-- **Database**: better-sqlite3 (WAL mode, FTS5)
-- **Sync Server**: Fastify v5, CRDT changesets
-- **Auth**: Challenge-Response + Bearer Token
-- **ORM**: Drizzle ORM (type-safe queries)
-- **Daemon**: macOS launchd
+```bash
+pnpm dev
+pnpm lint
+pnpm test
+```
 
----
+Package-level examples:
 
-## Roadmap
+```bash
+cd packages/cli
+npm run build
+node --test
 
-- [x] Claude Code integration
-- [x] Local SQLite memory with vitality decay
-- [x] Association engine
-- [x] CRDT sync server
-- [x] Drizzle ORM type-safe schema
-- [ ] Cursor integration
-- [ ] Feishu integration
-- [ ] Linux & Windows support
-- [ ] Web dashboard
-- [ ] Team / enterprise features
+cd ../solver
+npm run dev
+```
 
----
+## Contributing and Community
 
-## Beta Program
+- Contribution guide: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Code of conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- Security policy: [SECURITY.md](SECURITY.md)
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
+- Beta notes: [BETA.md](BETA.md)
+- Issue tracker: [github.com/xiaolin26/Corivo/issues](https://github.com/xiaolin26/Corivo/issues)
 
-Corivo v0.11 is in limited beta on **macOS arm64**.
+Clear bug reports, docs improvements, tests, and integration work are all welcome.
 
-[Join the beta →](BETA.md) · [File an issue →](https://github.com/xiaolin26/Corivo/issues)
+## Roadmap Snapshot
 
----
-
-## Contributing
-
-Pull requests are welcome! Please open an issue first to discuss what you'd like to change.
-
-1. Fork the repo
-2. Create a branch: `git checkout -b feature/your-feature`
-3. Commit your changes following [conventional commits](https://www.conventionalcommits.org)
-4. Push and open a PR against `main`
-
----
+- Improve plugin stability and cross-tool ingestion coverage
+- Expand support beyond macOS arm64
+- Continue tightening sync reliability and operational docs
+- Add a clearer external API story for ecosystem contributors
 
 ## License
 
-Corivo Core is open-source under the **[MIT License](LICENSE)**.
-
-Enterprise and team features (planned) will be available under a commercial license.
+Corivo is released under the [MIT License](LICENSE).
 
 ---
 
 <p align="center">
-  <sub>Built for humans who work with AI every day · v0.11.0</sub>
+  <sub>Built for humans who work with AI every day.</sub>
 </p>

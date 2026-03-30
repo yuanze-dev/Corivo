@@ -1,48 +1,119 @@
 # Contributing to Corivo
 
-感谢你考虑为 Corivo 做贡献！
+Thanks for helping improve Corivo.
 
-## 开源协议
+This document explains how to contribute in a way that matches the current monorepo workflow.
 
-本仓库使用 MIT 协议开源。所有贡献的内容也将以 MIT 协议发布。
+## Before You Start
 
-## 企业代码隔离原则
+- License: this project is released under MIT, and contributions are accepted under the same license.
+- Node.js: `>=18`
+- Package manager: `pnpm` workspace (recommended for repo-level development)
 
-为了保持 Corivo Core 的简洁和开放性，以下功能**不会**被接受到本仓库：
+## Repository Layout
 
-- 团队协作功能（共享记忆、团队空间）
-- 权限管理系统
-- 审计日志
-- 管理后台
-- 企业级 SSO 集成
-- 商业版本专属功能
+- `packages/cli` - main `corivo` CLI package
+- `packages/solver` - sync relay server
+- `packages/shared` - shared types and APIs
+- `packages/plugins/*` - plugin packages
 
-这些企业功能将在独立私有仓库 `corivo-enterprise` 中开发，以商业许可发布。
+## Local Setup
 
-## 适合贡献的内容
-
-- Bug 修复
-- 性能优化
-- 新的 AI 工具集成（Cursor、Windsurf 等）
-- 文档改进
-- 测试用例
-
-## 开发流程
-
-1. Fork 本仓库
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'feat: add AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 创建 Pull Request
-
-## Commit 规范
-
-```
-<类型>: <描述>
-
-类型：feat / fix / refactor / docs / test
+```bash
+git clone https://github.com/xiaolin26/Corivo.git
+cd Corivo
+pnpm install
 ```
 
----
+## Development Commands
 
-有问题？请 [提 Issue](https://github.com/xiaolin26/Corivo/issues)
+Run from repository root:
+
+```bash
+pnpm run build
+pnpm run dev
+pnpm run lint
+pnpm run test
+```
+
+Run package-level commands when working on a specific package:
+
+```bash
+cd packages/cli
+npm run build
+npm run dev
+
+cd ../solver
+npm run build
+npm run dev
+```
+
+## Testing
+
+- Root-level tests currently run through `pnpm run test` (`vitest`).
+- Some packages also keep package-specific tests under `__tests__/`.
+- If your change affects runtime behavior, include or update tests in the relevant package.
+
+## What We Usually Accept
+
+- Bug fixes
+- Performance improvements
+- Documentation improvements
+- Test coverage improvements
+- New integrations that fit Corivo's core scope
+
+## Scope Boundary
+
+To keep Corivo Core focused, we generally do not accept enterprise-only features in this repository, such as:
+
+- team workspace administration
+- advanced permission systems
+- enterprise SSO and similar commercial-only modules
+
+## Branch and Commit Conventions
+
+Please do not commit directly to `main`.
+
+Recommended branch names:
+
+- `feature/<name>`
+- `fix/<name>`
+- `refactor/<name>`
+
+Recommended commit format:
+
+```text
+<type>: <summary>
+```
+
+Common types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`.
+
+Keep commits atomic: one clear change per commit.
+
+## Pull Requests
+
+1. Create a branch from `main`.
+2. Make focused changes with tests/docs as needed.
+3. Ensure build and relevant tests pass locally.
+4. Open a PR with a clear description:
+   - what changed
+   - why it changed
+   - how it was validated
+
+## Community Standards
+
+By participating, you agree to follow our Code of Conduct:
+
+- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+
+## Security Reports
+
+Please do not open public issues for security vulnerabilities.
+
+See:
+
+- [SECURITY.md](./SECURITY.md)
+
+## Need Help?
+
+- Open a discussion in Issues: <https://github.com/xiaolin26/Corivo/issues>

@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { RuleEngine } from '../../src/engine/rules';
-import { TechChoiceRule } from '../../src/engine/rules/tech-choice';
+import { RuleEngine } from '../../src/engine/rules.js';
+import { TechChoiceRule } from '../../src/engine/rules/tech-choice.js';
 
 describe('RuleEngine', () => {
   describe('TechChoiceRule', () => {

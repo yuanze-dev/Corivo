@@ -12,10 +12,10 @@ import {
   inferDecayRate,
   NATURE_TYPES,
   DOMAIN_TYPES,
-} from '../../src/models/block';
-import { Pattern, validatePattern, DECISION_TYPES } from '../../src/models/pattern';
-import { isCorivoError, wrapError, ERROR_CODES } from '../../src/errors';
-import { KeyManager } from '../../src/crypto/keys';
+} from '../../src/models/block.js';
+import { Pattern, validatePattern, DECISION_TYPES } from '../../src/models/pattern.js';
+import { isCorivoError, wrapError, ERROR_CODES } from '../../src/errors/index.js';
+import { KeyManager } from '../../src/crypto/keys.js';
 
 // Mock BIP39 wordlist for testing
 const TEST_WORDLIST = [

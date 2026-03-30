@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import crypto from 'node:crypto';
-import { KeyManager } from '../../src/crypto/keys';
+import { KeyManager } from '../../src/crypto/keys.js';
 
 describe('KeyManager', () => {
   describe('password validation', () => {

@@ -6,7 +6,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 Corivo 是一个融入用户已有工作流的赛博**伙伴**。它不是一个独立的 App，而是寄生在 Codex、Cursor、飞书等工具中的后台服务——自动从用户的 AI 对话和消息中采集信息，持续整理和更新，在合适的时机以 `[corivo]` 的名义主动提醒用户。
 
-当前版本：**v0.11.0**
+当前版本请以各 package 的 `package.json` 为准（workspace 内版本独立演进）
 
 详细设计文档见 [README.md](./README.md)
 
@@ -14,13 +14,13 @@ Corivo 是一个融入用户已有工作流的赛博**伙伴**。它不是一个
 
 ## Package 文档
 
-每个 package 内都有独立的 `AGENTS.md`，包含该包详细的构建命令、目录结构、核心概念和开发规范：
+相关 package 的本地开发说明分散在各自文档中：
 
-- [`packages/cli/AGENTS.md`](./packages/cli/AGENTS.md) — CLI 工具、数据库、心跳引擎
-- [`packages/solver/AGENTS.md`](./packages/solver/AGENTS.md) — CRDT 同步服务器
-- [`packages/plugins/Codex/AGENTS.md`](./packages/plugins/Codex/AGENTS.md) — Codex 插件
+- [`packages/cli/CLAUDE.md`](./packages/cli/CLAUDE.md) — CLI 工具、数据库、心跳引擎
+- [`packages/solver/CLAUDE.md`](./packages/solver/CLAUDE.md) — CRDT 同步服务器
+- [`packages/plugins/codex/AGENTS.md`](./packages/plugins/codex/AGENTS.md) — Codex 插件
 
-**进入某个 package 工作时，优先阅读该 package 的 AGENTS.md。**
+**进入某个 package 工作时，优先阅读该 package 的本地说明文档。**
 
 ---
 
@@ -31,8 +31,9 @@ Corivo 是一个融入用户已有工作流的赛博**伙伴**。它不是一个
 ```bash
 # packages/cli
 cd packages/cli
-npm run build          # tsc
-npm run dev            # tsc --watch
+npm run build          # tsup
+npm run dev            # tsup --watch
+npm run test           # vitest --run
 
 # packages/solver
 cd packages/solver
@@ -40,22 +41,22 @@ npm run dev            # tsx watch src/index.ts（开发热重载）
 npm run build          # tsc
 npm run start          # node dist/index.js
 
-# packages/plugins/Codex
-cd packages/plugins/Codex
-npm run build          # tsc
+# packages/plugins/codex
+cd packages/plugins/codex
+# 配置/文档型 package，无独立构建步骤
 ```
 
-**测试**（仅 cli package 有完整测试套件）：
+**测试**（当前以 cli package 的 Vitest 套件最完整）：
 
 ```bash
 cd packages/cli
-# 运行所有测试（Node.js 内置 test runner，需先 build）
-node --test
+# 运行所有测试
+npm run test
 
 # 运行单个测试文件
-node --test __tests__/unit/database.test.ts
-node --test __tests__/unit/heartbeat.test.ts
-node --test __tests__/integration/Codex-ingestor.test.ts
+npm run test -- __tests__/unit/database.test.ts
+npm run test -- __tests__/integration/heartbeat.test.ts
+npm run test -- __tests__/integration/claude-code-ingestor.test.ts
 ```
 
 > 注意：`@corivo/cli` 是纯 ESM 模块。`better-sqlite3` 是 CJS，通过 `createRequire(import.meta.url)` 加载。
@@ -153,7 +154,7 @@ Changeset 存储于服务端 SQLite（`src/db/server-db.ts`），每条记录按
 
 ---
 
-### packages/plugins/Codex（`@corivo/Codex`）
+### packages/plugins/codex（`@corivo/codex`）
 
 Codex 插件包，让 AI 工具能读写 Corivo 记忆。
 

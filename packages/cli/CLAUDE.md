@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - 纯 ESM TypeScript，编译目标 ES2022，Node ≥ 18
 - `better-sqlite3`（CJS）通过 `createRequire(import.meta.url)` 加载
-- 无测试框架依赖，使用 Node.js 内置 `node:test`
+- 测试使用 Vitest
 
 ---
 
@@ -16,20 +16,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # 构建
-npm run build          # tsc → dist/
+npm run build          # tsup → dist/
 
 # 开发（监听模式）
-npm run dev            # tsc --watch
+npm run dev            # tsup --watch
 
 # 打包独立二进制（macOS arm64/x64 + Linux x64）
 npm run package
 
-# 测试（需先 build）
-node --test                                               # 全部测试
-node --test __tests__/unit/database.test.ts              # 单个测试文件
-node --test __tests__/unit/heartbeat.test.ts
-node --test __tests__/integration/claude-code-ingestor.test.ts
-node --test __tests__/e2e/cli-flow.test.ts
+# 测试
+npm run test
+npm run test -- __tests__/unit/database.test.ts
+npm run test -- __tests__/integration/heartbeat.test.ts
+npm run test -- __tests__/integration/claude-code-ingestor.test.ts
+npm run test -- __tests__/e2e/cli-flow.test.ts
 ```
 
 测试文件分三层：`unit/` → `integration/` → `e2e/`

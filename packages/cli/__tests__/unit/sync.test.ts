@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { applyPulledChangesets, createSyncLogger, post } from '../../src/cli/commands/sync';
+import { applyPulledChangesets, createSyncLogger, post } from '../../src/cli/commands/sync.js';
 
 describe('sync logging', () => {
   it('logLevel=debug 时记录 pull changeset 的过滤与写入细节', () => {
@@ -11,7 +11,7 @@ describe('sync logging', () => {
     });
     const db = {
       upsertBlock: vi.fn(),
-    } as unknown as import('../../src/storage/database').CorivoDatabase;
+    } as unknown as import('../../src/storage/database.js').CorivoDatabase;
 
     const applied = applyPulledChangesets(
       db,
@@ -55,7 +55,7 @@ describe('sync logging', () => {
       upsertBlock: vi.fn(() => {
         throw new Error('SQLITE_CONSTRAINT');
       }),
-    } as unknown as import('../../src/storage/database').CorivoDatabase;
+    } as unknown as import('../../src/storage/database.js').CorivoDatabase;
 
     expect(() =>
       applyPulledChangesets(

@@ -23,6 +23,7 @@ From this directory:
 npm install
 npm run build
 npm run dev
+npm run test
 npm run typecheck
 ```
 
@@ -39,4 +40,3 @@ pnpm -r run build
 - Heartbeat and engine logic: `src/engine/`
 - Database layer: `src/storage/database.ts`
 - Service management: `src/service/`
-

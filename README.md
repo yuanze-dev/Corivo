@@ -155,7 +155,7 @@ Package-level examples:
 ```bash
 cd packages/cli
 npm run build
-node --test
+npm run test
 
 cd ../solver
 npm run dev

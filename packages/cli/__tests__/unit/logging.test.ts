@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createTimestampLogger } from '../../src/utils/logging';
+import { createTimestampLogger } from '../../src/utils/logging.js';
 
 describe('createTimestampLogger', () => {
   it('debug 级别会输出 debug 日志', () => {

@@ -2,7 +2,7 @@
  * CorivoSettings 配置类型测试
  */
 import { describe, it, expect } from 'vitest';
-import type { CorivoConfig, CorivoSettings } from '../../src/config';
+import type { CorivoConfig, CorivoSettings } from '../../src/config.js';
 
 describe('CorivoSettings', () => {
   it('accepts syncIntervalSeconds in config', () => {

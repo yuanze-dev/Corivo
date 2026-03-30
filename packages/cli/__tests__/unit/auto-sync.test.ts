@@ -3,17 +3,17 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AutoSync } from '../../src/engine/auto-sync';
+import { AutoSync } from '../../src/engine/auto-sync.js';
 
 // Mock 配置模块
-vi.mock('../../src/config', () => ({
+vi.mock('../../src/config.js', () => ({
   loadConfig: vi.fn(),
   loadSolverConfig: vi.fn(),
   saveSolverConfig: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock sync 命令的工具函数
-vi.mock('../../src/cli/commands/sync', () => ({
+vi.mock('../../src/cli/commands/sync.js', () => ({
   authenticate: vi.fn(),
   post: vi.fn(),
   applyPulledChangesets: vi.fn((db: { upsertBlock: (input: { id: string; content: string }) => void }, changesets: Array<{ table_name: string; pk: string; col_name: string | null; value: string | null }>) => {
@@ -28,8 +28,8 @@ vi.mock('../../src/cli/commands/sync', () => ({
   }),
 }));
 
-import { loadConfig, loadSolverConfig, saveSolverConfig } from '../../src/config';
-import { authenticate, post } from '../../src/cli/commands/sync';
+import { loadConfig, loadSolverConfig, saveSolverConfig } from '../../src/config.js';
+import { authenticate, post } from '../../src/cli/commands/sync.js';
 
 const mockLoadConfig = loadConfig as ReturnType<typeof vi.fn>;
 const mockLoadSolverConfig = loadSolverConfig as ReturnType<typeof vi.fn>;
@@ -42,7 +42,7 @@ const mockDb = {
   queryBlocks: vi.fn().mockReturnValue([]),
   getBlock: vi.fn(),
   upsertBlock: vi.fn(),
-} as unknown as import('../../src/storage/database').CorivoDatabase;
+} as unknown as import('../../src/storage/database.js').CorivoDatabase;
 
 const defaultConfig = {
   version: '1',

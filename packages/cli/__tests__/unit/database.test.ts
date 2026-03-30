@@ -5,8 +5,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import Database from 'better-sqlite3';
-import { CorivoDatabase } from '../../src/storage/database';
-import { KeyManager } from '../../src/crypto/keys';
+import { CorivoDatabase } from '../../src/storage/database.js';
+import { KeyManager } from '../../src/crypto/keys.js';
 
 describe('CorivoDatabase', () => {
   let db: CorivoDatabase;

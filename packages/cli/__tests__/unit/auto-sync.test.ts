@@ -4,13 +4,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AutoSync } from '../../src/engine/auto-sync.js';
-
-// Mock configuration module
-vi.mock('../../src/config.js', () => ({
-  loadConfig: vi.fn(),
-  loadSolverConfig: vi.fn(),
-  saveSolverConfig: vi.fn().mockResolvedValue(undefined),
-}));
+import type { CliContext } from '../../src/cli/context/types.js';
+import type { Logger } from '../../src/utils/logging.js';
 
 // Utility functions for the Mock sync command
 vi.mock('../../src/cli/commands/sync.js', () => ({
@@ -28,12 +23,8 @@ vi.mock('../../src/cli/commands/sync.js', () => ({
   }),
 }));
 
-import { loadConfig, loadSolverConfig, saveSolverConfig } from '../../src/config.js';
 import { authenticate, post } from '../../src/cli/commands/sync.js';
 
-const mockLoadConfig = loadConfig as ReturnType<typeof vi.fn>;
-const mockLoadSolverConfig = loadSolverConfig as ReturnType<typeof vi.fn>;
-const mockSaveSolverConfig = saveSolverConfig as ReturnType<typeof vi.fn>;
 const mockAuthenticate = authenticate as ReturnType<typeof vi.fn>;
 const mockPost = post as ReturnType<typeof vi.fn>;
 
@@ -48,7 +39,6 @@ const defaultConfig = {
   version: '1',
   created_at: '2026-01-01',
   identity_id: 'test-identity-id',
-  db_key: 'dGVzdA==',
 };
 
 const defaultSolverConfig = {
@@ -59,12 +49,45 @@ const defaultSolverConfig = {
   last_pull_version: 0,
 };
 
+function createMockLogger(logs: string[], errors: string[]): Logger {
+  return {
+    log: (message: string) => logs.push(message),
+    info: (message: string) => logs.push(message),
+    success: (message: string) => logs.push(message),
+    warn: (message: string) => errors.push(message),
+    error: (message: string) => errors.push(message),
+    debug: (message: string) => logs.push(message),
+    isDebugEnabled: () => true,
+  };
+}
+
 describe('AutoSync', () => {
   let autoSync: AutoSync;
+  let logs: string[];
+  let errors: string[];
+  let now: number;
+  let context: Pick<CliContext, 'logger' | 'config' | 'clock'>;
+  const mockLoadConfig = vi.fn();
+  const mockLoadSolverConfig = vi.fn();
+  const mockSaveSolverConfig = vi.fn().mockResolvedValue(undefined);
 
   beforeEach(() => {
     vi.clearAllMocks();
-    autoSync = new AutoSync(mockDb);
+    logs = [];
+    errors = [];
+    now = Date.now();
+    context = {
+      logger: createMockLogger(logs, errors),
+      config: {
+        load: mockLoadConfig,
+        loadSolver: mockLoadSolverConfig,
+        saveSolver: mockSaveSolverConfig,
+      },
+      clock: {
+        now: () => now,
+      },
+    };
+    autoSync = new AutoSync(mockDb, context);
     mockAuthenticate.mockResolvedValue('mock-token');
     mockPost.mockResolvedValue({ stored: 0, changesets: [], current_version: 0 });
   });
@@ -98,27 +121,16 @@ describe('AutoSync', () => {
       mockLoadSolverConfig.mockResolvedValue({ ...defaultSolverConfig });
     });
 
-    it('logLevel=debug 时输出同步阶段日志', async () => {
-      const logs: string[] = [];
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation((message?: unknown) => {
-        logs.push(String(message ?? ''));
-      });
-      mockLoadConfig.mockResolvedValue({
-        ...defaultConfig,
-        settings: { logLevel: 'debug' },
-      });
+    it('使用注入 logger 输出同步阶段日志', async () => {
       (mockDb.queryBlocks as ReturnType<typeof vi.fn>).mockReturnValue([]);
       mockPost.mockResolvedValue({ changesets: [], current_version: 5 });
 
-      try {
-        await autoSync.run();
-      } finally {
-        consoleLogSpy.mockRestore();
-      }
+      await autoSync.run();
 
       expect(logs.join('\n')).toContain('[sync:auto] 开始同步');
       expect(logs.join('\n')).toContain('[sync:auto] pull 完成');
       expect(logs.join('\n')).toContain('currentVersion=5');
+      expect(errors).toEqual([]);
     });
 
     it('无 blocks 时 push 0 条，返回计数', async () => {
@@ -228,9 +240,7 @@ describe('AutoSync', () => {
       await autoSync.run();
       expect(mockAuthenticate).toHaveBeenCalledTimes(1);
 
-      // Simulate token timeout: directly modify the internal timestamp
-      // @ts-expect-error access private fields for testing
-      autoSync.tokenObtainedAt = Date.now() - 5 * 60 * 1000; // 5 minutes ago
+      now += 5 * 60 * 1000;
 
       await autoSync.run();
       expect(mockAuthenticate).toHaveBeenCalledTimes(2);
@@ -248,6 +258,7 @@ describe('AutoSync', () => {
       mockPost.mockRejectedValue(new Error('ECONNREFUSED'));
 
       await expect(autoSync.run()).resolves.toBeNull();
+      expect(errors.join('\n')).toContain('[sync:auto] 同步失败:');
     });
 
     it('401 认证失败后清除 token 缓存', async () => {

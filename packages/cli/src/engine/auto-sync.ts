@@ -5,10 +5,9 @@
  * Prerequisite: The user has completed registration through `corivo sync --register`.
  */
 
-import { loadConfig, loadSolverConfig, saveSolverConfig } from '@/config';
-import { applyPulledChangesets, authenticate, post } from '@/cli/commands/sync';
-import type { CorivoDatabase } from '@/storage/database';
-import { createLogger } from '@/utils/logging';
+import type { CliContext } from '../cli/context/types.js';
+import { applyPulledChangesets, authenticate, post } from '../cli/commands/sync.js';
+import type { CorivoDatabase } from '../storage/database.js';
 
 const TOKEN_TTL = 4 * 60 * 1000; // 4 minutes (server TTL 5 minutes)
 
@@ -16,7 +15,10 @@ export class AutoSync {
   private token: string | null = null;
   private tokenObtainedAt = 0;
 
-  constructor(private db: CorivoDatabase) {}
+  constructor(
+    private db: CorivoDatabase,
+    private readonly context: Pick<CliContext, 'logger' | 'config' | 'clock'>
+  ) {}
 
   /**
    * Perform a synchronization (push + pull)
@@ -24,11 +26,11 @@ export class AutoSync {
    */
   async run(): Promise<{ pushed: number; pulled: number } | null> {
     try {
-      const config = await loadConfig();
+      const config = await this.context.config.load();
       if (!config) return null;
-      const logger = createLogger(console, config.settings?.logLevel);
+      const logger = this.context.logger;
 
-      const solverConfig = await loadSolverConfig();
+      const solverConfig = await this.context.config.loadSolver();
       if (!solverConfig) return null;
 
       const { server_url, shared_secret, site_id } = solverConfig;
@@ -57,15 +59,15 @@ export class AutoSync {
         const pushResult = (await post(
           `${server_url}/sync/push`,
           { site_id, db_version: changesets.length, changesets },
-          token,
           logger,
+          token,
           'push'
         )) as { stored: number };
         pushed = pushResult.stored;
         logger.debug(`[sync:auto] push 完成 stored=${pushed} changesets=${changesets.length}`);
 
         solverConfig.last_push_version = blocks.length;
-        await saveSolverConfig(solverConfig);
+        await this.context.config.saveSolver(solverConfig);
         logger.debug(`[sync:auto] 已更新 last_push_version=${solverConfig.last_push_version}`);
       }
 
@@ -74,8 +76,8 @@ export class AutoSync {
       const pullResult = (await post(
         `${server_url}/sync/pull`,
         { site_id, since_version: solverConfig.last_pull_version },
-        token,
         logger,
+        token,
         'pull'
       )) as {
         changesets: import('../cli/commands/sync.js').PulledChangeset[];
@@ -90,14 +92,14 @@ export class AutoSync {
 
       if (pullResult.current_version > solverConfig.last_pull_version) {
         solverConfig.last_pull_version = pullResult.current_version;
-        await saveSolverConfig(solverConfig);
+        await this.context.config.saveSolver(solverConfig);
         logger.debug(`[sync:auto] 已更新 last_pull_version=${solverConfig.last_pull_version}`);
       }
 
       logger.debug(`[sync:auto] 同步结束 push=${pushed} pull=${pulled}`);
       return { pushed, pulled };
     } catch (error) {
-      createLogger().error('[sync:auto] 同步失败:', error instanceof Error ? error.message : error);
+      this.context.logger.error('[sync:auto] 同步失败:', error instanceof Error ? error.message : error);
       // 401 Authentication failed: clear the cache token and obtain it again next time
       if (error instanceof Error && error.message.includes('401')) {
         this.token = null;
@@ -111,7 +113,7 @@ export class AutoSync {
     serverUrl: string,
     identityId: string,
     sharedSecret: string,
-    logger = createLogger()
+    logger = this.context.logger
   ): Promise<string> {
     if (this.token && this.isTokenValid()) {
       logger.debug('[sync:auto] 复用缓存 token');
@@ -119,11 +121,11 @@ export class AutoSync {
     }
     logger.debug('[sync:auto] 重新获取 token');
     this.token = await authenticate(serverUrl, identityId, sharedSecret, logger);
-    this.tokenObtainedAt = Date.now();
+    this.tokenObtainedAt = this.context.clock.now();
     return this.token;
   }
 
   private isTokenValid(): boolean {
-    return Date.now() - this.tokenObtainedAt < TOKEN_TTL;
+    return this.context.clock.now() - this.tokenObtainedAt < TOKEN_TTL;
   }
 }

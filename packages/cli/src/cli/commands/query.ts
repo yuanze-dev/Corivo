@@ -31,7 +31,7 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
     const content = await fs.readFile(configPath, 'utf-8');
     config = JSON.parse(content);
   } catch {
-    throw new ConfigError('Corivo 未初始化。请先运行: corivo init');
+    throw new ConfigError('Corivo is not initialized. Please run: corivo init');
   }
 
   // Decrypt database key (optional password)
@@ -43,19 +43,19 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
     if (config.db_key) {
       dbKey = Buffer.from(config.db_key, 'base64');
     } else if (config.encrypted_db_key) {
-      throw new ConfigError('数据库已加密，请输入密码或移除 --no-password 选项');
+      throw new ConfigError('The database is encrypted. Enter a password or remove --no-password');
     } else {
       dbKey = KeyManager.generateDatabaseKey();
       config.db_key = dbKey.toString('base64');
       await fs.writeFile(configPath, JSON.stringify(config, null, 2));
     }
   } else {
-    const password = await readPassword('请输入主密码: ', { allowEmpty: !process.stdin.isTTY });
+    const password = await readPassword('Enter master password: ', { allowEmpty: !process.stdin.isTTY });
     if (password === '') {
       if (config.db_key) {
         dbKey = Buffer.from(config.db_key, 'base64');
       } else if (config.encrypted_db_key) {
-        throw new ConfigError('数据库已加密，请输入密码');
+        throw new ConfigError('The database is encrypted. Please enter the password');
       } else {
         dbKey = KeyManager.generateDatabaseKey();
         config.db_key = dbKey.toString('base64');
@@ -66,7 +66,7 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
       const masterKey = KeyManager.deriveMasterKey(password, salt);
       const encryptedDbKey = config.encrypted_db_key;
       if (!encryptedDbKey) {
-        throw new ConfigError('未设置密码，请先运行: corivo setup-password');
+        throw new ConfigError('Password is not set. Please run: corivo setup-password');
       }
       dbKey = KeyManager.decryptDatabaseKey(encryptedDbKey, masterKey);
     }
@@ -79,17 +79,17 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
   // Search
   const limit = options.limit ? parseInt(options.limit, 10) : 10;
   if (options.limit && isNaN(limit)) {
-    throw new Error('--limit 参数必须是有效数字');
+    throw new Error('--limit must be a valid number');
   }
   const results = db.searchBlocks(query, limit);
 
   if (results.length === 0) {
-    console.log(chalk.yellow(`\n未找到与 "${query}" 相关的记忆`));
+    console.log(chalk.yellow(`\nNo memories found related to "${query}"`));
     return;
   }
 
   // Show results
-  console.log(chalk.cyan(`\n找到 ${results.length} 条相关记忆:\n`));
+  console.log(chalk.cyan(`\nFound ${results.length} related memories:\n`));
 
   for (const block of results) {
     // ID and content
@@ -101,19 +101,19 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
     const statusText = statusColor(block.status);
 
     console.log(
-      chalk.gray(`  标注: ${annotation} | 生命力: ${block.vitality} | 状态: ${statusText}`)
+      chalk.gray(`  Annotation: ${annotation} | Vitality: ${block.vitality} | Status: ${statusText}`)
     );
 
     // Details
     if (options.verbose) {
-      console.log(chalk.gray(`  访问次数: ${block.access_count}`));
+      console.log(chalk.gray(`  Access count: ${block.access_count}`));
       if (block.last_accessed) {
         const lastAccess = new Date(block.last_accessed);
         const daysAgo = Math.floor((Date.now() - block.last_accessed) / 86400000);
-        console.log(chalk.gray(`  最后访问: ${lastAccess.toLocaleString('zh-CN')} (${daysAgo}天前)`));
+        console.log(chalk.gray(`  Last accessed: ${lastAccess.toLocaleString('en-US')} (${daysAgo} days ago)`));
       }
       if (block.pattern) {
-        console.log(chalk.gray(`  模式: ${block.pattern.type} - ${block.pattern.decision}`));
+        console.log(chalk.gray(`  Pattern: ${block.pattern.type} - ${block.pattern.decision}`));
       }
     }
 

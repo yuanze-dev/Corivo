@@ -31,7 +31,7 @@ export async function verifyIdentityCommand(options: VerifyIdentityOptions = {})
     const content = await fs.readFile(configPath, 'utf-8');
     config = JSON.parse(content);
   } catch {
-    throw new ConfigError('Corivo 未初始化。请先运行: corivo init');
+    throw new ConfigError('Corivo is not initialized. Please run: corivo init');
   }
 
   // read identity
@@ -40,16 +40,16 @@ export async function verifyIdentityCommand(options: VerifyIdentityOptions = {})
     const content = await fs.readFile(identityPath, 'utf-8');
     identity = JSON.parse(content);
   } catch {
-    throw new ConfigError('未找到身份信息。请先运行: corivo init');
+    throw new ConfigError('Identity information not found. Please run: corivo init');
   }
 
   console.log('\\n═══════════════════════════════════════════════════════');
-  console.log('           跨设备身份验证');
+  console.log('           Cross-Device Identity Verification');
   console.log('═══════════════════════════════════════════════════════\\n');
 
   // Show current identity information
-  console.log(chalk.gray('当前身份 ID: ') + chalk.white(identity.identity_id));
-  console.log(chalk.gray('创建时间: ') + chalk.gray(new Date(identity.created_at).toLocaleString('zh-CN')));
+  console.log(chalk.gray('Current identity ID: ') + chalk.white(identity.identity_id));
+  console.log(chalk.gray('Created at: ') + chalk.gray(new Date(identity.created_at).toLocaleString('en-US')));
   console.log();
 
   // Initialize the fingerprint collector
@@ -57,7 +57,7 @@ export async function verifyIdentityCommand(options: VerifyIdentityOptions = {})
   const currentFingerprints = await DynamicFingerprintCollector.collectAll();
   const fingerprintValues = currentFingerprints.map(fp => fp.value);
 
-  console.log(chalk.cyan(`📸 采集到 ${currentFingerprints.length} 个指纹:`));
+  console.log(chalk.cyan(`📸 Collected ${currentFingerprints.length} fingerprints:`));
   for (const fp of currentFingerprints) {
     const confidence = fp.confidence === 'high' ? '🔴' : fp.confidence === 'medium' ? '🟡' : '🟢';
     console.log(`  ${confidence} ${fp.platform}: ${fp.value.substring(0, 8)}...`);
@@ -71,19 +71,19 @@ export async function verifyIdentityCommand(options: VerifyIdentityOptions = {})
   // Match fingerprint
   const matchResult = identityManager.matchIdentity(currentFingerprints);
 
-  console.log(chalk.cyan('🔍 指纹匹配结果:'));
-  console.log(`  匹配分数: ${(matchResult.confidence * 100).toFixed(0)}/100`);
-  console.log(`  匹配平台: ${matchResult.matched_platforms.join(', ') || '无'}`);
-  console.log(`  匹配状态: ${matchResult.matched ? chalk.green('✓ 匹配') : chalk.red('✗ 不匹配')}`);
+  console.log(chalk.cyan('🔍 Fingerprint match results:'));
+  console.log(`  Match score: ${(matchResult.confidence * 100).toFixed(0)}/100`);
+  console.log(`  Matched platforms: ${matchResult.matched_platforms.join(', ') || 'none'}`);
+  console.log(`  Match status: ${matchResult.matched ? chalk.green('✓ Matched') : chalk.red('✗ Not matched')}`);
   console.log();
 
   // If fingerprint match is insufficient, request password verification
   if (!matchResult.matched || matchResult.confidence < 0.6) {
-    console.log(chalk.yellow('⚠️  指纹匹配不足，需要密码验证\\n'));
+    console.log(chalk.yellow('⚠️  Fingerprint match is insufficient, password verification is required\\n'));
 
     // If a password is set
     if (config.encrypted_db_key) {
-      const password = options.password || await readPassword('请输入主密码: ');
+      const password = options.password || await readPassword('Enter master password: ');
 
       // Verify password
       const salt = Buffer.from(config.salt, 'base64');
@@ -100,26 +100,26 @@ export async function verifyIdentityCommand(options: VerifyIdentityOptions = {})
           password
         );
 
-        console.log(chalk.cyan('\\n🔐 联合验证结果:'));
-        console.log(`  验证方式: ${result.method}`);
-        console.log(`  置信度: ${result.confidence}`);
-        console.log(`  验证状态: ${result.success ? chalk.green('✓ 通过') : chalk.red('✗ 失败')}`);
+        console.log(chalk.cyan('\\n🔐 Combined verification result:'));
+        console.log(`  Method: ${result.method}`);
+        console.log(`  Confidence: ${result.confidence}`);
+        console.log(`  Status: ${result.success ? chalk.green('✓ Passed') : chalk.red('✗ Failed')}`);
 
         if (result.success) {
-          console.log(chalk.green('\\n✅ 身份验证成功！\\n'));
-          console.log(chalk.gray('已证明你是此身份的合法拥有者。'));
+          console.log(chalk.green('\\n✅ Identity verification successful!\\n'));
+          console.log(chalk.gray('You have proven that you are the legitimate owner of this identity.'));
         } else {
-          console.log(chalk.red('\\n❌ 身份验证失败\\n'));
-          console.log(chalk.gray('指纹和密码都不匹配，无法证明身份。'));
+          console.log(chalk.red('\\n❌ Identity verification failed\\n'));
+          console.log(chalk.gray('Neither fingerprints nor password matched, so identity could not be verified.'));
         }
       } catch {
-        console.log(chalk.red('\\n❌ 密码错误\\n'));
+        console.log(chalk.red('\\n❌ Incorrect password\\n'));
       }
     } else {
-      console.log(chalk.yellow('提示: 未设置主密码，请先运行: corivo setup-password\\n'));
+      console.log(chalk.yellow('Tip: no master password is set yet. Please run: corivo setup-password\\n'));
     }
   } else {
-    console.log(chalk.green('\\n✅ 指纹验证通过！\\n'));
-    console.log(chalk.gray('已通过指纹识别证明身份。'));
+    console.log(chalk.green('\\n✅ Fingerprint verification passed!\\n'));
+    console.log(chalk.gray('Identity has been verified through fingerprint recognition.'));
   }
 }

@@ -32,26 +32,26 @@ export async function saveCommand(options: SaveOptions): Promise<void> {
     const content = await fs.readFile(configPath, 'utf-8');
     config = JSON.parse(content);
   } catch {
-    throw new ConfigError('Corivo 未初始化。请先运行: corivo init');
+    throw new ConfigError('Corivo is not initialized. Please run: corivo init');
   }
 
   // Validate input
   if (!options.content) {
-    throw new ValidationError('缺少 --content 参数');
+    throw new ValidationError('Missing --content argument');
   }
 
   // If there is no label and it is not in pending mode, prompt the user
   const annotation = options.annotation || (options.pending ? 'pending' : '');
 
   if (!options.pending && !annotation) {
-    console.log(chalk.yellow('\n⚠️  未提供标注，将以 pending 模式保存'));
-    console.log(chalk.gray('心跳守护进程稍后会尝试自动标注\n'));
+    console.log(chalk.yellow('\n⚠️  No annotation provided, saving in pending mode'));
+    console.log(chalk.gray('The heartbeat daemon will try to annotate it automatically later\n'));
   }
 
   // Only non-pending mode will verify the annotation format.
   if (annotation && annotation !== 'pending' && !validateAnnotation(annotation)) {
     throw new ValidationError(
-      '标注格式无效。格式应为 "性质 · 领域 · 标签"，例如: "决策 · project · corivo"'
+      'Invalid annotation format. Expected "type · domain · tag", for example: "Decision · project · corivo"'
     );
   }
 
@@ -65,7 +65,7 @@ export async function saveCommand(options: SaveOptions): Promise<void> {
       dbKey = Buffer.from(config.db_key, 'base64');
     } else if (config.encrypted_db_key) {
       // Encryption key available but password skipped: prompt user
-      throw new ConfigError('数据库已加密，请输入密码或移除 --no-password 选项');
+      throw new ConfigError('The database is encrypted. Enter a password or remove --no-password');
     } else {
       // Old version compatibility: generate and save new keys
       dbKey = KeyManager.generateDatabaseKey();
@@ -73,13 +73,13 @@ export async function saveCommand(options: SaveOptions): Promise<void> {
       await fs.writeFile(configPath, JSON.stringify(config, null, 2));
     }
   } else {
-    const password = await readPassword('请输入主密码: ', { allowEmpty: !process.stdin.isTTY });
+    const password = await readPassword('Enter master password: ', { allowEmpty: !process.stdin.isTTY });
     if (password === '') {
       // Empty password: try using db_key from config
       if (config.db_key) {
         dbKey = Buffer.from(config.db_key, 'base64');
       } else if (config.encrypted_db_key) {
-        throw new ConfigError('数据库已加密，请输入密码');
+        throw new ConfigError('The database is encrypted. Please enter the password');
       } else {
         dbKey = KeyManager.generateDatabaseKey();
         config.db_key = dbKey.toString('base64');
@@ -91,7 +91,7 @@ export async function saveCommand(options: SaveOptions): Promise<void> {
       const masterKey = KeyManager.deriveMasterKey(password, salt);
       const encryptedDbKey = config.encrypted_db_key;
       if (!encryptedDbKey) {
-        throw new ConfigError('未设置密码，请先运行: corivo setup-password');
+        throw new ConfigError('Password is not set. Please run: corivo setup-password');
       }
       dbKey = KeyManager.decryptDatabaseKey(encryptedDbKey, masterKey);
     }
@@ -114,11 +114,11 @@ export async function saveCommand(options: SaveOptions): Promise<void> {
   const conflictReminder = conflictDetector.detect(options.content, existingBlocks);
 
   // Show results
-  console.log(chalk.green(`\n✅ 记忆已保存\n`));
+  console.log(chalk.green('\n✅ Memory saved\n'));
   console.log(chalk.gray('ID:       ') + chalk.white(block.id));
-  console.log(chalk.gray('内容:     ') + chalk.white(block.content));
-  console.log(chalk.gray('标注:     ') + chalk.cyan(block.annotation));
-  console.log(chalk.gray('生命力:   ') + chalk.yellow('100 (活跃)'));
+  console.log(chalk.gray('Content:   ') + chalk.white(block.content));
+  console.log(chalk.gray('Annotation:') + chalk.cyan(block.annotation));
+  console.log(chalk.gray('Vitality:  ') + chalk.yellow('100 (active)'));
   console.log();
 
   // If there is any conflict, please give a friendly reminder

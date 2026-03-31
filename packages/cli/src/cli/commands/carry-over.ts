@@ -21,9 +21,9 @@ export async function runCarryOverCommand(
 export const carryOverCommand = new Command('carry-over');
 
 carryOverCommand
-  .description('生成会话开场 carry-over（内部命令，供 hooks 调用）')
-  .option('-f, --format <type>', '输出格式: text | json | hook-text', 'text')
-  .option('--no-password', '跳过密码输入（开发模式）')
+  .description('Generate session-start carry-over (internal command for hooks)')
+  .option('-f, --format <type>', 'Output format: text | json | hook-text', 'text')
+  .option('--no-password', 'Skip password prompt (development mode)')
   .action(async (options) => {
     const output = await runCarryOverCommand({
       password: options.password,

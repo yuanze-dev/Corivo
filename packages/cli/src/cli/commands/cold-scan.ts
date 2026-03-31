@@ -13,22 +13,22 @@ import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../stor
 export const coldScanCommand = new Command('cold-scan');
 
 coldScanCommand
-  .description('认识你 - 扫描本地环境构建初始画像')
-  .option('-v, --verbose', '显示详细输出')
-  .option('--dry-run', '不保存到数据库')
-  .option('--skip <sources...>', '跳过指定的扫描源')
+  .description('Get to know you - scan the local environment to build an initial profile')
+  .option('-v, --verbose', 'Show verbose output')
+  .option('--dry-run', 'Do not save to the database')
+  .option('--skip <sources...>', 'Skip specified scan sources')
   .action(async (options) => {
     try {
       console.log('');
       console.log(
         chalk.cyan('══════════════════════════════════════════')
       );
-      console.log(chalk.cyan('     正在认识你...                      '));
+      console.log(chalk.cyan('     Getting to know you...              '));
       console.log(
         chalk.cyan('══════════════════════════════════════════')
       );
       console.log('');
-      console.log(chalk.gray('让我看看你的工作环境...'));
+      console.log(chalk.gray('Let me take a look at your workspace...'));
       console.log('');
 
       const result = await coldScan({
@@ -48,8 +48,8 @@ coldScanCommand
           config = JSON.parse(content);
         } catch {
           console.log('');
-          console.log(chalk.yellow('⚠️  未找到配置文件，跳过保存到数据库'));
-          console.log(chalk.gray('提示: 运行 corivo init 初始化数据库'));
+          console.log(chalk.yellow('⚠️  No config file found, skipping database save'));
+          console.log(chalk.gray('Tip: run corivo init to initialize the database'));
           console.log('');
         }
 
@@ -79,18 +79,18 @@ coldScanCommand
 
           if (saved > 0) {
             console.log('');
-            console.log(chalk.green(`💾 已保存 ${saved} 条信息到数据库`));
+            console.log(chalk.green(`💾 Saved ${saved} items to the database`));
           }
         }
       }
 
       console.log('');
       console.log(chalk.green('══════════════════════════════════════════'));
-      console.log(chalk.green('     认识你完成！                        '));
+      console.log(chalk.green('     Profile scan complete!              '));
       console.log(chalk.green('══════════════════════════════════════════'));
       console.log('');
-      console.log(`看过的地方: ${result.totalScanned}`);
-      console.log(`记住的事: ${result.totalFound} 条`);
+      console.log(`Places scanned: ${result.totalScanned}`);
+      console.log(`Items remembered: ${result.totalFound}`);
       console.log('');
 
       // Show summary
@@ -98,22 +98,22 @@ coldScanCommand
       const failCount = result.results.filter((r) => !r.success).length;
 
       if (successCount > 0) {
-        console.log(chalk.green(`成功: ${successCount} 个来源`));
+        console.log(chalk.green(`Successful sources: ${successCount}`));
       }
 
       if (failCount > 0) {
-        console.log(chalk.yellow(`失败: ${failCount} 个来源`));
+        console.log(chalk.yellow(`Failed sources: ${failCount}`));
       }
 
       // Next step tips
       if (!options.dryRun && result.totalFound > 0) {
         console.log('');
-        console.log(chalk.gray('下一步: 运行 corivo first-run 整理这些信息'));
+        console.log(chalk.gray('Next step: run corivo first-run to organize this information'));
       }
 
       console.log('');
     } catch (error) {
-      console.error(chalk.red('扫描失败:'), error);
+      console.error(chalk.red('Scan failed:'), error);
       process.exit(1);
     }
   });

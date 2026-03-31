@@ -40,7 +40,7 @@ function exit(code = 0): never {
  */
 export async function initCommand(options: { join?: string; server?: string } = {}): Promise<void> {
   console.log('\n═══════════════════════════════════════════════════════');
-  console.log('           Corivo — 一个为你而活着的数字伙伴');
+  console.log('           Corivo - a digital companion that lives for you');
   console.log('═══════════════════════════════════════════════════════\n');
 
   // Skip existence check when --join is provided; the user will be prompted to confirm merging identities.
@@ -48,8 +48,8 @@ export async function initCommand(options: { join?: string; server?: string } = 
   if (!options.join) {
     try {
       if (fsSync.existsSync(dbPath)) {
-        console.log(`⚠️  检测到 Corivo 已存在于: ${dbPath}`);
-        console.log('如果需要重新初始化，请先删除现有数据库：');
+        console.log(`⚠️  Existing Corivo database detected at: ${dbPath}`);
+        console.log('If you need to re-initialize, delete the existing database first:');
         console.log(`  rm ${dbPath}`);
         exit(1);
       }
@@ -61,7 +61,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
   try {
     await fs.mkdir(configDir, { recursive: true });
   } catch (error) {
-    throw new FileSystemError(`无法创建配置目录: ${configDir}`, { cause: error });
+    throw new FileSystemError(`Failed to create config directory: ${configDir}`, { cause: error });
   }
 
   // ========== Identity resolution ==========
@@ -70,7 +70,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
   if (options.join) {
     // --join flow: join an existing identity using a pairing code
     const serverUrl = options.server || process.env.CORIVO_SOLVER_URL || 'http://localhost:3141';
-    console.log(`正在通过配对码加入 identity...\n`);
+    console.log('Joining identity with pairing code...\n');
 
     const deviceId = (await import('node:crypto')).randomBytes(8).toString('hex');
     const siteId = (await import('node:crypto')).randomBytes(16).toString('hex');
@@ -90,18 +90,18 @@ export async function initCommand(options: { join?: string; server?: string } = 
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('404')) {
-        console.error('❌ 配对码无效或已过期，请在 Device A 重新运行 corivo sync --pair');
+        console.error('❌ The pairing code is invalid or expired. Please rerun corivo sync --pair on Device A');
       } else if (msg.includes('409')) {
-        console.error('❌ 该设备已注册');
+        console.error('❌ This device is already registered');
       } else {
-        console.error('❌ 配对失败:', msg);
+        console.error('❌ Pairing failed:', msg);
       }
       exit(1);
     }
 
     identityId = redeemResult.identity_id;
-    console.log('✓ 配对成功');
-    console.log(`  身份 ID: ${identityId}`);
+    console.log('✓ Pairing successful');
+    console.log(`  Identity ID: ${identityId}`);
 
     // Detect whether a local identity already exists (conflict scenario).
     const existingConfig = await loadConfig(configDir);
@@ -109,15 +109,15 @@ export async function initCommand(options: { join?: string; server?: string } = 
     let dbKeyBase64: string;
 
     if (existingConfig && existingConfig.identity_id !== identityId) {
-      console.log('\n⚠️  检测到本机已有 Corivo 身份：');
-      console.log(`   当前身份 ID: ${existingConfig.identity_id}`);
-      console.log(`   将加入身份 ID: ${identityId}`);
-      console.log('\n   选择 Yes：保留本机数据，切换到新 identity（本机数据将在下次同步时推送至服务器）');
-      console.log('   选择 No：取消操作，保持现状\n');
+      console.log('\n⚠️  An existing Corivo identity was detected on this machine:');
+      console.log(`   Current identity ID: ${existingConfig.identity_id}`);
+      console.log(`   Will join identity ID: ${identityId}`);
+      console.log('\n   Choose Yes: keep local data and switch to the new identity (local data will be pushed on the next sync)');
+      console.log('   Choose No: cancel and keep the current setup\n');
 
-      const confirmed = await readConfirm('是否继续？');
+      const confirmed = await readConfirm('Continue?');
       if (!confirmed) {
-        console.log('已取消。');
+        console.log('Cancelled.');
         exit(0);
       }
 
@@ -136,11 +136,11 @@ export async function initCommand(options: { join?: string; server?: string } = 
     await initializeIdentityWithId(identityId, configDir);
 
     if (!existingConfig || existingConfig.identity_id !== identityId) {
-      console.log('\n正在创建加密数据库...');
+      console.log('\nCreating encrypted database...');
       const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
       const health = db.checkHealth();
       if (!health.ok) {
-        console.log('❌ 数据库创建失败');
+        console.log('❌ Failed to create database');
         exit(1);
       }
     }
@@ -153,7 +153,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
     };
     const saveResult = await saveConfig(config, configDir);
     if (!saveResult.success) {
-      console.log('❌ 配置保存失败: ' + saveResult.error);
+      console.log('❌ Failed to save config: ' + saveResult.error);
       exit(1);
     }
 
@@ -167,24 +167,24 @@ export async function initCommand(options: { join?: string; server?: string } = 
     await saveSolverConfig(solverConfig, configDir);
 
     console.log('\n═══════════════════════════════════════════════════════');
-    console.log('                  ✅ 加入成功！');
+    console.log('                  ✅ Joined successfully!');
     console.log('═══════════════════════════════════════════════════════\n');
-    console.log('🎯 Corivo 已准备就绪');
-    console.log('   身份 ID: ' + identityId);
-    console.log('   数据库:   ' + dbPath);
-    console.log('   同步服务器: ' + serverUrl + '\n');
+    console.log('🎯 Corivo is ready');
+    console.log('   Identity ID: ' + identityId);
+    console.log('   Database:    ' + dbPath);
+    console.log('   Sync server: ' + serverUrl + '\n');
 
     // Auto-start the heartbeat after joining.
-    console.log('🫀 正在启动心跳...');
+    console.log('🫀 Starting heartbeat...');
     try {
       await startCommand();
-      console.log('\n✨ Corivo 已苏醒！心跳将自动同步数据。');
+      console.log('\n✨ Corivo is awake. Heartbeat will sync data automatically.');
     } catch {
-      console.log('\n⚠️  心跳启动失败，请手动运行: corivo start');
+      console.log('\n⚠️  Failed to start heartbeat, please run: corivo start');
     }
 
-    console.log('\n下一步：');
-    console.log('  corivo sync       # 立即拉取已有数据');
+    console.log('\nNext steps:');
+    console.log('  corivo sync       # Pull existing data now');
     console.log('  corivo query "..."');
     console.log('  corivo status\n');
 
@@ -192,27 +192,27 @@ export async function initCommand(options: { join?: string; server?: string } = 
   }
 
   // Normal (non-join) initialization flow.
-  console.log('正在识别您的身份...\n');
+  console.log('Identifying you...\n');
 
   const identityResult = await initializeIdentity(configDir);
   identityId = identityResult.identity.identity_id;
 
   if (identityResult.isNew) {
-    console.log('✓ 创建新身份');
-    console.log(`  身份 ID: ${identityId}`);
+    console.log('✓ Created a new identity');
+    console.log(`  Identity ID: ${identityId}`);
   } else {
-    console.log('✓ 识别到现有身份');
-    console.log(`  身份 ID: ${identityId}`);
+    console.log('✓ Found an existing identity');
+    console.log(`  Identity ID: ${identityId}`);
   }
 
   // Display the platform fingerprints that were detected.
   if (identityResult.fingerprints.length > 0) {
-    console.log('\n检测到的平台：');
+    console.log('\nDetected platforms:');
     for (const fp of identityResult.fingerprints) {
       const platformNames: Record<string, string> = {
         claude_code: 'Claude Code',
-        feishu: '飞书',
-        device: '设备',
+        feishu: 'Feishu',
+        device: 'Device',
       };
       const confidenceIcons: Record<string, string> = {
         high: '🟢',
@@ -229,21 +229,21 @@ export async function initCommand(options: { join?: string; server?: string } = 
   // ========== End identity resolution ==========
 
   // Generate a database key without requiring a password.
-  console.log('正在生成密钥...');
+  console.log('Generating keys...');
 
   const dbKey = KeyManager.generateDatabaseKey();
   // Store the key as base64 in plaintext — security relies on filesystem permissions.
   const dbKeyBase64 = dbKey.toString('base64');
 
   // Create the encrypted database.
-  console.log('正在创建加密数据库...');
+  console.log('Creating encrypted database...');
 
   const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
 
   // Verify that the database was created and is healthy.
   const health = db.checkHealth();
   if (!health.ok) {
-    console.log('❌ 数据库创建失败');
+    console.log('❌ Failed to create database');
     exit(1);
   }
 
@@ -257,20 +257,20 @@ export async function initCommand(options: { join?: string; server?: string } = 
 
   const saveResult = await saveConfig(config, configDir);
   if (!saveResult.success) {
-    console.log('❌ 配置保存失败: ' + saveResult.error);
+    console.log('❌ Failed to save config: ' + saveResult.error);
     exit(1);
   }
 
   console.log('\n═══════════════════════════════════════════════════════');
-  console.log('                  ✅ 初始化完成！');
+  console.log('                  ✅ Initialization complete!');
   console.log('═══════════════════════════════════════════════════════\n');
 
-  console.log('🎯 Corivo 已准备就绪');
-  console.log('   身份 ID: ' + identityId);
-  console.log('   数据库:   ' + dbPath);
-  console.log('\n💡 提示：');
-  console.log('   数据库密钥明文存储在本地，依赖文件系统权限保护');
-  console.log('   请确保你的用户目录安全（不与他人共享）\n');
+  console.log('🎯 Corivo is ready');
+  console.log('   Identity ID: ' + identityId);
+  console.log('   Database:    ' + dbPath);
+  console.log('\n💡 Tip:');
+  console.log('   The database key is stored locally in plaintext and relies on filesystem permissions for protection');
+  console.log('   Make sure your user directory is secure and not shared with others\n');
 
   // ========== Auto-register with solver ==========
   const defaultSolverUrl = process.env.CORIVO_SOLVER_URL || 'http://localhost:3141';
@@ -278,7 +278,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
     const solverConfig = await registerWithSolver(defaultSolverUrl, identityId);
     if (solverConfig) {
       await saveSolverConfig(solverConfig, configDir);
-      console.log('🔗 已连接同步服务器\n');
+      console.log('🔗 Connected to sync server\n');
     }
   } catch {
     // Server unreachable — skip silently; the daemon will retry later.
@@ -286,23 +286,23 @@ export async function initCommand(options: { join?: string; server?: string } = 
   // ========== End auto-register with solver ==========
 
   // ========== Auto-start heartbeat ==========
-  console.log('🫀 正在启动心跳...');
+  console.log('🫀 Starting heartbeat...');
 
   try {
     // Start the heartbeat without requiring user interaction.
     await startCommand();
-    console.log('\n✨ Corivo 已苏醒！心跳将持续跳动，自动整理你的记忆。');
+    console.log('\n✨ Corivo is awake. Heartbeat will keep running and organize your memory automatically.');
   } catch (error) {
-    console.log('\n⚠️  心跳启动失败，你可以稍后手动启动：');
+    console.log('\n⚠️  Failed to start heartbeat. You can start it manually later:');
     console.log('  corivo start\n');
   }
 
   // Next-step hints for the user.
-  console.log('下一步：');
-  console.log('  corivo save --content "..." --annotation "性质 · 领域 · 标签"');
+  console.log('Next steps:');
+  console.log('  corivo save --content "..." --annotation "type · domain · tag"');
   console.log('  corivo query "..."');
   console.log('  corivo status');
-  console.log('  corivo stop    # 停止心跳（如需要）\n');
+  console.log('  corivo stop    # Stop heartbeat if needed\n');
 
   exit(0);
 }

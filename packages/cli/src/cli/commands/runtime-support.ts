@@ -24,7 +24,7 @@ export async function loadRuntimeDb(options: RuntimeCommandOptions = {}): Promis
 
   const skipPassword = options.password === false || process.env.CORIVO_NO_PASSWORD === '1';
   if (!skipPassword) {
-    throw new ConfigError('运行时记忆命令需要无密码模式或外部数据库密钥');
+    throw new ConfigError('Runtime memory commands require no-password mode or an external database key');
   }
 
   let dbKey: Buffer;
@@ -34,7 +34,7 @@ export async function loadRuntimeDb(options: RuntimeCommandOptions = {}): Promis
   } else if (config.db_key) {
     dbKey = Buffer.from(config.db_key, 'base64');
   } else if (config.encrypted_db_key) {
-    throw new ConfigError('数据库已加密，请提供 CORIVO_DB_KEY 或移除 --no-password');
+    throw new ConfigError('The database is encrypted. Provide CORIVO_DB_KEY or remove --no-password');
   } else {
     dbKey = KeyManager.generateDatabaseKey();
     config.db_key = dbKey.toString('base64');

@@ -16,25 +16,25 @@ import type { BlockFilter, BlockStatus } from '../../models/block.js';
 const VALID_STATUSES: BlockStatus[] = ['active', 'cooling', 'cold', 'archived'];
 const VALID_SORTS = ['time', 'vitality'];
 
-/** English annotation type alias → Chinese prefix */
+/** English annotation type alias → annotation prefix */
 const ANNOTATION_ALIASES: Record<string, string> = {
-  decision:    '决策',
-  fact:        '事实',
-  knowledge:   '知识',
-  instruction: '指令',
+  decision: 'Decision',
+  fact: 'Fact',
+  knowledge: 'Knowledge',
+  instruction: 'Instruction',
 };
 
 export const listCommand = new Command('list');
 
 listCommand
-  .description('浏览记忆列表（支持过滤和排序）')
-  .option('-s, --status <status>', '按状态过滤: active / cooling / cold / archived')
-  .option('-a, --annotation <type>', '按标注类型前缀过滤（如 "决策"、"事实"）')
-  .option('--source <source>', '按来源过滤（如 claude-code）')
-  .option('-l, --limit <number>', '返回数量', '20')
-  .option('--sort <field>', '排序方式: time / vitality', 'time')
-  .option('-v, --verbose', '显示详细信息')
-  .option('--json', '以 JSON 格式输出')
+  .description('Browse memory list (supports filtering and sorting)')
+  .option('-s, --status <status>', 'Filter by status: active / cooling / cold / archived')
+  .option('-a, --annotation <type>', 'Filter by annotation prefix (for example "Decision" or "Fact")')
+  .option('--source <source>', 'Filter by source (for example claude-code)')
+  .option('-l, --limit <number>', 'Result limit', '20')
+  .option('--sort <field>', 'Sort order: time / vitality', 'time')
+  .option('-v, --verbose', 'Show detailed information')
+  .option('--json', 'Output as JSON')
   .action(async (options: {
     status?: string;
     annotation?: string;
@@ -47,17 +47,17 @@ listCommand
     // Parameter verification
     const limit = parseInt(options.limit, 10);
     if (isNaN(limit) || limit < 1) {
-      console.error(chalk.red('错误: --limit 必须是正整数'));
+      console.error(chalk.red('Error: --limit must be a positive integer'));
       process.exit(1);
     }
 
     if (options.status && !VALID_STATUSES.includes(options.status as BlockStatus)) {
-      console.error(chalk.red(`错误: --status 必须是 ${VALID_STATUSES.join(' / ')} 之一`));
+      console.error(chalk.red(`Error: --status must be one of ${VALID_STATUSES.join(' / ')}`));
       process.exit(1);
     }
 
     if (!VALID_SORTS.includes(options.sort)) {
-      console.error(chalk.red(`错误: --sort 必须是 ${VALID_SORTS.join(' / ')} 之一`));
+      console.error(chalk.red(`Error: --sort must be one of ${VALID_SORTS.join(' / ')}`));
       process.exit(1);
     }
 
@@ -70,12 +70,12 @@ listCommand
       const content = await fs.readFile(configPath, 'utf-8');
       config = JSON.parse(content);
     } catch {
-      throw new ConfigError('Corivo 未初始化。请先运行: corivo init');
+      throw new ConfigError('Corivo is not initialized. Please run: corivo init');
     }
 
     const dbKey = await getDatabaseKey(configDir);
     if (!dbKey) {
-      throw new ConfigError('无法获取数据库密钥，请重新初始化: corivo init');
+      throw new ConfigError('Unable to get database key. Please re-initialize with: corivo init');
     }
 
     const dbPath = getDefaultDatabasePath();
@@ -109,11 +109,11 @@ listCommand
 
     // human readable output
     if (blocks.length === 0) {
-      console.log(chalk.yellow('\n未找到符合条件的记忆'));
+      console.log(chalk.yellow('\nNo matching memories found'));
       return;
     }
 
-    console.log(chalk.cyan(`\n找到 ${blocks.length} 条记忆:\n`));
+    console.log(chalk.cyan(`\nFound ${blocks.length} memories:\n`));
 
     const termWidth = process.stdout.columns ?? 80;
 
@@ -132,13 +132,13 @@ listCommand
       console.log(`${idStr}  ${annotationStr}  ${contentStr}  ${vitalityBar} ${vitalityNum} ${statusStr}`);
 
       if (options.verbose) {
-        const createdDate = new Date(block.created_at * 1000).toLocaleDateString('zh-CN');
-        const updatedDate = new Date(block.updated_at * 1000).toLocaleDateString('zh-CN');
+        const createdDate = new Date(block.created_at * 1000).toLocaleDateString('en-US');
+        const updatedDate = new Date(block.updated_at * 1000).toLocaleDateString('en-US');
         console.log(
-          chalk.gray(`  来源: ${block.source} | 访问: ${block.access_count}次 | 创建: ${createdDate} | 更新: ${updatedDate}`)
+          chalk.gray(`  Source: ${block.source} | Accesses: ${block.access_count} | Created: ${createdDate} | Updated: ${updatedDate}`)
         );
         if (block.refs && block.refs.length > 0) {
-          console.log(chalk.gray(`  引用: ${block.refs.join(', ')}`));
+          console.log(chalk.gray(`  Refs: ${block.refs.join(', ')}`));
         }
       }
     }

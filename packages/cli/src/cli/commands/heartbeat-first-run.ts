@@ -13,18 +13,18 @@ import { getConfigDir, getDefaultDatabasePath } from '../../storage/database.js'
 export const firstRunCommand = new Command('first-run');
 
 firstRunCommand
-  .description('首次运行 - 整理记住的事')
-  .option('-m, --max-pending <number>', '最大 pending 数量', '50')
-  .option('-t, --time-limit <number>', '时间限制（毫秒）', '8000')
-  .option('--no-decay', '跳过衰减')
-  .option('--no-cold-zone', '跳过冷区整合')
+  .description('First run - organize remembered items')
+  .option('-m, --max-pending <number>', 'Maximum pending count', '50')
+  .option('-t, --time-limit <number>', 'Time limit (ms)', '8000')
+  .option('--no-decay', 'Skip decay')
+  .option('--no-cold-zone', 'Skip cold-zone consolidation')
   .action(async (options) => {
     try {
       console.log('');
       console.log(
         chalk.cyan('══════════════════════════════════════════')
       );
-      console.log(chalk.cyan('     正在整理记忆...                    '));
+      console.log(chalk.cyan('     Organizing memories...              '));
       console.log(
         chalk.cyan('══════════════════════════════════════════')
       );
@@ -40,7 +40,7 @@ firstRunCommand
         config = JSON.parse(content);
       } catch {
         console.log('');
-        console.log(chalk.yellow('请先运行 corivo init'));
+        console.log(chalk.yellow('Please run corivo init first'));
         console.log('');
         return;
       }
@@ -55,7 +55,7 @@ firstRunCommand
 
       if (!dbKey) {
         console.log('');
-        console.log(chalk.yellow('数据库未初始化，请先运行: corivo init'));
+        console.log(chalk.yellow('Database is not initialized, please run: corivo init'));
         console.log('');
         return;
       }
@@ -71,14 +71,14 @@ firstRunCommand
 
       console.log('');
       console.log(chalk.green('══════════════════════════════════════════'));
-      console.log(chalk.green('     整理完成！                          '));
+      console.log(chalk.green('     Organization complete!              '));
       console.log(chalk.green('══════════════════════════════════════════'));
       console.log('');
-      console.log(`处理了 ${result.processedBlocks} 条记忆`);
-      console.log(`用时: ${result.elapsedTime}ms`);
+      console.log(`Processed ${result.processedBlocks} memories`);
+      console.log(`Elapsed time: ${result.elapsedTime}ms`);
       console.log('');
     } catch (error) {
-      console.error(chalk.red('错误:'), error);
+      console.error(chalk.red('Error:'), error);
       process.exit(1);
     }
   });

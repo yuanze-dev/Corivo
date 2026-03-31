@@ -22,16 +22,16 @@ function hasObviousNextStep(message: string): boolean {
 
   const signals = [
     'bug.*fix',
-    '修复.*bug',
-    'fix.*完成',
-    '代码.*完成',
-    '写完了',
+    'resolved.*bug',
+    'fix.*done',
+    'code.*done',
+    'wrapped up',
     'implemented',
     'done',
     'finished',
     'complete',
-    '测试.*通过',
-    'tests.*pass',
+    'tests?.*passed',
+    'tests?.*pass',
   ];
 
   return signals.some((signal) => new RegExp(signal, 'i').test(lower));
@@ -61,11 +61,11 @@ export async function runSuggestCommand(
 }
 
 suggestCommand
-  .description('兼容旧 hooks 的建议入口（内部命令，供 hooks 调用）')
-  .option('-c, --context <type>', '上下文类型: session-start | post-request', 'session-start')
-  .option('-m, --last-message <text>', 'Claude 最后的回复内容')
-  .option('-f, --format <type>', '输出格式: text | json | hook-text', 'text')
-  .option('--no-password', '跳过密码输入（开发模式）')
+  .description('Compatibility entry point for legacy hooks (internal command for hooks)')
+  .option('-c, --context <type>', 'Context type: session-start | post-request', 'session-start')
+  .option('-m, --last-message <text>', "Claude's last response")
+  .option('-f, --format <type>', 'Output format: text | json | hook-text', 'text')
+  .option('--no-password', 'Skip password prompt (development mode)')
   .action(async (options) => {
     const output = await runSuggestCommand({
       context: options.context,

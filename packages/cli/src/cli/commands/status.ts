@@ -23,7 +23,7 @@ export async function statusCommand(_options: { noPassword?: boolean } = {}): Pr
     const content = await fs.readFile(configPath, 'utf-8');
     config = JSON.parse(content);
   } catch {
-    throw new ConfigError('Corivo 未初始化。请先运行: corivo init');
+    throw new ConfigError('Corivo is not initialized. Please run: corivo init');
   }
 
   // Check daemon status (via ServiceManager)
@@ -32,7 +32,7 @@ export async function statusCommand(_options: { noPassword?: boolean } = {}): Pr
 
   const dbKey = await getDatabaseKey(configDir);
   if (!dbKey) {
-    throw new ConfigError('无法获取数据库密钥，请重新初始化: corivo init');
+    throw new ConfigError('Unable to get database key. Please re-initialize with: corivo init');
   }
 
   const dbPath = getDefaultDatabasePath();
@@ -44,44 +44,44 @@ export async function statusCommand(_options: { noPassword?: boolean } = {}): Pr
 
   console.log('');
   console.log(chalk.cyan('═══════════════════════════════════════════════════════'));
-  console.log(chalk.cyan('                      Corivo 状态'));
+  console.log(chalk.cyan('                     Corivo Status'));
   console.log(chalk.cyan('═══════════════════════════════════════════════════════\n'));
 
-  console.log(chalk.cyan('📊 记忆统计'));
-  console.log(chalk.gray('  总数:   ') + chalk.white(stats.total.toString()));
-  console.log(chalk.gray('  活跃:   ') + chalk.green((stats.byStatus.active || 0).toString()));
-  console.log(chalk.gray('  冷却:   ') + chalk.yellow((stats.byStatus.cooling || 0).toString()));
-  console.log(chalk.gray('  冷冻:   ') + chalk.hex('#FF9500')((stats.byStatus.cold || 0).toString()));
-  console.log(chalk.gray('  归档:   ') + chalk.gray((stats.byStatus.archived || 0).toString()));
+  console.log(chalk.cyan('📊 Memory Stats'));
+  console.log(chalk.gray('  Total:    ') + chalk.white(stats.total.toString()));
+  console.log(chalk.gray('  Active:   ') + chalk.green((stats.byStatus.active || 0).toString()));
+  console.log(chalk.gray('  Cooling:  ') + chalk.yellow((stats.byStatus.cooling || 0).toString()));
+  console.log(chalk.gray('  Cold:     ') + chalk.hex('#FF9500')((stats.byStatus.cold || 0).toString()));
+  console.log(chalk.gray('  Archived: ') + chalk.gray((stats.byStatus.archived || 0).toString()));
 
   const annotations = Object.entries(stats.byAnnotation);
   if (annotations.length > 0) {
-    console.log(chalk.cyan('\n🏷️  标注分布'));
+    console.log(chalk.cyan('\n🏷️  Annotation Distribution'));
     for (const [annotation, count] of annotations) {
       console.log(chalk.gray(`  ${annotation}: `) + chalk.white(count.toString()));
     }
   }
 
-  console.log(chalk.cyan('\n💾 数据库'));
-  console.log(chalk.gray('  路径:   ') + chalk.white(dbPath));
-  console.log(chalk.gray('  状态:   ') + (health.ok ? chalk.green('✅ 正常') : chalk.red('❌ 异常')));
+  console.log(chalk.cyan('\n💾 Database'));
+  console.log(chalk.gray('  Path:    ') + chalk.white(dbPath));
+  console.log(chalk.gray('  Status:  ') + (health.ok ? chalk.green('✅ OK') : chalk.red('❌ Error')));
   if (health.size) {
-    console.log(chalk.gray('  大小:   ') + chalk.white(`${(health.size / 1024 / 1024).toFixed(2)} MB`));
+    console.log(chalk.gray('  Size:    ') + chalk.white(`${(health.size / 1024 / 1024).toFixed(2)} MB`));
   }
 
-  console.log(chalk.cyan('\n⚡ 心跳守护进程'))
-  console.log(chalk.gray('  状态:   ') + (serviceStatus.running ? chalk.green('🟢 运行中') : chalk.gray('⚪ 未启动')))
+  console.log(chalk.cyan('\n⚡ Heartbeat Daemon'))
+  console.log(chalk.gray('  Status:  ') + (serviceStatus.running ? chalk.green('🟢 Running') : chalk.gray('⚪ Not started')))
   if (serviceStatus.pid) {
     console.log(chalk.gray('  PID:    ') + chalk.white(serviceStatus.pid.toString()))
   }
 
-  console.log(chalk.cyan('\n🔗 同步'));
+  console.log(chalk.cyan('\n🔗 Sync'));
   if (solverConfig) {
-    console.log(chalk.gray('  服务器: ') + chalk.white(solverConfig.server_url));
-    console.log(chalk.gray('  已推送: ') + chalk.white(solverConfig.last_push_version.toString()) + chalk.gray(' 条'));
-    console.log(chalk.gray('  已拉取: ') + chalk.white(solverConfig.last_pull_version.toString()) + chalk.gray(' 条'));
+    console.log(chalk.gray('  Server:  ') + chalk.white(solverConfig.server_url));
+    console.log(chalk.gray('  Pushed:  ') + chalk.white(solverConfig.last_push_version.toString()) + chalk.gray(' items'));
+    console.log(chalk.gray('  Pulled:  ') + chalk.white(solverConfig.last_pull_version.toString()) + chalk.gray(' items'));
   } else {
-    console.log(chalk.gray('  状态:   ') + chalk.gray('⚪ 未注册'));
+    console.log(chalk.gray('  Status:  ') + chalk.gray('⚪ Not registered'));
   }
 
   const pusher = new ContextPusher(db);
@@ -90,7 +90,7 @@ export async function statusCommand(_options: { noPassword?: boolean } = {}): Pr
     console.log(needsAttention);
   }
 
-  console.log(chalk.cyan('\n🚀 下一步：'));
+  console.log(chalk.cyan('\n🚀 Next steps:'));
   console.log(chalk.gray('  corivo save --content "..." --annotation "..."'));
   console.log(chalk.gray('  corivo save --pending --content "..."'));
   console.log(chalk.gray('  corivo query "..."'));

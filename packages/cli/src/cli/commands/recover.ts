@@ -13,7 +13,7 @@ import { readPassword } from '../utils/password.js';
 
 export async function recoverCommand(): Promise<void> {
   console.log('\n═══════════════════════════════════════════════════════');
-  console.log('                      数据恢复向导');
+  console.log('                      Data Recovery Wizard');
   console.log('═══════════════════════════════════════════════════════\n');
 
   // Check configuration file
@@ -25,33 +25,33 @@ export async function recoverCommand(): Promise<void> {
     const content = await fs.readFile(configPath, 'utf-8');
     config = JSON.parse(content);
   } catch {
-    throw new ConfigError('配置文件不存在。如果您是首次使用，请运行: corivo init');
+    throw new ConfigError('Config file does not exist. If this is your first time, run: corivo init');
   }
 
-  console.log('请选择恢复方式:\n');
-  console.log('  [1] 使用恢复密钥（24 个单词，BIP39 标准）');
-  console.log('  [2] 退出\n');
+  console.log('Choose a recovery method:\n');
+  console.log('  [1] Use a recovery key (24 words, BIP39 standard)');
+  console.log('  [2] Exit\n');
 
-  const choice = await readPassword('请选择 [1-2]: ');
+  const choice = await readPassword('Choose [1-2]: ');
 
   if (choice !== '1') {
-    console.log('已取消');
+    console.log('Cancelled');
     return;
   }
 
   // Enter recovery key
-  console.log('\n请输入您的恢复密钥（24 个单词，用空格分隔）:\n');
+  console.log('\nEnter your recovery key (24 words separated by spaces):\n');
 
-  const recoveryKey = await readPassword('恢复密钥: ');
+  const recoveryKey = await readPassword('Recovery key: ');
   const inputWords = recoveryKey.trim().split(/\s+/);
 
   if (inputWords.length !== 24) {
-    console.log('❌ 恢复密钥必须是 24 个单词');
+    console.log('❌ Recovery key must contain 24 words');
     return;
   }
 
   // Verify recovery key
-  console.log('\n正在验证恢复密钥...');
+  console.log('\nVerifying recovery key...');
 
   try {
     KeyManager.deriveFromRecoveryKey(recoveryKey);
@@ -59,30 +59,30 @@ export async function recoverCommand(): Promise<void> {
     if (error instanceof ValidationError) {
       console.log(`❌ ${error.message}`);
     } else {
-      console.log('❌ 恢复密钥验证失败');
+      console.log('❌ Recovery key verification failed');
     }
     return;
   }
 
-  console.log('✅ 恢复密钥验证通过');
+  console.log('✅ Recovery key verification passed');
 
   // Set new password
-  console.log('\n请设置新的主密码（至少 8 位，包含字母和数字）\n');
+  console.log('\nSet a new master password (at least 8 characters, including letters and numbers)\n');
 
-  const password1 = await readPassword('新密码: ');
+  const password1 = await readPassword('New password: ');
   if (!KeyManager.validatePasswordStrength(password1)) {
-    console.log('❌ 密码强度不足');
+    console.log('❌ Password is too weak');
     return;
   }
 
-  const password2 = await readPassword('确认新密码: ');
+  const password2 = await readPassword('Confirm new password: ');
   if (password1 !== password2) {
-    console.log('❌ 两次输入的密码不一致');
+    console.log('❌ Password entries do not match');
     return;
   }
 
   // Regenerate key
-  console.log('\n正在重新生成密钥链...');
+  console.log('\nRegenerating key chain...');
 
   const salt = KeyManager.generateSalt();
   const newMasterKey = KeyManager.deriveMasterKey(password1, salt);
@@ -106,32 +106,32 @@ export async function recoverCommand(): Promise<void> {
     const health = db.checkHealth();
 
     if (health.ok) {
-      console.log('✅ 数据库验证通过');
+      console.log('✅ Database verification passed');
       const stats = db.getStats();
-      console.log(`   已恢复 ${stats.total} 个 block`);
+      console.log(`   Recovered ${stats.total} blocks`);
     } else {
-      console.log('❌ 数据库验证失败');
-      console.log('   请从其他设备同步最新数据');
+      console.log('❌ Database verification failed');
+      console.log('   Please sync the latest data from another device');
     }
   } catch {
-    console.log('⚠️  无法打开数据库');
-    console.log('   请从其他设备同步最新数据');
+    console.log('⚠️  Unable to open database');
+    console.log('   Please sync the latest data from another device');
   }
 
   // Generate new recovery key
   const newRecoveryKey = KeyManager.generateRecoveryKey(newMasterKey);
   const recoveryWords = newRecoveryKey.split(' ');
 
-  console.log('\n密钥链已更新！');
-  console.log('\n⚠️  重要：您的新恢复密钥已生成（24 个单词）\n');
+  console.log('\nKey chain updated!');
+  console.log('\n⚠️  Important: your new recovery key has been generated (24 words)\n');
 
   console.log(`  ${recoveryWords.slice(0, 6).join('  ')}`);
   console.log(`  ${recoveryWords.slice(6, 12).join('  ')}`);
   console.log(`  ${recoveryWords.slice(12, 18).join('  ')}`);
   console.log(`  ${recoveryWords.slice(18, 24).join('  ')}`);
 
-  console.log('\n⚠️  旧恢复密钥已失效，请保存新的恢复密钥');
+  console.log('\n⚠️  The old recovery key is no longer valid. Please save the new recovery key');
 
-  console.log('\n下一步：');
-  console.log('  在其他设备上重新授权（设备列表已重置）');
+  console.log('\nNext steps:');
+  console.log('  Re-authorize on other devices (the device list has been reset)');
 }

@@ -13,9 +13,9 @@ import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../stor
 export const pushCommand = new Command('push');
 
 pushCommand
-  .description('输出推送消息')
-  .option('-f, --first-activation', '首次激活时的自我介绍')
-  .option('-w, --welcome', '欢迎消息')
+  .description('Output push messages')
+  .option('-f, --first-activation', 'Intro message for first activation')
+  .option('-w, --welcome', 'Welcome message')
   .action(async (options) => {
     try {
       if (options.welcome) {
@@ -36,7 +36,7 @@ pushCommand
         config = JSON.parse(content);
       } catch {
         console.log('');
-        console.log(chalk.yellow('请先运行 corivo init'));
+        console.log(chalk.yellow('Please run corivo init first'));
         console.log('');
         return;
       }
@@ -51,7 +51,7 @@ pushCommand
 
       if (!dbKeyBase64) {
         console.log('');
-        console.log(chalk.yellow('数据库未初始化，请先运行: corivo init'));
+        console.log(chalk.yellow('Database is not initialized, please run: corivo init'));
         console.log('');
         return;
       }
@@ -89,13 +89,13 @@ pushCommand
 
       if (blocks.length === 0) {
         console.log('');
-        console.log(chalk.gray('没有待推送的消息'));
+        console.log(chalk.gray('No pending push messages'));
         console.log('');
         return;
       }
 
       console.log('');
-      console.log(chalk.cyan('待推送的消息：'));
+      console.log(chalk.cyan('Pending push messages:'));
       console.log('');
 
       for (const block of blocks) {
@@ -104,7 +104,7 @@ pushCommand
         console.log('');
       }
     } catch (error) {
-      console.error(chalk.red('错误:'), error);
+      console.error(chalk.red('Error:'), error);
       process.exit(1);
     }
   });

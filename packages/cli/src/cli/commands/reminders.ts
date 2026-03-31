@@ -14,12 +14,12 @@ const REMINDERS_FILE = 'reminders.json';
 export const remindersCommand = new Command('reminders');
 
 remindersCommand
-  .description('查看和管理提醒队列')
-  .option('-p, --pending', '只显示待处理的提醒')
-  .option('-d, --dismiss <id>', '忽略指定的提醒')
-  .option('-a, --dismiss-all', '忽略所有待处理提醒')
-  .option('-c, --cleanup', '清理过期的提醒')
-  .option('-j, --json', '以 JSON 格式输出（供脚本调用）')
+  .description('View and manage the reminder queue')
+  .option('-p, --pending', 'Show only pending reminders')
+  .option('-d, --dismiss <id>', 'Dismiss a specific reminder')
+  .option('-a, --dismiss-all', 'Dismiss all pending reminders')
+  .option('-c, --cleanup', 'Clean up expired reminders')
+  .option('-j, --json', 'Output as JSON (for scripts)')
   .action(async (options) => {
     try {
       const configDir = getConfigDir();
@@ -44,7 +44,7 @@ remindersCommand
       // Default: Show reminder list
       await displayReminders(remindersPath, options);
     } catch (error) {
-      console.error(chalk.red('错误:'), error);
+      console.error(chalk.red('Error:'), error);
       process.exit(1);
     }
   });
@@ -75,7 +75,7 @@ async function displayReminders(
       console.log(JSON.stringify({ reminders: [] }));
     } else {
       console.log('');
-      console.log(chalk.gray('没有待处理的提醒'));
+      console.log(chalk.gray('No pending reminders'));
       console.log('');
     }
     return;
@@ -89,7 +89,7 @@ async function displayReminders(
 
   // human readable output
   console.log('');
-  console.log(chalk.cyan(`你有 ${reminders.length} 条提醒:`));
+  console.log(chalk.cyan(`You have ${reminders.length} reminders:`));
   console.log('');
 
   for (const reminder of reminders) {
@@ -99,7 +99,7 @@ async function displayReminders(
 
   // Tips on how to deal with
   if (options.pending) {
-    console.log(chalk.gray(`提示: 运行 corivo reminders --dismiss-all 可忽略所有提醒`));
+    console.log(chalk.gray('Tip: run corivo reminders --dismiss-all to dismiss all reminders'));
     console.log('');
   }
 }
@@ -113,7 +113,7 @@ async function dismissReminder(remindersPath: string, id: string): Promise<void>
 
   if (!reminder) {
     console.log('');
-    console.log(chalk.yellow(`未找到提醒: ${id}`));
+    console.log(chalk.yellow(`Reminder not found: ${id}`));
     console.log('');
     return;
   }
@@ -124,7 +124,7 @@ async function dismissReminder(remindersPath: string, id: string): Promise<void>
   await saveStore(remindersPath, store);
 
   console.log('');
-  console.log(chalk.green(`已忽略提醒: ${reminder.title || id}`));
+  console.log(chalk.green(`Dismissed reminder: ${reminder.title || id}`));
   console.log('');
 }
 
@@ -148,7 +148,7 @@ async function dismissAll(remindersPath: string): Promise<void> {
   }
 
   console.log('');
-  console.log(chalk.green(`已忽略 ${count} 条提醒`));
+  console.log(chalk.green(`Dismissed ${count} reminders`));
   console.log('');
 }
 
@@ -179,7 +179,7 @@ async function cleanupReminders(remindersPath: string): Promise<void> {
   }
 
   console.log('');
-  console.log(chalk.green(`清理了 ${cleanedCount} 条过期提醒`));
+  console.log(chalk.green(`Cleaned up ${cleanedCount} expired reminders`));
   console.log('');
 }
 
@@ -235,7 +235,7 @@ function formatReminder(reminder: any): string {
   const pIcon = priorityIcon[reminder.priority] || '○';
   const tIcon = typeIcon[reminder.type] || '📌';
 
-  lines.push(`${statusIcon} ${pIcon} ${tIcon} ${reminder.title || '提醒'}`);
+  lines.push(`${statusIcon} ${pIcon} ${tIcon} ${reminder.title || 'Reminder'}`);
 
   // Message content
   if (reminder.message) {

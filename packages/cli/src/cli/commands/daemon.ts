@@ -14,11 +14,11 @@ export const daemonCommand = new Command('daemon')
 const logger = createLogger()
 
 daemonCommand
-  .description('内部使用，由 service manager 调用')
+  .description('Internal use only, invoked by the service manager')
 
 daemonCommand
   .command('run')
-  .description('运行心跳循环（由系统调用，不应手动执行）')
+  .description('Run the heartbeat loop (invoked by the system, not intended for manual execution)')
   .action(async () => {
     const pidPath = path.join(getConfigDir(), 'heartbeat.pid')
 
@@ -33,7 +33,7 @@ daemonCommand
       '../engine/heartbeat.js'
     )
 
-    logger.log('[corivo] 后台心跳启动中...')
+    logger.log('[corivo] Starting heartbeat background worker...')
 
     // Start heartbeat as an independent child process and inherit the environment variables injected by launchd
     const child = spawn(process.execPath, [heartbeatPath], {
@@ -55,7 +55,7 @@ daemonCommand
     })
 
     child.once('error', async (err) => {
-      logger.error('[corivo] 启动心跳子进程失败:', err)
+      logger.error('[corivo] Failed to start heartbeat child process:', err)
       await fs.unlink(pidPath).catch(() => {})
       process.exit(1)
     })

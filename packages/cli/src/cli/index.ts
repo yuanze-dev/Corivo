@@ -50,42 +50,42 @@ const program = new Command();
 
 program
   .name('corivo')
-  .description('你的硅基同事 — 它只为你活着')
+  .description('Your silicon teammate, alive only for you')
   .version(VERSION);
 
 // Register command
 program
   .command('init')
-  .description('初始化 Corivo')
-  .option('--join <code>', '通过配对码加入已有 identity（多设备同步）')
-  .option('--server <url>', 'Solver 服务器地址（配合 --join 使用）')
+  .description('Initialize Corivo')
+  .option('--join <code>', 'Join an existing identity using a pairing code (multi-device sync)')
+  .option('--server <url>', 'Solver server URL (used with --join)')
   .action(initCommand);
 
 program
   .command('save')
-  .description('保存信息')
-  .option('-c, --content <text>', '内容')
-  .option('-a, --annotation <text>', '标注（性质 · 领域 · 标签）')
-  .option('-s, --source <text>', '来源')
-  .option('--pending', '以 pending 模式保存（稍后由心跳进程自动标注）')
-  .option('--no-password', '跳过密码输入（开发模式）')
+  .description('Save information')
+  .option('-c, --content <text>', 'Content')
+  .option('-a, --annotation <text>', 'Annotation (type · domain · tag)')
+  .option('-s, --source <text>', 'Source')
+  .option('--pending', 'Save in pending mode (the heartbeat process will annotate it later)')
+  .option('--no-password', 'Skip password prompt (development mode)')
   .action((options) => saveCommand(options));
 
 program
   .command('query')
-  .description('查询信息')
-  .argument('<query>', '搜索关键词')
-  .option('-l, --limit <number>', '返回数量', '10')
-  .option('-v, --verbose', '显示详细信息')
-  .option('-p, --pattern', '显示决策模式')
-  .option('--no-password', '跳过密码输入（开发模式）')
+  .description('Query information')
+  .argument('<query>', 'Search keywords')
+  .option('-l, --limit <number>', 'Result limit', '10')
+  .option('-v, --verbose', 'Show detailed information')
+  .option('-p, --pattern', 'Show decision patterns')
+  .option('--no-password', 'Skip password prompt (development mode)')
   .action((query, options) => queryCommand(query, options));
 
 program
   .command('status')
-  .description('查看状态')
-  .option('--tui', '启动交互式状态面板')
-  .option('--no-password', '跳过密码输入（开发模式）')
+  .description('View status')
+  .option('--tui', 'Launch the interactive status panel')
+  .option('--no-password', 'Skip password prompt (development mode)')
   .action(async (options) => {
     if (options.tui) {
       const { renderTui } = await import('../tui/index.js');
@@ -97,61 +97,61 @@ program
 
 program
   .command('start')
-  .description('启动守护进程')
+  .description('Start the daemon')
   .action(startCommand);
 
 program
   .command('stop')
-  .description('停止守护进程')
+  .description('Stop the daemon')
   .action(stopCommand);
 
 program
   .command('doctor')
-  .description('健康检查')
+  .description('Run health checks')
   .action(doctorCommand);
 
 program
   .command('recover')
-  .description('密钥恢复')
+  .description('Recover keys')
   .action(recoverCommand);
 
 program
   .command('inject')
-  .description('注入 Corivo 规则到项目')
-  .option('-t, --target <path>', '目标项目路径')
-  .option('-g, --global', '注入到全局 CLAUDE.md')
-  .option('--claude-code', '安装 Claude Code 主动记忆适配器')
-  .option('--codex', '以 Codex 规则模板注入')
-  .option('--cursor', '以 Cursor 规则模板注入')
-  .option('--opencode', '安装 OpenCode 主动记忆插件')
-  .option('--eject', '移除已注入的规则')
-  .option('--force', '强制替换已存在的规则')
+  .description('Inject Corivo rules into a project')
+  .option('-t, --target <path>', 'Target project path')
+  .option('-g, --global', 'Inject into the global CLAUDE.md')
+  .option('--claude-code', 'Install the Claude Code proactive-memory adapter')
+  .option('--codex', 'Inject using the Codex rules template')
+  .option('--cursor', 'Inject using the Cursor rules template')
+  .option('--opencode', 'Install the OpenCode proactive-memory plugin')
+  .option('--eject', 'Remove injected rules')
+  .option('--force', 'Force-replace existing rules')
   .action((options) => injectCommand(options));
 
 program
   .command('identity')
-  .description('查看身份信息')
-  .option('-v, --verbose', '显示详细信息')
+  .description('View identity information')
+  .option('-v, --verbose', 'Show detailed information')
   .action((options) => identityCommand(options));
 
 program
   .command('setup-password')
-  .description('设置主密码（用于数据库加密和跨设备验证）')
-  .option('-f, --force', '强制修改已有密码')
+  .description('Set the master password (for database encryption and cross-device verification)')
+  .option('-f, --force', 'Force-change the existing password')
   .action((options) => setupPasswordCommand(options));
 
 program
   .command('unlock')
-  .description('解锁并查看数据库内容')
-  .option('-r, --raw', '原始格式输出')
-  .option('-l, --limit <number>', '返回数量', '100')
+  .description('Unlock and inspect database contents')
+  .option('-r, --raw', 'Output in raw format')
+  .option('-l, --limit <number>', 'Result limit', '100')
   .action((options) => unlockCommand(options));
 
 program
   .command('verify-identity')
-  .description('跨设备身份验证（指纹 + 密码）')
-  .option('-p, --password <password>', '主密码')
-  .option('-v, --verbose', '显示详细信息')
+  .description('Cross-device identity verification (fingerprints + password)')
+  .option('-p, --password <password>', 'Master password')
+  .option('-v, --verbose', 'Show detailed information')
   .action((options) => verifyIdentityCommand(options));
 
 program.addCommand(listCommand);
@@ -182,7 +182,7 @@ program.configureOutput({
 // Parse parameters
 program.parseAsync().catch((error) => {
   if (error instanceof Error) {
-    console.error(chalk.red(`错误: ${error.message}`));
+    console.error(chalk.red(`Error: ${error.message}`));
     process.exit(1);
   }
 });

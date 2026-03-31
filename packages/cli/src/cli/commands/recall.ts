@@ -26,10 +26,10 @@ export async function runRecallCommand(
 export const recallCommand = new Command('recall');
 
 recallCommand
-  .description('生成答前 recall（内部命令，供 hooks 调用）')
-  .option('-p, --prompt <text>', '当前用户输入')
-  .option('-f, --format <type>', '输出格式: text | json | hook-text', 'text')
-  .option('--no-password', '跳过密码输入（开发模式）')
+  .description('Generate pre-response recall (internal command for hooks)')
+  .option('-p, --prompt <text>', 'Current user input')
+  .option('-f, --format <type>', 'Output format: text | json | hook-text', 'text')
+  .option('--no-password', 'Skip password prompt (development mode)')
   .action(async (options) => {
     const output = await runRecallCommand({
       password: options.password,

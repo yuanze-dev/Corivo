@@ -17,22 +17,22 @@ import type { UpdateConfig } from '../../update/types.js';
 export const updateCommand = new Command('update');
 
 updateCommand
-  .description('手动检查并安装更新')
-  .option('--check', '仅检查更新，不安装')
+  .description('Manually check for and install updates')
+  .option('--check', 'Only check for updates, do not install')
   .action(async (options) => {
     await handleUpdateCommand(options);
   });
 
 updateCommand
   .command('check')
-  .description('检查是否有新版本')
+  .description('Check whether a new version is available')
   .action(async () => {
     await checkUpdates();
   });
 
 updateCommand
   .command('status')
-  .description('查看更新状态')
+  .description('View update status')
   .action(async () => {
     await showUpdateStatus();
   });
@@ -40,42 +40,42 @@ updateCommand
 async function handleUpdateCommand(options: { check?: boolean }) {
   console.log('');
   console.log(chalk.cyan('══════════════════════════════════════════'));
-  console.log(chalk.cyan('     Corivo 更新                         '));
+  console.log(chalk.cyan('     Corivo Update                       '));
   console.log(chalk.cyan('══════════════════════════════════════════'));
   console.log('');
 
   const currentVersion = getCurrentVersion();
-  console.log(`当前版本: ${currentVersion}`);
+  console.log(`Current version: ${currentVersion}`);
   console.log('');
 
   // Check for updates
-  console.log('正在检查更新...');
+  console.log('Checking for updates...');
 
   const status = await checkForUpdate();
 
   if (!status.latestVersion) {
-    console.log(chalk.yellow('无法连接到更新服务器'));
+    console.log(chalk.yellow('Unable to connect to the update server'));
     console.log('');
     return;
   }
 
   if (!status.hasUpdate) {
-    console.log(chalk.green('已是最新版本'));
+    console.log(chalk.green('Already on the latest version'));
     console.log('');
     return;
   }
 
   console.log('');
-  console.log(chalk.green(`发现新版本: ${status.latestVersion}`));
+  console.log(chalk.green(`New version available: ${status.latestVersion}`));
 
   if (status.isBreaking) {
-    console.log(chalk.yellow('注意: 此更新包含破坏性变更'));
+    console.log(chalk.yellow('Note: this update contains breaking changes'));
   }
 
   // If you just check, don’t install
   if (options.check) {
     console.log('');
-    console.log('要安装更新，请运行: corivo update');
+    console.log('To install the update, run: corivo update');
     console.log('');
     return;
   }
@@ -83,19 +83,19 @@ async function handleUpdateCommand(options: { check?: boolean }) {
   // Breaking updates require confirmation
   if (status.isBreaking) {
     console.log('');
-    console.log(chalk.yellow('破坏性更新需要手动确认'));
-    console.log('请查看更新日志后决定是否更新');
+    console.log(chalk.yellow('Breaking updates require manual confirmation'));
+    console.log('Please review the changelog before updating');
     console.log('');
     return;
   }
 
   // perform update
   console.log('');
-  console.log('正在下载更新...');
+  console.log('Downloading update...');
 
   const versionInfo = await fetchVersionInfo();
   if (!versionInfo) {
-    console.log(chalk.red('获取更新信息失败'));
+    console.log(chalk.red('Failed to fetch update information'));
     console.log('');
     return;
   }
@@ -103,47 +103,47 @@ async function handleUpdateCommand(options: { check?: boolean }) {
   const result = await performUpdate(versionInfo, getPlatform());
 
   if (result.success) {
-    console.log(chalk.green('✔ 更新成功'));
+    console.log(chalk.green('✔ Update successful'));
     console.log('');
-    console.log(`版本: ${currentVersion} → ${versionInfo.version}`);
+    console.log(`Version: ${currentVersion} -> ${versionInfo.version}`);
     console.log('');
-    console.log('下次 CLI 调用时将使用新版本');
+    console.log('The new version will be used on the next CLI invocation');
     console.log('');
   } else {
-    console.log(chalk.red('✖ 更新失败:'), result.error);
+    console.log(chalk.red('✖ Update failed:'), result.error);
     console.log('');
   }
 }
 
 async function checkUpdates() {
   console.log('');
-  console.log(chalk.cyan('Corivo 版本检查'));
+  console.log(chalk.cyan('Corivo Version Check'));
   console.log('');
 
   const currentVersion = getCurrentVersion();
-  console.log(`当前版本: ${currentVersion}`);
+  console.log(`Current version: ${currentVersion}`);
   console.log('');
 
   const status = await checkForUpdate();
 
   if (!status.latestVersion) {
-    console.log(chalk.yellow('无法连接到更新服务器'));
+    console.log(chalk.yellow('Unable to connect to the update server'));
     console.log('');
     return;
   }
 
-  console.log(`最新版本: ${status.latestVersion}`);
+  console.log(`Latest version: ${status.latestVersion}`);
   console.log('');
 
   if (status.hasUpdate) {
-    console.log(chalk.green('有可用更新'));
+    console.log(chalk.green('An update is available'));
 
     const record = await getUpdateRecord();
     if (record && record.to !== status.latestVersion) {
-      console.log(`最近更新: ${record.from} → ${record.to}`);
+      console.log(`Recent update: ${record.from} -> ${record.to}`);
     }
   } else {
-    console.log(chalk.gray('已是最新版本'));
+    console.log(chalk.gray('Already on the latest version'));
   }
 
   console.log('');
@@ -151,29 +151,29 @@ async function checkUpdates() {
 
 async function showUpdateStatus() {
   console.log('');
-  console.log(chalk.cyan('Corivo 更新状态'));
+  console.log(chalk.cyan('Corivo Update Status'));
   console.log('');
 
   const record = await getUpdateRecord();
 
   if (record) {
-    console.log(`最近更新: ${record.from} → ${record.to}`);
-    console.log(`更新时间: ${record.at}`);
+    console.log(`Recent update: ${record.from} -> ${record.to}`);
+    console.log(`Updated at: ${record.at}`);
     console.log('');
 
     if (record.changelog) {
-      console.log(chalk.gray('更新日志:'));
+      console.log(chalk.gray('Changelog:'));
       console.log(chalk.gray(record.changelog));
       console.log('');
     }
   } else {
-    console.log(chalk.gray('暂无更新记录'));
+    console.log(chalk.gray('No update history yet'));
     console.log('');
   }
 
   const status = await checkForUpdate();
   if (status.hasUpdate) {
-    console.log(chalk.green(`有可用更新: ${status.latestVersion}`));
+    console.log(chalk.green(`Update available: ${status.latestVersion}`));
     console.log('');
   }
 }

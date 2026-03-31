@@ -51,7 +51,7 @@ export async function unlockCommand(options: UnlockOptions = {}): Promise<void> 
     const content = await fs.readFile(configPath, 'utf-8');
     config = JSON.parse(content);
   } catch {
-    throw new ConfigError('Corivo 未初始化。请先运行: corivo init');
+    throw new ConfigError('Corivo is not initialized. Please run: corivo init');
   }
 
   // Check if a password is required
@@ -60,8 +60,8 @@ export async function unlockCommand(options: UnlockOptions = {}): Promise<void> 
   let dbKey: Buffer;
 
   if (needsPassword) {
-    console.log('\\n数据库已加密，请输入密码解锁\\n');
-    const password = await readPassword('密码: ');
+    console.log('\\nThe database is encrypted. Enter the password to unlock it.\\n');
+    const password = await readPassword('Password: ');
 
     const salt = Buffer.from(config.salt, 'base64');
     const masterKey = KeyManager.deriveMasterKey(password, salt);
@@ -69,7 +69,7 @@ export async function unlockCommand(options: UnlockOptions = {}): Promise<void> 
     try {
       dbKey = KeyManager.decryptDatabaseKey(config.encrypted_db_key, masterKey);
     } catch {
-      throw new ValidationError('密码错误');
+      throw new ValidationError('Incorrect password');
     }
   } else {
     // Passwordless mode: uses stored key
@@ -92,24 +92,24 @@ export async function unlockCommand(options: UnlockOptions = {}): Promise<void> 
   // Get all blocks
   const blocks = db.queryBlocks({ limit: options.limit || 100 });
 
-  console.log(chalk.green(`\\n✓ 找到 ${blocks.length} 条记忆\\n`));
+  console.log(chalk.green(`\\n✓ Found ${blocks.length} memories\\n`));
 
   if (options.raw) {
     // raw output
     for (const block of blocks) {
       console.log(chalk.white('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
       console.log(chalk.gray('ID:       ') + chalk.white(block.id));
-      console.log(chalk.gray('内容:     ') + chalk.white(block.content));
-      console.log(chalk.gray('标注:     ') + chalk.cyan(block.annotation));
-      console.log(chalk.gray('来源:     ') + chalk.yellow(block.source));
-      console.log(chalk.gray('生命力:   ') + chalk.green(String(block.vitality)));
-      console.log(chalk.gray('状态:     ') + chalk.blue(block.status));
-      console.log(chalk.gray('创建时间: ') + chalk.gray(new Date(block.created_at * 1000).toLocaleString('zh-CN')));
+      console.log(chalk.gray('Content:   ') + chalk.white(block.content));
+      console.log(chalk.gray('Annotation:') + chalk.cyan(block.annotation));
+      console.log(chalk.gray('Source:    ') + chalk.yellow(block.source));
+      console.log(chalk.gray('Vitality:  ') + chalk.green(String(block.vitality)));
+      console.log(chalk.gray('Status:    ') + chalk.blue(block.status));
+      console.log(chalk.gray('Created at:') + chalk.gray(new Date(block.created_at * 1000).toLocaleString('en-US')));
       console.log();
     }
   } else {
     // Table output
-    const headers = ['ID', '内容', '标注', '生命力'];
+    const headers = ['ID', 'Content', 'Annotation', 'Vitality'];
     const rows = blocks.map(b => [
       b.id.slice(0, 12),
       b.content.length > 40 ? b.content.slice(0, 40) + '...' : b.content,

@@ -23,24 +23,24 @@ export async function identityCommand(options: {
     const identity = JSON.parse(content);
 
     console.log('\n═══════════════════════════════════════════════════════');
-    console.log('                    Corivo 身份信息');
+    console.log('                 Corivo Identity Information');
     console.log('═══════════════════════════════════════════════════════\n');
 
-    console.log(`身份 ID: ${identity.identity_id}`);
-    console.log(`创建时间: ${new Date(identity.created_at).toLocaleString('zh-CN')}`);
-    console.log(`更新时间: ${new Date(identity.updated_at).toLocaleString('zh-CN')}`);
+    console.log(`Identity ID: ${identity.identity_id}`);
+    console.log(`Created at: ${new Date(identity.created_at).toLocaleString('en-US')}`);
+    console.log(`Updated at: ${new Date(identity.updated_at).toLocaleString('en-US')}`);
 
     if (identity.display_name) {
-      console.log(`显示名称: ${identity.display_name}`);
+      console.log(`Display name: ${identity.display_name}`);
     }
 
     // Display platform fingerprint
     if (Object.keys(identity.fingerprints).length > 0) {
-      console.log('\n关联的平台：');
+      console.log('\nLinked platforms:');
       const platformNames: Record<string, string> = {
         claude_code: 'Claude Code',
-        feishu: '飞书',
-        device: '设备',
+        feishu: 'Feishu',
+        device: 'Device',
       };
 
       for (const [platform, data] of Object.entries(identity.fingerprints)) {
@@ -49,15 +49,15 @@ export async function identityCommand(options: {
           `  🟢 ${platformNames[platform] || platform}: ${fp.value.substring(0, 8)}...`
         );
         if (options.verbose) {
-          console.log(`     完整值: ${fp.value}`);
-          console.log(`     添加时间: ${new Date(fp.added_at).toLocaleString('zh-CN')}`);
+          console.log(`     Full value: ${fp.value}`);
+          console.log(`     Added at: ${new Date(fp.added_at).toLocaleString('en-US')}`);
         }
       }
     }
 
     // Show device list
     if (Object.keys(identity.devices).length > 0) {
-      console.log('\n已授权设备：');
+      console.log('\nAuthorized devices:');
       for (const [deviceId, data] of Object.entries(identity.devices)) {
         const device = data as { name: string; last_seen: string };
         const lastSeen = new Date(device.last_seen);
@@ -65,15 +65,15 @@ export async function identityCommand(options: {
         const diffMs = now.getTime() - lastSeen.getTime();
         const diffMins = Math.floor(diffMs / 60000);
 
-        let status = '离线';
+        let status = 'Offline';
         if (diffMins < 5) {
-          status = '在线 🟢';
+          status = 'Online 🟢';
         } else if (diffMins < 60) {
-          status = '最近活跃 🟡';
+          status = 'Recently active 🟡';
         }
 
         console.log(`  📱 ${device.name} (${deviceId.substring(0, 16)}...)`);
-        console.log(`     最后活跃: ${lastSeen.toLocaleString('zh-CN')} (${status})`);
+        console.log(`     Last seen: ${lastSeen.toLocaleString('en-US')} (${status})`);
       }
     }
 
@@ -81,7 +81,7 @@ export async function identityCommand(options: {
 
     // Check if the new fingerprint can be detected
     if (options.verbose) {
-      console.log('正在扫描新的平台指纹...\n');
+      console.log('Scanning for new platform fingerprints...\n');
       const fingerprints = await FingerprintCollector.collectAll();
 
       for (const fp of fingerprints) {
@@ -89,18 +89,18 @@ export async function identityCommand(options: {
         if (!existing || existing.value !== fp.value) {
           const platformNames: Record<string, string> = {
             claude_code: 'Claude Code',
-            feishu: '飞书',
-            device: '设备',
+            feishu: 'Feishu',
+            device: 'Device',
           };
-          console.log(`  ➕ 新增: ${platformNames[fp.platform] || fp.platform} (${fp.value.substring(0, 8)}...)`);
+          console.log(`  ➕ Added: ${platformNames[fp.platform] || fp.platform} (${fp.value.substring(0, 8)}...)`);
         }
       }
       console.log('');
     }
 
   } catch {
-    console.log('\n❌ 未找到身份信息');
-    console.log('请先运行: corivo init\n');
+    console.log('\n❌ Identity information not found');
+    console.log('Please run: corivo init\n');
     process.exit(1);
   }
 }

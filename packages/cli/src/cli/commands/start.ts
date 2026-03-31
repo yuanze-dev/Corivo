@@ -19,41 +19,41 @@ export async function startCommand(): Promise<void> {
     const content = await fs.readFile(configPath, 'utf-8')
     config = JSON.parse(content)
   } catch {
-    throw new ConfigError('Corivo 未初始化。请先运行: corivo init')
+    throw new ConfigError('Corivo is not initialized. Please run: corivo init')
   }
 
   const dbKey = config.db_key
 
   if (!dbKey && config.encrypted_db_key) {
-    console.log('⚠️  检测到旧版配置格式（需要密码）')
+    console.log('⚠️  Detected legacy config format (password-based)')
     console.log('')
-    console.log('Corivo v0.10+ 已移除密码系统，请按以下步骤迁移：')
-    console.log('  1. 备份数据库：cp ~/.corivo/corivo.db ~/.corivo/corivo.db.backup')
-    console.log('  2. 重新初始化：corivo init')
+    console.log('Corivo v0.10+ removed the password system. Please migrate using these steps:')
+    console.log('  1. Back up the database: cp ~/.corivo/corivo.db ~/.corivo/corivo.db.backup')
+    console.log('  2. Re-initialize: corivo init')
     return
   }
 
   if (!dbKey) {
-    throw new ConfigError('配置文件无效：缺少 db_key')
+    throw new ConfigError('Invalid config file: missing db_key')
   }
 
   const manager = getServiceManager()
   const corivoBin = await resolveCorivoBin()
   const dbPath = getDefaultDatabasePath()
 
-  console.log('正在启动心跳守护进程...')
+  console.log('Starting heartbeat daemon...')
 
   const result = await manager.install({ corivoBin, dbKey, dbPath })
 
   if (result.success) {
-    console.log('✅ 心跳守护进程已启动')
-    console.log('\n日志路径:')
+    console.log('✅ Heartbeat daemon started')
+    console.log('\nLog paths:')
     console.log(`  stdout: ${path.join(configDir, 'daemon.log')}`)
     console.log(`  stderr: ${path.join(configDir, 'daemon.err')}`)
   } else {
-    console.log(`❌ 启动失败: ${result.error}`)
+    console.log(`❌ Start failed: ${result.error}`)
     console.log('')
-    console.log('你可以手动启动心跳：')
+    console.log('You can start heartbeat manually:')
     console.log('  node ./dist/engine/heartbeat.js')
   }
 }

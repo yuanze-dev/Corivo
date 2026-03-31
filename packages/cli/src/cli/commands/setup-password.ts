@@ -26,54 +26,54 @@ export async function setupPasswordCommand(options: SetupPasswordOptions = {}): 
     const content = await fs.readFile(configPath, 'utf-8');
     config = JSON.parse(content);
   } catch {
-    throw new ConfigError('Corivo 未初始化。请先运行: corivo init');
+    throw new ConfigError('Corivo is not initialized. Please run: corivo init');
   }
 
   // Check if a password has been set
   const hasPassword = config.encrypted_db_key !== undefined;
 
   if (hasPassword && !options.force) {
-    console.log(chalk.yellow('\\n⚠️  已设置主密码'));
-    console.log(chalk.gray('如需修改密码，请使用: corivo setup-password --force\\n'));
+    console.log(chalk.yellow('\\n⚠️  Master password is already set'));
+    console.log(chalk.gray('To change it, run: corivo setup-password --force\\n'));
     return;
   }
 
   console.log('\\n═══════════════════════════════════════════════════════');
-  console.log('           设置主密码');
+  console.log('           Set Master Password');
   console.log('═══════════════════════════════════════════════════════\\n');
 
-  console.log('主密码用于：');
-  console.log('  • 数据库加密保护（云同步安全）');
-  console.log('  • 跨设备身份验证');
-  console.log('  • 身份恢复凭据\\n');
+  console.log('The master password is used for:');
+  console.log('  • Protecting database encryption (for cloud sync security)');
+  console.log('  • Cross-device identity verification');
+  console.log('  • Identity recovery credentials\\n');
 
-  console.log(chalk.gray('提示：'));
-  console.log(chalk.gray('  • 密码至少 8 个字符，包含字母和数字'));
-  console.log(chalk.gray('  • 请使用容易记住但不易被猜到的密码'));
-  console.log(chalk.gray('  • 忘记密码无法找回，请妥善保管\\n'));
+  console.log(chalk.gray('Tips:'));
+  console.log(chalk.gray('  • Use at least 8 characters, including letters and numbers'));
+  console.log(chalk.gray('  • Pick something memorable but hard to guess'));
+  console.log(chalk.gray('  • Forgotten passwords cannot be recovered, so keep it safe\\n'));
 
   // If you already have a password, you need to verify it first
   if (hasPassword && options.force) {
-    const oldPassword = await readPassword('请输入当前密码: ');
+    const oldPassword = await readPassword('Enter current password: ');
     const salt = Buffer.from(config.salt, 'base64');
     const masterKey = KeyManager.deriveMasterKey(oldPassword, salt);
 
     try {
       KeyManager.decryptDatabaseKey(config.encrypted_db_key, masterKey);
     } catch {
-      throw new ValidationError('当前密码错误');
+      throw new ValidationError('Current password is incorrect');
     }
   }
 
   // Enter new password
-  const newPassword = await readPassword('请输入新密码: ');
+  const newPassword = await readPassword('Enter new password: ');
   if (!KeyManager.validatePasswordStrength(newPassword)) {
-    throw new ValidationError('密码强度不足：至少 8 个字符，包含字母和数字');
+    throw new ValidationError('Password is too weak: use at least 8 characters, including letters and numbers');
   }
 
-  const confirmPassword = await readPassword('请确认密码: ');
+  const confirmPassword = await readPassword('Confirm password: ');
   if (newPassword !== confirmPassword) {
-    throw new ValidationError('两次输入的密码不一致');
+    throw new ValidationError('Passwords do not match');
   }
 
   // Generate new encryption key
@@ -95,7 +95,7 @@ export async function setupPasswordCommand(options: SetupPasswordOptions = {}): 
 
   await fs.writeFile(configPath, JSON.stringify(config, null, 2));
 
-  console.log(chalk.green('\\n✅ 主密码设置成功！\\n'));
-  console.log(chalk.gray('从现在起，每次使用 Corivo 时需要输入密码。'));
-  console.log(chalk.gray('数据库内容已加密保护。\\n'));
+  console.log(chalk.green('\\n✅ Master password set successfully!\\n'));
+  console.log(chalk.gray('From now on, you will need to enter the password when using Corivo.'));
+  console.log(chalk.gray('Database contents are now encrypted.\\n'));
 }

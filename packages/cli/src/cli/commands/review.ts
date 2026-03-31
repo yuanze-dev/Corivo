@@ -26,10 +26,10 @@ export async function runReviewCommand(
 export const reviewCommand = new Command('review');
 
 reviewCommand
-  .description('生成答后 review（内部命令，供 hooks 调用）')
-  .option('-m, --last-message <text>', 'Claude 最后的回复内容')
-  .option('-f, --format <type>', '输出格式: text | json | hook-text', 'text')
-  .option('--no-password', '跳过密码输入（开发模式）')
+  .description('Generate post-response review (internal command for hooks)')
+  .option('-m, --last-message <text>', "Claude's last response")
+  .option('-f, --format <type>', 'Output format: text | json | hook-text', 'text')
+  .option('--no-password', 'Skip password prompt (development mode)')
   .action(async (options) => {
     const output = await runReviewCommand({
       password: options.password,

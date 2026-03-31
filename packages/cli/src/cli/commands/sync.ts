@@ -77,7 +77,7 @@ export async function post(
 ): Promise<unknown> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  logger.debug(`[sync:${label}] 请求 url=${url} token=${token ? 'present' : 'absent'} body=${truncate(stringifyPayload(body))}`);
+  logger.debug(`[sync:${label}] request url=${url} token=${token ? 'present' : 'absent'} body=${truncate(stringifyPayload(body))}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const res = await fetch(url, {
     method: 'POST',
@@ -86,10 +86,10 @@ export async function post(
   });
   const text = await res.text();
   if (!res.ok) {
-    logger.error(`[sync:${label}] 请求失败 status=${res.status} body=${truncate(text)}`);
+    logger.error(`[sync:${label}] request failed status=${res.status} body=${truncate(text)}`);
     throw new Error(`HTTP ${res.status}: ${text}`);
   }
-  logger.debug(`[sync:${label}] 响应 status=${res.status} body=${truncate(text)}`);
+  logger.debug(`[sync:${label}] response status=${res.status} body=${truncate(text)}`);
   return text.length === 0 ? null : JSON.parse(text);
 }
 
@@ -138,19 +138,19 @@ export function applyPulledChangesets(
   logger: SyncLogger = createSyncLogger()
 ): number {
   let applied = 0;
-  logger.debug(`[sync:pull] 收到 ${changesets.length} 条 pull changesets preview=${summarizeChangesets(changesets)}`);
+  logger.debug(`[sync:pull] received ${changesets.length} pull changesets preview=${summarizeChangesets(changesets)}`);
 
   for (const cs of changesets) {
     // The current simplified synchronization protocol only synchronizes blocks.content.
     if (cs.table_name !== 'blocks' || cs.col_name !== 'content' || !cs.pk || cs.value == null) {
       logger.debug(
-        `[sync:pull] 已跳过 changeset block=${cs.pk || '(empty)'} table=${cs.table_name} col=${cs.col_name ?? 'null'} dbVersion=${cs.db_version ?? 'n/a'}`
+        `[sync:pull] skipped changeset block=${cs.pk || '(empty)'} table=${cs.table_name} col=${cs.col_name ?? 'null'} dbVersion=${cs.db_version ?? 'n/a'}`
       );
       continue;
     }
 
     logger.debug(
-      `[sync:pull] 准备写入 block=${cs.pk} dbVersion=${cs.db_version ?? 'n/a'} site=${cs.site_id ?? 'n/a'} contentLength=${cs.value.length}`
+      `[sync:pull] preparing to write block=${cs.pk} dbVersion=${cs.db_version ?? 'n/a'} site=${cs.site_id ?? 'n/a'} contentLength=${cs.value.length}`
     );
     try {
       db.upsertBlock({
@@ -159,15 +159,15 @@ export function applyPulledChangesets(
       });
     } catch (error) {
       logger.error(
-        `[sync:pull] 写入 block 失败 block=${cs.pk} dbVersion=${cs.db_version ?? 'n/a'} site=${cs.site_id ?? 'n/a'} error=${error instanceof Error ? error.message : String(error)}`
+        `[sync:pull] failed to write block=${cs.pk} dbVersion=${cs.db_version ?? 'n/a'} site=${cs.site_id ?? 'n/a'} error=${error instanceof Error ? error.message : String(error)}`
       );
       throw error;
     }
     applied++;
-    logger.debug(`[sync:pull] 写入 block 成功 block=${cs.pk} applied=${applied}`);
+    logger.debug(`[sync:pull] wrote block successfully block=${cs.pk} applied=${applied}`);
   }
 
-  logger.debug(`[sync:pull] 应用完成 applied=${applied}/${changesets.length}`);
+  logger.debug(`[sync:pull] apply complete applied=${applied}/${changesets.length}`);
   return applied;
 }
 
@@ -207,23 +207,23 @@ export async function registerWithSolver(
 
 export function createSyncCommand(): Command {
   const cmd = new Command('sync');
-  cmd.description('与 Corivo solver 服务器同步记忆数据');
-  cmd.option('--server <url>', 'Solver 服务器地址', 'http://localhost:3141');
-  cmd.option('--register', '注册到 solver 服务器');
-  cmd.option('--pair', '生成配对码，供新设备加入');
+  cmd.description('Sync memory data with the Corivo solver server');
+  cmd.option('--server <url>', 'Solver server URL', 'http://localhost:3141');
+  cmd.option('--register', 'Register with the solver server');
+  cmd.option('--pair', 'Generate a pairing code for a new device');
 
   cmd.action(async (options, command: Command) => {
     // --pair: generate pairing code
     if (options.pair) {
       const config = await loadConfig();
       if (!config) {
-        console.error('Corivo 未初始化，请先运行 corivo init');
+        console.error('Corivo is not initialized, please run corivo init');
         process.exit(1);
       }
       const logger = createSyncLogger(config.settings?.logLevel);
       const solverConfig = await loadSolverConfig();
       if (!solverConfig) {
-        console.error('未连接同步服务器，请先运行 corivo sync --register');
+        console.error('Not connected to a sync server, please run corivo sync --register');
         process.exit(1);
       }
       const pairServerUrl = command.getOptionValueSource('server') === 'cli'
@@ -233,20 +233,20 @@ export function createSyncCommand(): Command {
       try {
         token = await authenticate(pairServerUrl, config.identity_id, solverConfig.shared_secret, logger);
       } catch (err: unknown) {
-        console.error('认证失败:', err instanceof Error ? err.message : String(err));
+        console.error('Authentication failed:', err instanceof Error ? err.message : String(err));
         process.exit(1);
       }
       const result = await post(`${pairServerUrl}/auth/pair`, {}, token, logger, 'pair') as { pairing_code: string; expires_at: number };
       const expiresIn = Math.round((result.expires_at - Date.now()) / 60000);
-      console.log(`\n配对码: ${result.pairing_code}  (${expiresIn} 分钟内有效)\n`);
-      console.log('在新设备上运行:');
+      console.log(`\nPairing code: ${result.pairing_code}  (valid for ${expiresIn} minutes)\n`);
+      console.log('Run this on the new device:');
       console.log(`  corivo init --join ${result.pairing_code} --server ${pairServerUrl}\n`);
       return;
     }
 
     const config = await loadConfig();
     if (!config) {
-      console.error('Corivo 未初始化，请先运行 corivo init');
+      console.error('Corivo is not initialized, please run corivo init');
       process.exit(1);
     }
     const logger = createSyncLogger(config.settings?.logLevel);
@@ -259,7 +259,7 @@ export function createSyncCommand(): Command {
       const siteId = randomBytes(16).toString('hex');
       const deviceId = randomBytes(8).toString('hex');
 
-      console.log(`正在向 ${serverUrl} 注册...`);
+      console.log(`Registering with ${serverUrl}...`);
       let result: RegisterResponse;
       try {
         result = await post(`${serverUrl}/auth/register`, {
@@ -274,9 +274,9 @@ export function createSyncCommand(): Command {
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
         if (errMsg.includes('409')) {
-          console.error('该 identity 已注册，请使用已有的 solver.json 或添加 --register 强制重新配置');
+          console.error('This identity is already registered. Use the existing solver.json or add --register to force reconfiguration');
         } else {
-          console.error('注册失败:', errMsg);
+          console.error('Registration failed:', errMsg);
         }
         process.exit(1);
       }
@@ -292,31 +292,31 @@ export function createSyncCommand(): Command {
       try {
         await saveSolverConfig(solverConfig);
       } catch (err: unknown) {
-        console.error('保存 solver.json 失败:', err instanceof Error ? err.message : String(err));
+        console.error('Failed to save solver.json:', err instanceof Error ? err.message : String(err));
         // Continue execution without terminating the process
       }
-      console.log(`注册成功！site_id: ${siteId}`);
-      console.log('solver.json 已保存到 ~/.corivo/solver.json');
+      console.log(`Registration successful! site_id: ${siteId}`);
+      console.log('solver.json saved to ~/.corivo/solver.json');
     }
 
     const { server_url, shared_secret, site_id } = solverConfig;
-    logger.debug(`[sync:cli] 开始同步 server=${server_url} site=${site_id} lastPull=${solverConfig.last_pull_version} lastPush=${solverConfig.last_push_version}`);
+    logger.debug(`[sync:cli] starting sync server=${server_url} site=${site_id} lastPull=${solverConfig.last_pull_version} lastPush=${solverConfig.last_push_version}`);
 
     // Certification
-    console.log('正在认证...');
+    console.log('Authenticating...');
     let token: string;
     try {
       token = await authenticate(server_url, config.identity_id, shared_secret, logger);
     } catch (err: unknown) {
-      console.error('认证失败:', err instanceof Error ? err.message : String(err));
+      console.error('Authentication failed:', err instanceof Error ? err.message : String(err));
       process.exit(1);
     }
-    console.log('认证成功');
+    console.log('Authentication successful');
 
     // Get local database
     const dbKey = await getDatabaseKey();
     if (!dbKey) {
-      console.error('无法获取数据库密钥');
+      console.error('Unable to get database key');
       process.exit(1);
     }
 
@@ -332,7 +332,7 @@ export function createSyncCommand(): Command {
     let pushStored = 0;
     try {
       const blocks = db.queryBlocks({ limit: 10000 });
-      logger.debug(`[sync:cli] 准备 push blocks=${blocks.length}`);
+      logger.debug(`[sync:cli] preparing push blocks=${blocks.length}`);
       if (blocks.length > 0) {
         const changesets = blocks.map((b, i) => ({
           table_name: 'blocks',
@@ -352,19 +352,19 @@ export function createSyncCommand(): Command {
           'push'
         ) as { stored: number };
         pushStored = pushResult.stored;
-        logger.debug(`[sync:cli] push 完成 stored=${pushStored} changesets=${changesets.length}`);
+        logger.debug(`[sync:cli] push complete stored=${pushStored} changesets=${changesets.length}`);
 
         solverConfig!.last_push_version = blocks.length;  // Record the total amount pushed and no longer add it up
         try {
           await saveSolverConfig(solverConfig!);
-          logger.debug(`[sync:cli] 已更新 last_push_version=${solverConfig!.last_push_version}`);
+          logger.debug(`[sync:cli] updated last_push_version=${solverConfig!.last_push_version}`);
         } catch (err: any) {
-          console.error('保存 solver.json 失败:', err.message);
+          console.error('Failed to save solver.json:', err.message);
           // Continue execution without terminating the process
         }
       }
     } catch (err: unknown) {
-      console.error('Push 失败:', err instanceof Error ? err.message : String(err));
+      console.error('Push failed:', err instanceof Error ? err.message : String(err));
     }
 
     // Pull: Pull remote changes
@@ -378,24 +378,24 @@ export function createSyncCommand(): Command {
         'pull'
       ) as { changesets: PulledChangeset[]; current_version: number };
       logger.debug(
-        `[sync:cli] pull 完成 changesets=${pullResult.changesets.length} currentVersion=${pullResult.current_version} sinceVersion=${solverConfig.last_pull_version}`
+        `[sync:cli] pull complete changesets=${pullResult.changesets.length} currentVersion=${pullResult.current_version} sinceVersion=${solverConfig.last_pull_version}`
       );
 
       pullCount = applyPulledChangesets(db, pullResult.changesets, logger);
-      logger.debug(`[sync:cli] pull 已写库 applied=${pullCount}`);
+      logger.debug(`[sync:cli] pull written to database applied=${pullCount}`);
 
       // Update the version regardless of whether there is data (to avoid repeated pulls)
       if (pullResult.current_version > solverConfig!.last_pull_version) {
         solverConfig!.last_pull_version = pullResult.current_version;
         try {
           await saveSolverConfig(solverConfig!);
-          logger.debug(`[sync:cli] 已更新 last_pull_version=${solverConfig!.last_pull_version}`);
+          logger.debug(`[sync:cli] updated last_pull_version=${solverConfig!.last_pull_version}`);
         } catch (err: any) {
-          console.error('保存 solver.json 失败:', err.message);
+          console.error('Failed to save solver.json:', err.message);
         }
       }
     } catch (err: unknown) {
-      console.error('Pull 失败:', err instanceof Error ? err.message : String(err));
+      console.error('Pull failed:', err instanceof Error ? err.message : String(err));
     }
 
     // Pull the server device list and update the local identity.json
@@ -407,7 +407,7 @@ export function createSyncCommand(): Command {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<{ devices: Array<{ deviceId: string; deviceName: string | null; platform: string | null; arch: string | null; createdAt: number; lastSeenAt: number }> }>;
       })();
-      logger.debug(`[sync:cli] 拉取设备列表成功 devices=${devicesResult.devices.length}`);
+      logger.debug(`[sync:cli] fetched device list successfully devices=${devicesResult.devices.length}`);
 
       const configDir = getConfigDir();
       const identityPath = path.join(configDir, 'identity.json');
@@ -427,11 +427,11 @@ export function createSyncCommand(): Command {
         }
         identity.updated_at = new Date().toISOString();
         await fs.writeFile(identityPath, JSON.stringify(identity, null, 2));
-      } catch { /* identity.json 不存在则忽略 */ }
-    } catch { /* 拉取 devices 失败不影响主流程 */ }
+      } catch { /* ignore if identity.json does not exist */ }
+    } catch { /* failure to fetch devices does not affect the main flow */ }
 
-    logger.debug(`[sync:cli] 同步结束 push=${pushStored} pull=${pullCount}`);
-    console.log(`同步完成 — Push: ${pushStored} 条, Pull: ${pullCount} 条`);
+    logger.debug(`[sync:cli] sync finished push=${pushStored} pull=${pullCount}`);
+    console.log(`Sync complete - Push: ${pushStored}, Pull: ${pullCount}`);
   });
 
   return cmd;

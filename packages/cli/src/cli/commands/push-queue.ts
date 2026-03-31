@@ -13,12 +13,12 @@ import { PushQueue } from '../../engine/push-queue.js';
 export const pushQueueCommand = new Command('push-queue');
 
 pushQueueCommand
-  .description('管理推送队列（内部命令）')
-  .option('-p, --pending', '显示待处理的推送')
-  .option('--dismiss <id>', '忽略指定的推送')
-  .option('--dismiss-all', '忽略所有推送')
-  .option('--clear', '清空队列')
-  .option('--json', '以 JSON 格式输出')
+  .description('Manage push queue (internal command)')
+  .option('-p, --pending', 'Show pending pushes')
+  .option('--dismiss <id>', 'Dismiss a specific push')
+  .option('--dismiss-all', 'Dismiss all pushes')
+  .option('--clear', 'Clear the queue')
+  .option('--json', 'Output as JSON')
   .action(async (options) => {
     try {
       const queue = new PushQueue();
@@ -27,21 +27,21 @@ pushQueueCommand
       // Handle clear
       if (options.clear) {
         await queue.clear();
-        console.log('推送队列已清空');
+        console.log('Push queue cleared');
         return;
       }
 
       // handle ignore all
       if (options.dismissAll) {
         await queue.markAllShown();
-        console.log('所有推送已忽略');
+        console.log('All pushes dismissed');
         return;
       }
 
       // Processing ignores single
       if (options.dismiss) {
         await queue.markShown(options.dismiss);
-        console.log(`推送 ${options.dismiss} 已忽略`);
+        console.log(`Dismissed push ${options.dismiss}`);
         return;
       }
 
@@ -65,7 +65,7 @@ pushQueueCommand
 
       // human readable output
       console.log('');
-      console.log(`📬 待处理提醒 (${pending.length} 条):`);
+      console.log(`📬 Pending notifications (${pending.length}):`);
       console.log('');
 
       for (const item of pending) {

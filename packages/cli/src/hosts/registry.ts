@@ -8,13 +8,7 @@ import type {
 } from './types.js';
 
 const adapters: HostAdapter[] = [];
-const adapterById: Record<HostId, HostAdapter | undefined> = {
-  'claude-code': undefined,
-  codex: undefined,
-  cursor: undefined,
-  opencode: undefined,
-  'project-claude': undefined,
-};
+const adapterById = new Map<HostId, HostAdapter>();
 
 function registerHostAdapter(adapter: HostAdapter): void {
   const existingIndex = adapters.findIndex((item) => item.id === adapter.id);
@@ -22,15 +16,15 @@ function registerHostAdapter(adapter: HostAdapter): void {
     adapters.splice(existingIndex, 1);
   }
   adapters.push(adapter);
-  adapterById[adapter.id] = adapter;
+  adapterById.set(adapter.id, adapter);
 }
 
 function getAllHostAdapters(): HostAdapter[] {
   return adapters.slice();
 }
 
-function getHostAdapter(id: HostId): HostAdapter | null {
-  return adapterById[id] ?? null;
+function getHostAdapter(id: string): HostAdapter | null {
+  return adapterById.get(id as HostId) ?? null;
 }
 
 const isCapability = (__capability: unknown): __capability is HostCapability => true;

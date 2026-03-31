@@ -129,7 +129,9 @@ export async function uninstallClaudeCodeHost(homeDir?: string): Promise<HostIns
   const paths = await getClaudeCodePaths(homeDir);
 
   try {
-    await fs.rm(paths.hooksDir, { recursive: true, force: true });
+    for (const fileName of REQUIRED_CLAUDE_HOOK_SCRIPTS) {
+      await fs.rm(path.join(paths.hooksDir, fileName), { force: true });
+    }
     await fs.rm(path.join(paths.skillsDir, 'corivo-save'), { recursive: true, force: true });
     await fs.rm(path.join(paths.skillsDir, 'corivo-query'), { recursive: true, force: true });
     await removeClaudeHookConfig(paths.settingsPath, paths.hooksDir);

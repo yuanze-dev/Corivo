@@ -89,6 +89,23 @@ describe('host doctor reusable helpers', () => {
     expect(toCheckMap(doctor.checks)['notify-dispatch.sh']).toBe(false);
   });
 
+  it('marks Codex doctor unhealthy when sandbox section exists without Corivo writable root', async () => {
+    const installResult = await installCodexHost(tempHome);
+    expect(installResult.success).toBe(true);
+
+    const configPath = path.join(tempHome, '.codex', 'config.toml');
+    const config = await fs.readFile(configPath, 'utf8');
+    const updatedConfig = config.replace(
+      /writable_roots\s*=\s*\[[\s\S]*?\]/m,
+      'writable_roots = [ "/tmp/not-corivo" ]',
+    );
+    await fs.writeFile(configPath, updatedConfig, 'utf8');
+
+    const doctor = await isCodexInstalled(tempHome);
+    expect(doctor.ok).toBe(false);
+    expect(toCheckMap(doctor.checks)['config.toml']).toBe(false);
+  });
+
   it('preserves pre-existing Codex notify command after uninstall', async () => {
     const configPath = path.join(tempHome, '.codex', 'config.toml');
     const originalNotifyCommand = '/tmp/existing-notify.sh';
@@ -201,6 +218,26 @@ describe('host doctor reusable helpers', () => {
     expect(uninstallChecks.hooks).toBe(false);
     expect(uninstallChecks.skills).toBe(false);
     expect(uninstallChecks['settings.json hooks']).toBe(false);
+  });
+
+  it('uninstalls only Claude-owned hook files from shared hooks directory', async () => {
+    const installResult = await installClaudeCodeHost(tempHome);
+    expect(installResult.success).toBe(true);
+
+    const hooksDir = path.join(tempHome, '.corivo', 'hooks');
+    const unrelatedHook = path.join(hooksDir, 'custom-hook.sh');
+    await fs.writeFile(unrelatedHook, '#!/usr/bin/env bash\necho custom\n', 'utf8');
+
+    const uninstallResult = await uninstallClaudeCodeHost(tempHome);
+    expect(uninstallResult.success).toBe(true);
+
+    await expect(fs.stat(hooksDir)).resolves.toBeTruthy();
+    await expect(fs.readFile(unrelatedHook, 'utf8')).resolves.toContain('custom');
+    await expect(fs.readFile(path.join(hooksDir, 'session-init.sh'), 'utf8')).rejects.toThrow();
+    await expect(fs.readFile(path.join(hooksDir, 'ingest-turn.sh'), 'utf8')).rejects.toThrow();
+    await expect(fs.readFile(path.join(hooksDir, 'session-carry-over.sh'), 'utf8')).rejects.toThrow();
+    await expect(fs.readFile(path.join(hooksDir, 'prompt-recall.sh'), 'utf8')).rejects.toThrow();
+    await expect(fs.readFile(path.join(hooksDir, 'stop-review.sh'), 'utf8')).rejects.toThrow();
   });
 
   it('covers project CLAUDE.md marker checks', async () => {

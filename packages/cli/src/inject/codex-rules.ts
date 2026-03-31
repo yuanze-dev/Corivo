@@ -145,6 +145,7 @@ export async function installCodexHost(homeDir?: string): Promise<HostInstallRes
 
 export async function isCodexInstalled(homeDir?: string): Promise<HostDoctorResult> {
   const paths = getCodexPaths(homeDir);
+  const corivoRoot = path.join(paths.homeDir, '.corivo');
   const [agentsContent, configContent, reviewContent, dispatchContent] = await Promise.all([
     readFileIfExists(paths.agentsPath),
     readFileIfExists(paths.configPath),
@@ -164,7 +165,7 @@ export async function isCodexInstalled(homeDir?: string): Promise<HostDoctorResu
       ok: Boolean(
         notify
         && notify.includes(paths.dispatchPath)
-        && configContent.includes('[sandbox_workspace_write]'),
+        && hasSandboxWritableRoot(configContent, corivoRoot),
       ),
       detail: paths.configPath,
     },
@@ -443,6 +444,24 @@ function removeSandboxWritableRoot(content: string, rootPath: string): string {
   const replacement = updatedSectionLines.length > 1 ? `${updatedSectionLines.join('\n')}\n` : '';
   const updatedContent = content.replace(sectionRegex, replacement).replace(/\n{3,}/g, '\n\n');
   return updatedContent.trimEnd() ? `${updatedContent.trimEnd()}\n` : '';
+}
+
+function hasSandboxWritableRoot(content: string, rootPath: string): boolean {
+  const sectionRegex = /\[sandbox_workspace_write\]([\s\S]*?)(?=\n\[|$)/;
+  const sectionMatch = content.match(sectionRegex);
+  if (!sectionMatch) {
+    return false;
+  }
+
+  const rootsMatch = sectionMatch[0].match(/writable_roots\s*=\s*\[([\s\S]*?)\]/m);
+  if (!rootsMatch) {
+    return false;
+  }
+
+  const roots = Array.from(rootsMatch[1].matchAll(/"((?:\\"|[^"])*)"/g)).map((item) =>
+    item[1].replace(/\\"/g, '"'),
+  );
+  return roots.includes(rootPath);
 }
 
 function buildDispatchScript(existingNotify: string[] | null): string {

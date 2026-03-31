@@ -75,6 +75,30 @@ describe('host doctor reusable helpers', () => {
     expect(uninstallChecks['notify-review.sh']).toBe(false);
   });
 
+  it('preserves pre-existing Codex notify command after uninstall', async () => {
+    const configPath = path.join(tempHome, '.codex', 'config.toml');
+    const originalNotifyCommand = '/tmp/existing-notify.sh';
+    await fs.mkdir(path.dirname(configPath), { recursive: true });
+    await fs.writeFile(
+      configPath,
+      `notify = [ "bash", "${originalNotifyCommand}" ]\n`,
+      'utf8',
+    );
+
+    const installResult = await installCodexHost(tempHome);
+    expect(installResult.success).toBe(true);
+
+    const installedConfig = await fs.readFile(configPath, 'utf8');
+    expect(installedConfig).toContain('notify-dispatch.sh');
+
+    const uninstallResult = await uninstallCodexHost(tempHome);
+    expect(uninstallResult.success).toBe(true);
+
+    const restoredConfig = await fs.readFile(configPath, 'utf8');
+    expect(restoredConfig).toContain(originalNotifyCommand);
+    expect(restoredConfig).not.toContain('notify-dispatch.sh');
+  });
+
   it('covers Cursor install/doctor/uninstall checks', async () => {
     const before = await isCursorInstalled(tempHome);
     const beforeChecks = toCheckMap(before.checks);

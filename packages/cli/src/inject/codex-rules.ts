@@ -8,6 +8,7 @@ const START_MARKER = '<!-- CORIVO CODEX START -->';
 const END_MARKER = '<!-- CORIVO CODEX END -->';
 const REVIEW_SCRIPT_NAME = 'notify-review.sh';
 const DISPATCH_SCRIPT_NAME = 'notify-dispatch.sh';
+const NOTIFY_BACKUP_NAME = 'notify-original.json';
 
 export async function getCodexRules(): Promise<string> {
   const templateText = (await readHostTemplateText('codex', 'templates/AGENTS.codex.md')).trim();
@@ -26,6 +27,7 @@ export interface CodexPaths {
   adapterDir: string;
   dispatchPath: string;
   reviewPath: string;
+  notifyBackupPath: string;
 }
 
 export function getCodexPaths(homeDir: string = process.env.HOME || os.homedir()): CodexPaths {
@@ -40,6 +42,7 @@ export function getCodexPaths(homeDir: string = process.env.HOME || os.homedir()
     adapterDir,
     dispatchPath: path.join(adapterDir, DISPATCH_SCRIPT_NAME),
     reviewPath: path.join(adapterDir, REVIEW_SCRIPT_NAME),
+    notifyBackupPath: path.join(adapterDir, NOTIFY_BACKUP_NAME),
   };
 }
 
@@ -100,6 +103,12 @@ export async function installCodexHost(homeDir?: string): Promise<HostInstallRes
     const existingNotify = extractNotifyCommand(existingConfig);
     const wrappedNotify = shouldWrapNotify(existingNotify, paths.dispatchPath) ? existingNotify : null;
     const existingDispatch = await readFileIfExists(paths.dispatchPath);
+
+    if (wrappedNotify) {
+      await writeNotifyBackup(paths.notifyBackupPath, wrappedNotify);
+    } else if (!existingNotify || !existingNotify.includes(paths.dispatchPath)) {
+      await fs.rm(paths.notifyBackupPath, { force: true });
+    }
 
     await copyHostAsset('codex', 'adapters/notify-review.sh', paths.reviewPath, { mode: 0o755 });
 
@@ -177,9 +186,10 @@ export async function uninstallCodexHost(homeDir?: string): Promise<HostInstallR
 
   try {
     await removeCodexRuleBlock(paths.agentsPath);
-    await removeCodexNotifyConfig(paths.configPath, paths.dispatchPath);
+    await removeCodexNotifyConfig(paths.configPath, paths.dispatchPath, paths.notifyBackupPath);
     await fs.rm(paths.dispatchPath, { force: true });
     await fs.rm(paths.reviewPath, { force: true });
+    await fs.rm(paths.notifyBackupPath, { force: true });
     await fs.rm(paths.adapterDir, { recursive: true, force: true });
 
     return {
@@ -208,6 +218,26 @@ async function readFileIfExists(filePath: string): Promise<string> {
     return await fs.readFile(filePath, 'utf8');
   } catch {
     return '';
+  }
+}
+
+async function writeNotifyBackup(backupPath: string, command: string[]): Promise<void> {
+  await fs.writeFile(backupPath, JSON.stringify(command), 'utf8');
+}
+
+async function readNotifyBackup(backupPath: string): Promise<string[] | null> {
+  const content = await readFileIfExists(backupPath);
+  if (!content) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(content);
+    return Array.isArray(parsed) && parsed.every((item) => typeof item === 'string')
+      ? parsed
+      : null;
+  } catch {
+    return null;
   }
 }
 
@@ -263,7 +293,11 @@ function removeNotifyCommand(content: string): string {
   return `${updated.replace(/\n{3,}/g, '\n\n').trimEnd()}\n`;
 }
 
-async function removeCodexNotifyConfig(configPath: string, dispatchPath: string): Promise<void> {
+async function removeCodexNotifyConfig(
+  configPath: string,
+  dispatchPath: string,
+  notifyBackupPath: string,
+): Promise<void> {
   const content = await readFileIfExists(configPath);
   if (!content) {
     return;
@@ -274,7 +308,10 @@ async function removeCodexNotifyConfig(configPath: string, dispatchPath: string)
     return;
   }
 
-  await fs.writeFile(configPath, removeNotifyCommand(content), 'utf8');
+  const backupNotify = await readNotifyBackup(notifyBackupPath);
+  const updatedConfig = backupNotify ? upsertNotifyCommand(content, backupNotify) : removeNotifyCommand(content);
+  await fs.writeFile(configPath, updatedConfig, 'utf8');
+  await fs.rm(notifyBackupPath, { force: true });
 }
 
 function upsertSandboxWritableRoot(content: string, rootPath: string): string {

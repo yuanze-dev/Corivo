@@ -106,6 +106,11 @@ export async function isCursorInstalled(homeDir?: string): Promise<HostDoctorRes
       ok: Array.isArray(cliConfig.permissions?.allow) && cliConfig.permissions.allow.includes(CURSOR_PERMISSION),
       detail: paths.cliConfigPath,
     },
+    {
+      label: 'adapter scripts',
+      ok: await hasRequiredCursorScripts(paths.adapterDir),
+      detail: paths.adapterDir,
+    },
   ];
 
   return {
@@ -305,6 +310,27 @@ function hasRequiredCursorHooks(hooks: CursorHookGroups | undefined, adapterDir:
       groups.some((group) => (group.hooks ?? []).some((hook) => hook.command === required)),
     ),
   );
+}
+
+async function hasRequiredCursorScripts(adapterDir: string): Promise<boolean> {
+  const scriptPaths = [
+    path.join(adapterDir, 'session-carry-over.sh'),
+    path.join(adapterDir, 'prompt-recall.sh'),
+    path.join(adapterDir, 'stop-review.sh'),
+  ];
+
+  const states = await Promise.all(
+    scriptPaths.map(async (scriptPath) => {
+      try {
+        await fs.stat(scriptPath);
+        return true;
+      } catch {
+        return false;
+      }
+    }),
+  );
+
+  return states.every(Boolean);
 }
 
 async function removeCursorHooks(settingsPath: string, adapterDir: string): Promise<void> {

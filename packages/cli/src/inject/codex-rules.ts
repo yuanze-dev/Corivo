@@ -145,10 +145,11 @@ export async function installCodexHost(homeDir?: string): Promise<HostInstallRes
 
 export async function isCodexInstalled(homeDir?: string): Promise<HostDoctorResult> {
   const paths = getCodexPaths(homeDir);
-  const [agentsContent, configContent, reviewContent] = await Promise.all([
+  const [agentsContent, configContent, reviewContent, dispatchContent] = await Promise.all([
     readFileIfExists(paths.agentsPath),
     readFileIfExists(paths.configPath),
     readFileIfExists(paths.reviewPath),
+    readFileIfExists(paths.dispatchPath),
   ]);
   const notify = extractNotifyCommand(configContent);
 
@@ -172,6 +173,11 @@ export async function isCodexInstalled(homeDir?: string): Promise<HostDoctorResu
       ok: reviewContent.includes('corivo review'),
       detail: paths.reviewPath,
     },
+    {
+      label: 'notify-dispatch.sh',
+      ok: dispatchContent.includes('notify-review.sh'),
+      detail: paths.dispatchPath,
+    },
   ];
 
   return {
@@ -187,6 +193,7 @@ export async function uninstallCodexHost(homeDir?: string): Promise<HostInstallR
   try {
     await removeCodexRuleBlock(paths.agentsPath);
     await removeCodexNotifyConfig(paths.configPath, paths.dispatchPath, paths.notifyBackupPath);
+    await removeCodexWritableRoot(paths.configPath, path.join(paths.homeDir, '.corivo'));
     await fs.rm(paths.dispatchPath, { force: true });
     await fs.rm(paths.reviewPath, { force: true });
     await fs.rm(paths.notifyBackupPath, { force: true });
@@ -314,6 +321,16 @@ async function removeCodexNotifyConfig(
   await fs.rm(notifyBackupPath, { force: true });
 }
 
+async function removeCodexWritableRoot(configPath: string, rootPath: string): Promise<void> {
+  const content = await readFileIfExists(configPath);
+  if (!content) {
+    return;
+  }
+
+  const updated = removeSandboxWritableRoot(content, rootPath);
+  await fs.writeFile(configPath, updated, 'utf8');
+}
+
 function upsertSandboxWritableRoot(content: string, rootPath: string): string {
   const line = `writable_roots = [ "${rootPath}" ]`;
   const normalizedContent = stripWritableRoots(content).replace(/\n{3,}/g, '\n\n');
@@ -392,6 +409,40 @@ function dedupeWritableRootLines(content: string): string {
       return true;
     })
     .join('\n');
+}
+
+function removeSandboxWritableRoot(content: string, rootPath: string): string {
+  const sectionRegex = /\[sandbox_workspace_write\]([\s\S]*?)(?=\n\[|$)/;
+  const sectionMatch = content.match(sectionRegex);
+  if (!sectionMatch) {
+    return content;
+  }
+
+  const section = sectionMatch[0];
+  const rootsMatch = section.match(/writable_roots\s*=\s*\[([\s\S]*?)\]/m);
+  if (!rootsMatch) {
+    return content;
+  }
+
+  const roots = Array.from(rootsMatch[1].matchAll(/"((?:\\"|[^"])*)"/g))
+    .map((item) => item[1].replace(/\\"/g, '"'))
+    .filter((item) => item !== rootPath);
+
+  const bodyLines = section
+    .split('\n')
+    .slice(1)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim() && !line.trimStart().startsWith('writable_roots'));
+
+  const updatedSectionLines = ['[sandbox_workspace_write]'];
+  if (roots.length > 0) {
+    updatedSectionLines.push(`writable_roots = [ ${roots.map((value) => `"${value}"`).join(', ')} ]`);
+  }
+  updatedSectionLines.push(...bodyLines);
+
+  const replacement = updatedSectionLines.length > 1 ? `${updatedSectionLines.join('\n')}\n` : '';
+  const updatedContent = content.replace(sectionRegex, replacement).replace(/\n{3,}/g, '\n\n');
+  return updatedContent.trimEnd() ? `${updatedContent.trimEnd()}\n` : '';
 }
 
 function buildDispatchScript(existingNotify: string[] | null): string {

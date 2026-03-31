@@ -53,6 +53,7 @@ describe('host doctor reusable helpers', () => {
     expect(beforeChecks['AGENTS.md']).toBe(false);
     expect(beforeChecks['config.toml']).toBe(false);
     expect(beforeChecks['notify-review.sh']).toBe(false);
+    expect(beforeChecks['notify-dispatch.sh']).toBe(false);
 
     const installResult = await installCodexHost(tempHome);
     expect(installResult.success).toBe(true);
@@ -63,6 +64,7 @@ describe('host doctor reusable helpers', () => {
     expect(installChecks['AGENTS.md']).toBe(true);
     expect(installChecks['config.toml']).toBe(true);
     expect(installChecks['notify-review.sh']).toBe(true);
+    expect(installChecks['notify-dispatch.sh']).toBe(true);
 
     const uninstallResult = await uninstallCodexHost(tempHome);
     expect(uninstallResult.success).toBe(true);
@@ -73,6 +75,18 @@ describe('host doctor reusable helpers', () => {
     expect(uninstallChecks['AGENTS.md']).toBe(false);
     expect(uninstallChecks['config.toml']).toBe(false);
     expect(uninstallChecks['notify-review.sh']).toBe(false);
+    expect(uninstallChecks['notify-dispatch.sh']).toBe(false);
+  });
+
+  it('marks Codex doctor unhealthy when notify-dispatch.sh is missing', async () => {
+    const installResult = await installCodexHost(tempHome);
+    expect(installResult.success).toBe(true);
+
+    await fs.rm(path.join(tempHome, '.codex', 'corivo', 'notify-dispatch.sh'), { force: true });
+
+    const doctor = await isCodexInstalled(tempHome);
+    expect(doctor.ok).toBe(false);
+    expect(toCheckMap(doctor.checks)['notify-dispatch.sh']).toBe(false);
   });
 
   it('preserves pre-existing Codex notify command after uninstall', async () => {
@@ -97,6 +111,7 @@ describe('host doctor reusable helpers', () => {
     const restoredConfig = await fs.readFile(configPath, 'utf8');
     expect(restoredConfig).toContain(originalNotifyCommand);
     expect(restoredConfig).not.toContain('notify-dispatch.sh');
+    expect(restoredConfig).not.toContain(path.join(tempHome, '.corivo'));
   });
 
   it('covers Cursor install/doctor/uninstall checks', async () => {
@@ -105,6 +120,7 @@ describe('host doctor reusable helpers', () => {
     expect(beforeChecks['corivo.mdc']).toBe(false);
     expect(beforeChecks['settings.json hooks']).toBe(false);
     expect(beforeChecks['cli-config.json permissions']).toBe(false);
+    expect(beforeChecks['adapter scripts']).toBe(false);
 
     const installResult = await installCursorHost(tempHome);
     expect(installResult.success).toBe(true);
@@ -115,6 +131,7 @@ describe('host doctor reusable helpers', () => {
     expect(installChecks['corivo.mdc']).toBe(true);
     expect(installChecks['settings.json hooks']).toBe(true);
     expect(installChecks['cli-config.json permissions']).toBe(true);
+    expect(installChecks['adapter scripts']).toBe(true);
 
     const uninstallResult = await uninstallCursorHost(tempHome);
     expect(uninstallResult.success).toBe(true);
@@ -125,6 +142,18 @@ describe('host doctor reusable helpers', () => {
     expect(uninstallChecks['corivo.mdc']).toBe(false);
     expect(uninstallChecks['settings.json hooks']).toBe(false);
     expect(uninstallChecks['cli-config.json permissions']).toBe(false);
+    expect(uninstallChecks['adapter scripts']).toBe(false);
+  });
+
+  it('marks Cursor doctor unhealthy when adapter script is missing', async () => {
+    const installResult = await installCursorHost(tempHome);
+    expect(installResult.success).toBe(true);
+
+    await fs.rm(path.join(tempHome, '.cursor', 'corivo', 'prompt-recall.sh'), { force: true });
+
+    const doctor = await isCursorInstalled(tempHome);
+    expect(doctor.ok).toBe(false);
+    expect(toCheckMap(doctor.checks)['adapter scripts']).toBe(false);
   });
 
   it('covers OpenCode install/doctor/uninstall checks', async () => {

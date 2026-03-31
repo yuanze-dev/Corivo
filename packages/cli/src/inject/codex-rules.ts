@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { copyHostAsset, readHostTemplateText } from './host-assets.js';
+import type { HostDoctorResult, HostInstallResult } from '../hosts/types.js';
 
 const START_MARKER = '<!-- CORIVO CODEX START -->';
 const END_MARKER = '<!-- CORIVO CODEX END -->';
@@ -15,6 +16,31 @@ ${START_MARKER}
 ${templateText}
 ${END_MARKER}
 `.trim();
+}
+
+export interface CodexPaths {
+  homeDir: string;
+  codexDir: string;
+  agentsPath: string;
+  configPath: string;
+  adapterDir: string;
+  dispatchPath: string;
+  reviewPath: string;
+}
+
+export function getCodexPaths(homeDir: string = process.env.HOME || os.homedir()): CodexPaths {
+  const codexDir = path.join(homeDir, '.codex');
+  const adapterDir = path.join(codexDir, 'corivo');
+
+  return {
+    homeDir,
+    codexDir,
+    agentsPath: path.join(codexDir, 'AGENTS.md'),
+    configPath: path.join(codexDir, 'config.toml'),
+    adapterDir,
+    dispatchPath: path.join(adapterDir, DISPATCH_SCRIPT_NAME),
+    reviewPath: path.join(adapterDir, REVIEW_SCRIPT_NAME),
+  };
 }
 
 export async function injectCodexRules(
@@ -56,46 +82,118 @@ export async function injectGlobalCodexRules(): Promise<{
   path?: string;
   error?: string;
 }> {
-  const home = process.env.HOME || os.homedir();
-  const codexDir = path.join(home, '.codex');
-  const filePath = path.join(codexDir, 'AGENTS.md');
-  const configPath = path.join(codexDir, 'config.toml');
-  const adapterDir = path.join(codexDir, 'corivo');
-  const dispatchPath = path.join(adapterDir, DISPATCH_SCRIPT_NAME);
-  const reviewPath = path.join(adapterDir, REVIEW_SCRIPT_NAME);
+  const result = await installCodexHost();
+  return {
+    success: result.success,
+    path: result.path,
+    error: result.error,
+  };
+}
+
+export async function installCodexHost(homeDir?: string): Promise<HostInstallResult> {
+  const paths = getCodexPaths(homeDir);
 
   try {
-    await fs.mkdir(adapterDir, { recursive: true });
+    await fs.mkdir(paths.adapterDir, { recursive: true });
 
-    const existingConfig = await readFileIfExists(configPath);
+    const existingConfig = await readFileIfExists(paths.configPath);
     const existingNotify = extractNotifyCommand(existingConfig);
-    const wrappedNotify = shouldWrapNotify(existingNotify, dispatchPath) ? existingNotify : null;
-    const existingDispatch = await readFileIfExists(dispatchPath);
+    const wrappedNotify = shouldWrapNotify(existingNotify, paths.dispatchPath) ? existingNotify : null;
+    const existingDispatch = await readFileIfExists(paths.dispatchPath);
 
-    await copyHostAsset('codex', 'adapters/notify-review.sh', reviewPath, { mode: 0o755 });
+    await copyHostAsset('codex', 'adapters/notify-review.sh', paths.reviewPath, { mode: 0o755 });
 
     const dispatchContent = wrappedNotify
       ? buildDispatchScript(wrappedNotify)
       : (existingDispatch || buildDispatchScript(null));
-    await fs.writeFile(dispatchPath, dispatchContent, 'utf8');
-    await fs.chmod(dispatchPath, 0o755);
+    await fs.writeFile(paths.dispatchPath, dispatchContent, 'utf8');
+    await fs.chmod(paths.dispatchPath, 0o755);
 
-    let updatedConfig = upsertNotifyCommand(existingConfig, ['bash', dispatchPath]);
-    updatedConfig = upsertSandboxWritableRoot(updatedConfig, path.join(home, '.corivo'));
-    await fs.mkdir(codexDir, { recursive: true });
-    await fs.writeFile(configPath, updatedConfig, 'utf8');
+    let updatedConfig = upsertNotifyCommand(existingConfig, ['bash', paths.dispatchPath]);
+    updatedConfig = upsertSandboxWritableRoot(updatedConfig, path.join(paths.homeDir, '.corivo'));
+    await fs.mkdir(paths.codexDir, { recursive: true });
+    await fs.writeFile(paths.configPath, updatedConfig, 'utf8');
 
-    const result = await injectCodexRules(filePath);
+    const result = await injectCodexRules(paths.agentsPath);
 
     return {
       success: result.success,
-      path: filePath,
+      host: 'codex',
+      path: paths.agentsPath,
+      summary: result.success ? 'Codex host installed' : 'Codex host install failed',
       error: result.error,
     };
   } catch (error) {
     return {
       success: false,
-      path: filePath,
+      host: 'codex',
+      path: paths.agentsPath,
+      summary: 'Codex host install failed',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function isCodexInstalled(homeDir?: string): Promise<HostDoctorResult> {
+  const paths = getCodexPaths(homeDir);
+  const [agentsContent, configContent, reviewContent] = await Promise.all([
+    readFileIfExists(paths.agentsPath),
+    readFileIfExists(paths.configPath),
+    readFileIfExists(paths.reviewPath),
+  ]);
+  const notify = extractNotifyCommand(configContent);
+
+  const checks = [
+    {
+      label: 'AGENTS.md',
+      ok: agentsContent.includes(START_MARKER) && agentsContent.includes(END_MARKER),
+      detail: paths.agentsPath,
+    },
+    {
+      label: 'config.toml',
+      ok: Boolean(
+        notify
+        && notify.includes(paths.dispatchPath)
+        && configContent.includes('[sandbox_workspace_write]'),
+      ),
+      detail: paths.configPath,
+    },
+    {
+      label: 'notify-review.sh',
+      ok: reviewContent.includes('corivo review'),
+      detail: paths.reviewPath,
+    },
+  ];
+
+  return {
+    ok: checks.every((item) => item.ok),
+    host: 'codex',
+    checks,
+  };
+}
+
+export async function uninstallCodexHost(homeDir?: string): Promise<HostInstallResult> {
+  const paths = getCodexPaths(homeDir);
+
+  try {
+    await removeCodexRuleBlock(paths.agentsPath);
+    await removeCodexNotifyConfig(paths.configPath, paths.dispatchPath);
+    await fs.rm(paths.dispatchPath, { force: true });
+    await fs.rm(paths.reviewPath, { force: true });
+    await fs.rm(paths.adapterDir, { recursive: true, force: true });
+
+    return {
+      success: true,
+      host: 'codex',
+      path: paths.agentsPath,
+      summary: 'Codex host uninstalled',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      host: 'codex',
+      path: paths.agentsPath,
+      summary: 'Codex host uninstall failed',
       error: error instanceof Error ? error.message : String(error),
     };
   }
@@ -111,6 +209,18 @@ async function readFileIfExists(filePath: string): Promise<string> {
   } catch {
     return '';
   }
+}
+
+async function removeCodexRuleBlock(filePath: string): Promise<void> {
+  const content = await readFileIfExists(filePath);
+
+  if (!content.includes(START_MARKER) || !content.includes(END_MARKER)) {
+    return;
+  }
+
+  const regex = new RegExp(`\\n?${escapeRegExp(START_MARKER)}[\\s\\S]*${escapeRegExp(END_MARKER)}\\n?`, 'g');
+  const updated = content.replace(regex, '\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
+  await fs.writeFile(filePath, updated, 'utf8');
 }
 
 function extractNotifyCommand(content: string): string[] | null {
@@ -142,6 +252,29 @@ function upsertNotifyCommand(content: string, command: string[]): string {
   }
 
   return content.endsWith('\n') ? `${content}${notifyLine}\n` : `${content}\n${notifyLine}\n`;
+}
+
+function removeNotifyCommand(content: string): string {
+  if (!/notify\s*=\s*\[[\s\S]*?\]/m.test(content)) {
+    return content;
+  }
+
+  const updated = content.replace(/notify\s*=\s*\[[\s\S]*?\]\s*\n?/m, '');
+  return `${updated.replace(/\n{3,}/g, '\n\n').trimEnd()}\n`;
+}
+
+async function removeCodexNotifyConfig(configPath: string, dispatchPath: string): Promise<void> {
+  const content = await readFileIfExists(configPath);
+  if (!content) {
+    return;
+  }
+
+  const notify = extractNotifyCommand(content);
+  if (!notify || !notify.includes(dispatchPath)) {
+    return;
+  }
+
+  await fs.writeFile(configPath, removeNotifyCommand(content), 'utf8');
 }
 
 function upsertSandboxWritableRoot(content: string, rootPath: string): string {

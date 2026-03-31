@@ -21,7 +21,6 @@ coverage/
 # Claude
 .gstack/
 .claude/
-.airbo/
 
 # Prebuild
 prebuilds/

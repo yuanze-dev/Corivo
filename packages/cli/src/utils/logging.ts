@@ -1,70 +1,64 @@
+import { formatWithOptions } from 'node:util';
+import { createConsola, LogLevels } from 'consola';
+import type { ConsolaReporter, LogObject } from 'consola';
+import type { LogLevel } from '@/type';
+
 type ConsoleMethod = (...args: unknown[]) => void;
-export type LogLevel = 'error' | 'info' | 'debug';
-type LogTarget = {
+
+export interface LogTarget {
   log: ConsoleMethod;
   error: ConsoleMethod;
-};
-
-function pad(value: number): string {
-  return String(value).padStart(2, '0');
 }
 
-function formatTimestamp(date: Date): string {
-  return [
-    date.getFullYear(),
-    pad(date.getMonth() + 1),
-    pad(date.getDate()),
-  ].join('-') + ` ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-}
-
-function stringifyLogArg(arg: unknown): string {
-  if (typeof arg === 'string') return arg;
-  if (arg instanceof Error) return arg.stack || arg.message;
-
-  try {
-    const json = JSON.stringify(arg);
-    return json ?? String(arg);
-  } catch {
-    return String(arg);
-  }
-}
-
-export function formatLogLine(args: unknown[], date = new Date()): string {
-  const timestamp = `[${formatTimestamp(date)}]`;
-  const message = args.map(stringifyLogArg).join(' ');
-
-  return message
-    .split('\n')
-    .map((line) => (line ? `${timestamp} ${line}` : line))
-    .join('\n');
-}
-
-export function createTimestampLogger(target = console): {
+export interface Logger {
   log: ConsoleMethod;
+  info: ConsoleMethod;
+  success: ConsoleMethod;
+  warn: ConsoleMethod;
   error: ConsoleMethod;
   debug: ConsoleMethod;
   isDebugEnabled: () => boolean;
-};
-export function createTimestampLogger(target: LogTarget = console, level: LogLevel = 'info'): {
-  log: ConsoleMethod;
-  error: ConsoleMethod;
-  debug: ConsoleMethod;
-  isDebugEnabled: () => boolean;
-} {
-  return {
-    log: (...args: unknown[]) => target.log(formatLogLine(args)),
-    error: (...args: unknown[]) => target.error(formatLogLine(args)),
-    debug: (...args: unknown[]) => {
-      if (level === 'debug') {
-        target.log(formatLogLine(args));
-      }
+}
+
+const DEFAULT_LOG_LEVEL: LogLevel = 'info';
+
+const isLogLevel = (value: string): value is LogLevel =>
+  value === 'error' || value === 'info' || value === 'debug';
+
+const resolveLogLevel = (value?: string | null): LogLevel =>
+  value && isLogLevel(value) ? value : DEFAULT_LOG_LEVEL;
+
+const formatArgs = (args: unknown[]): string =>
+  formatWithOptions({ colors: false, depth: 6 }, ...args);
+
+const createTargetReporter = (target: LogTarget): ConsolaReporter => ({
+  log: (logObj: LogObject) => {
+    const write = logObj.level <= 1 ? target.error : target.log;
+    write(formatArgs(logObj.args));
+  },
+});
+
+export const createLogger = (
+  target: LogTarget = console,
+  level?: LogLevel | string | null
+): Logger => {
+  const resolvedLevel = resolveLogLevel(level);
+  const logger = createConsola({
+    level: LogLevels[resolvedLevel],
+    reporters: target === console ? undefined : [createTargetReporter(target)],
+    formatOptions: {
+      date: true,
+      compact: true,
     },
-    isDebugEnabled: () => level === 'debug',
-  };
-}
+  });
 
-export function normalizeLogLevel(level?: string | null): LogLevel {
-  if (level === 'error') return 'error';
-  if (level === 'debug') return 'debug';
-  return 'info';
-}
+  return {
+    log: logger.info.bind(logger),
+    info: logger.info.bind(logger),
+    success: logger.success.bind(logger),
+    warn: logger.warn.bind(logger),
+    error: logger.error.bind(logger),
+    debug: logger.debug.bind(logger),
+    isDebugEnabled: () => resolvedLevel === 'debug',
+  };
+};

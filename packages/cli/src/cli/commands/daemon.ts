@@ -8,10 +8,10 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { Command } from 'commander'
 import { getConfigDir } from '../../storage/database.js'
-import { createTimestampLogger } from '../../utils/logging.js'
+import { createLogger } from '../../utils/logging.js'
 
 export const daemonCommand = new Command('daemon')
-const logger = createTimestampLogger()
+const logger = createLogger()
 
 daemonCommand
   .description('内部使用，由 service manager 调用')

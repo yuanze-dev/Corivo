@@ -5,10 +5,10 @@
  * 前提：用户已通过 `corivo sync --register` 完成注册。
  */
 
-import { loadConfig, loadSolverConfig, saveSolverConfig } from '../config.js';
-import { applyPulledChangesets, authenticate, post } from '../cli/commands/sync.js';
-import type { CorivoDatabase } from '../storage/database.js';
-import { createTimestampLogger, normalizeLogLevel } from '../utils/logging.js';
+import { loadConfig, loadSolverConfig, saveSolverConfig } from '@/config';
+import { applyPulledChangesets, authenticate, post } from '@/cli/commands/sync';
+import type { CorivoDatabase } from '@/storage/database';
+import { createLogger } from '@/utils/logging';
 
 const TOKEN_TTL = 4 * 60 * 1000; // 4 分钟（服务端 TTL 5 分钟）
 
@@ -23,11 +23,10 @@ export class AutoSync {
    * @returns 同步结果计数，若未配置或出错则返回 null
    */
   async run(): Promise<{ pushed: number; pulled: number } | null> {
-    let logger = createTimestampLogger();
     try {
       const config = await loadConfig();
       if (!config) return null;
-      logger = createTimestampLogger(console, normalizeLogLevel(config.settings?.logLevel));
+      const logger = createLogger(console, config.settings?.logLevel);
 
       const solverConfig = await loadSolverConfig();
       if (!solverConfig) return null;
@@ -98,7 +97,7 @@ export class AutoSync {
       logger.debug(`[sync:auto] 同步结束 push=${pushed} pull=${pulled}`);
       return { pushed, pulled };
     } catch (error) {
-      logger.error('[sync:auto] 同步失败:', error instanceof Error ? error.message : error);
+      createLogger().error('[sync:auto] 同步失败:', error instanceof Error ? error.message : error);
       // 401 认证失败：清除缓存 token，下次重新获取
       if (error instanceof Error && error.message.includes('401')) {
         this.token = null;
@@ -112,7 +111,7 @@ export class AutoSync {
     serverUrl: string,
     identityId: string,
     sharedSecret: string,
-    logger = createTimestampLogger()
+    logger = createLogger()
   ): Promise<string> {
     if (this.token && this.isTokenValid()) {
       logger.debug('[sync:auto] 复用缓存 token');

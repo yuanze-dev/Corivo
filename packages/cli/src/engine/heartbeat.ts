@@ -21,13 +21,13 @@ import { DatabaseError } from '../errors/index.js';
 import type { BlockStatus, Pattern } from '../models/index.js';
 import { vitalityToStatus } from '../models/block.js';
 import { loadConfig } from '../config.js';
-import { createTimestampLogger } from '../utils/logging.js';
+import { createLogger } from '../utils/logging.js';
 
 const HEARTBEAT_INTERVAL = 5000; // 5 秒
 const PENDING_BATCH_SIZE = 10; // 每次处理的 pending 数量
 const HEALTH_CHECK_FILE = '.heartbeat-health'; // 健康检查文件
 const HEALTH_CHECK_INTERVAL = 30000; // 30 秒写入一次健康状态
-const logger = createTimestampLogger();
+const logger = createLogger();
 
 /**
  * 心跳引擎配置

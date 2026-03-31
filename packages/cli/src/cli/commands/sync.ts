@@ -9,16 +9,14 @@ import { createHmac, randomBytes } from 'node:crypto';
 import os from 'node:os';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { loadConfig, loadSolverConfig, saveSolverConfig, getDatabaseKey } from '../../config.js';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
-import { createTimestampLogger, normalizeLogLevel } from '../../utils/logging.js';
+import { loadConfig, loadSolverConfig, saveSolverConfig, getDatabaseKey } from '@/config';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
+import { createLogger } from '@/utils/logging';
+import type { Logger as SyncLogger, LogTarget } from '@/utils/logging';
 
 interface RegisterResponse {
   shared_secret: string;
 }
-
-type SyncLogger = ReturnType<typeof createTimestampLogger>;
-type LogTarget = Parameters<typeof createTimestampLogger>[0];
 
 export interface PulledChangeset {
   table_name: string;
@@ -60,7 +58,7 @@ function summarizeChangesets(changesets: PulledChangeset[]): string {
 }
 
 export function createSyncLogger(logLevel?: string, target?: LogTarget): SyncLogger {
-  return createTimestampLogger(target, normalizeLogLevel(logLevel));
+  return createLogger(target, logLevel);
 }
 
 function buildDeviceName(): string {

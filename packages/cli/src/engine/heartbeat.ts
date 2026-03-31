@@ -22,6 +22,7 @@ import { DatabaseError } from '../errors/index.js';
 import type { BlockStatus, Pattern } from '../models/index.js';
 import { vitalityToStatus } from '../models/block.js';
 import { loadConfig } from '../config.js';
+import { createCliContext } from '../cli/context/create-context.js';
 import { createLogger } from '../utils/logging.js';
 
 const HEARTBEAT_INTERVAL = 5000; // 5 seconds
@@ -36,8 +37,6 @@ const logger = createLogger();
 export interface HeartbeatConfig {
   /** Database instance (optional; used for testing) */
   db?: CorivoDatabase;
-  /** Database encryption key (optional; base64-encoded) */
-  dbKey?: Buffer | string;
   /** Database file path (optional) */
   dbPath?: string;
   /** Sync interval in seconds (optional; for testing; production reads from config.json) */
@@ -127,30 +126,28 @@ export class Heartbeat {
 
     // Skip DB initialization if a db was injected (test mode)
     if (!this.db) {
-      // Read encryption key and DB path from environment variables set by the CLI process
-      const dbKeyBase64 = process.env.CORIVO_DB_KEY;
+      // Read DB path from environment variables set by the CLI process
       const dbPath = process.env.CORIVO_DB_PATH;
 
-      if (!dbKeyBase64 || !dbPath) {
-        throw new Error('缺少环境变量：CORIVO_DB_KEY 或 CORIVO_DB_PATH');
+      if (!dbPath) {
+        throw new Error('缺少环境变量：CORIVO_DB_PATH');
       }
 
-      // Decode base64 key to Buffer
-      const dbKey = Buffer.from(dbKeyBase64, 'base64');
-
       // Open the database
-      this.db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
+      this.db = CorivoDatabase.getInstance({ path: dbPath });
 
       // Initialize managers that depend on the database
       this.weeklySummary = new WeeklySummary(this.db);
       this.followUpManager = new FollowUpManager(this.db);
       this.triggerDecision = new TriggerDecision(this.db);
       this.pushQueue = new PushQueue();
-      this.autoSync = new AutoSync(this.db);
-
       // Load sync interval from config.json (production path; test mode uses constructor injection)
       const configDir = process.env.CORIVO_CONFIG_DIR || getConfigDir();
       const corivoConfig = await loadConfig(configDir);
+      this.autoSync = new AutoSync(
+        this.db,
+        createCliContext({ logLevel: corivoConfig?.settings?.logLevel })
+      );
       this.syncCycles = this.computeSyncCycles(corivoConfig?.settings?.syncIntervalSeconds);
 
       // Dynamically load configured plugins
@@ -323,24 +320,18 @@ export class Heartbeat {
     try {
       // Initialize the database if not already open
       if (!this.db) {
-        let dbKeyBase64 = process.env.CORIVO_DB_KEY;
         let dbPath = process.env.CORIVO_DB_PATH;
 
         // Fall back to constructor-injected config
-        if (!dbKeyBase64 && this.config?.dbKey) {
-          const key = this.config.dbKey;
-          dbKeyBase64 = Buffer.isBuffer(key) ? key.toString('base64') : key;
-        }
         if (!dbPath && this.config?.dbPath) {
           dbPath = this.config.dbPath;
         }
 
-        if (!dbKeyBase64 || !dbPath) {
-          throw new Error('缺少环境变量：CORIVO_DB_KEY 或 CORIVO_DB_PATH');
+        if (!dbPath) {
+          throw new Error('缺少环境变量：CORIVO_DB_PATH');
         }
 
-        const dbKey = Buffer.from(dbKeyBase64, 'base64');
-        this.db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
+        this.db = CorivoDatabase.getInstance({ path: dbPath });
       }
 
       // Process pending blocks with a relaxed count limit

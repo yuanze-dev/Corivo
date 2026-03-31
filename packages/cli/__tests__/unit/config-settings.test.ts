@@ -10,7 +10,6 @@ describe('CorivoSettings', () => {
       version: '1',
       created_at: '2026-01-01',
       identity_id: 'test-id',
-      db_key: 'dGVzdA==',
       settings: { syncIntervalSeconds: 900 },
     };
     expect(config.settings?.syncIntervalSeconds).toBe(900);
@@ -21,7 +20,6 @@ describe('CorivoSettings', () => {
       version: '1',
       created_at: '2026-01-01',
       identity_id: 'test-id',
-      db_key: 'dGVzdA==',
     };
     expect(config.settings).toBeUndefined();
   });
@@ -31,7 +29,6 @@ describe('CorivoSettings', () => {
       version: '1',
       created_at: '2026-01-01',
       identity_id: 'test-id',
-      db_key: 'dGVzdA==',
       plugins: ['@corivo/openclaw'],
     };
     expect(config.plugins).toEqual(['@corivo/openclaw']);
@@ -42,7 +39,6 @@ describe('CorivoSettings', () => {
       version: '1',
       created_at: '2026-01-01',
       identity_id: 'test-id',
-      db_key: 'dGVzdA==',
     };
     expect(config.plugins).toBeUndefined();
   });

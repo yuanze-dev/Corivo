@@ -7,6 +7,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { getConfigDir } from '@/storage/database';
+import { printBanner } from '@/utils/banner';
 import { IdentityManager, FingerprintCollector } from '../../identity/index.js';
 
 /**
@@ -22,9 +23,7 @@ export async function identityCommand(options: {
     const content = await fs.readFile(identityPath, 'utf-8');
     const identity = JSON.parse(content);
 
-    console.log('\n═══════════════════════════════════════════════════════');
-    console.log('                 Corivo Identity Information');
-    console.log('═══════════════════════════════════════════════════════\n');
+    printBanner('Corivo Identity Information', { width: 55 });
 
     console.log(`Identity ID: ${identity.identity_id}`);
     console.log(`Created at: ${new Date(identity.created_at).toLocaleString('en-US')}`);

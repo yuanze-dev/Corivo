@@ -7,14 +7,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
+import { printBanner } from '@/utils/banner';
 import { KeyManager } from '../../crypto/keys.js';
 import { ConfigError, ValidationError } from '../../errors/index.js';
 import { readPassword } from '../utils/password.js';
 
 export async function recoverCommand(): Promise<void> {
-  console.log('\n═══════════════════════════════════════════════════════');
-  console.log('                      Data Recovery Wizard');
-  console.log('═══════════════════════════════════════════════════════\n');
+  printBanner('Data Recovery Wizard', { width: 55 });
 
   // Check configuration file
   const configDir = getConfigDir();

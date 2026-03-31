@@ -2,7 +2,7 @@ import React from 'react';
 import { render } from 'ink';
 import path from 'node:path';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../storage/database.js';
-import { getDatabaseKey, loadConfig } from '../config.js';
+import { loadConfig } from '../config.js';
 import { App } from './App.js';
 
 export async function renderTui(): Promise<void> {
@@ -27,18 +27,14 @@ export async function renderTui(): Promise<void> {
     process.exit(1);
   }
 
-  const dbKey = await getDatabaseKey(configDir);
-  if (!dbKey) {
-    console.error('Cannot read database key. Run: corivo init');
+  if (rawConfig!['encrypted_db_key'] !== undefined) {
+    console.error('Detected a legacy password-based config. Run: corivo init');
     process.exit(1);
   }
 
-  const enableEncryption = rawConfig!['encrypted_db_key'] !== undefined;
-
   const db = CorivoDatabase.getInstance({
     path: dbPath,
-    key: dbKey,
-    enableEncryption,
+    enableEncryption: false,
   });
 
   const { waitUntilExit } = render(

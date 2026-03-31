@@ -126,7 +126,7 @@ src/
 
 **守护进程运行方式：**
 
-`corivo start` 通过 macOS launchd（`packages/cli/src/daemon/macos.ts`）将心跳进程注册为后台服务。密钥通过环境变量 `CORIVO_DB_KEY`（base64）传入心跳进程。
+`corivo start` 通过 service manager 将心跳进程注册为后台服务。当前只通过环境变量 `CORIVO_DB_PATH` 传入数据库路径，不再传递 `db_key`。
 
 ---
 

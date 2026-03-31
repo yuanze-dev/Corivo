@@ -41,8 +41,6 @@ ${programArgsXml}
 
   <key>EnvironmentVariables</key>
   <dict>
-    <key>CORIVO_DB_KEY</key>
-    <string>${config.dbKey}</string>
     <key>CORIVO_DB_PATH</key>
     <string>${config.dbPath}</string>
   </dict>

@@ -6,6 +6,7 @@
 
 import path from 'node:path';
 import chalk from 'chalk';
+import { printBanner } from '@/utils/banner';
 import { injectRules, ejectRules as ejectClaudeRules, injectGlobalRules, injectProjectRules, hasCorivoRules } from '../../inject/claude-rules.js';
 import { injectGlobalClaudeCodeHost } from '../../inject/claude-host.js';
 import { injectGlobalCodexRules } from '../../inject/codex-rules.js';
@@ -30,11 +31,7 @@ export async function injectCommand(options: {
 
   if (options.global) {
     if (options.claudeCode) {
-      console.log('');
-      console.log(chalk.cyan('══════════════════════════════════════════'));
-      console.log(chalk.cyan('     Installing global Claude Code adapter'));
-      console.log(chalk.cyan('══════════════════════════════════════════'));
-      console.log('');
+      printBanner('Installing global Claude Code adapter', { color: chalk.cyan });
 
       const result = await injectGlobalClaudeCodeHost();
 
@@ -53,11 +50,7 @@ export async function injectCommand(options: {
     }
 
     if (options.codex) {
-      console.log('');
-      console.log(chalk.cyan('══════════════════════════════════════════'));
-      console.log(chalk.cyan('     Injecting global Codex rules         '));
-      console.log(chalk.cyan('══════════════════════════════════════════'));
-      console.log('');
+      printBanner('Injecting global Codex rules', { color: chalk.cyan });
 
       const result = await injectGlobalCodexRules();
 
@@ -76,11 +69,7 @@ export async function injectCommand(options: {
     }
 
     if (options.cursor) {
-      console.log('');
-      console.log(chalk.cyan('══════════════════════════════════════════'));
-      console.log(chalk.cyan('     Injecting global Cursor rules        '));
-      console.log(chalk.cyan('══════════════════════════════════════════'));
-      console.log('');
+      printBanner('Injecting global Cursor rules', { color: chalk.cyan });
 
       const result = await injectGlobalCursorRules();
 
@@ -99,11 +88,7 @@ export async function injectCommand(options: {
     }
 
     if (options.opencode) {
-      console.log('');
-      console.log(chalk.cyan('══════════════════════════════════════════'));
-      console.log(chalk.cyan('     Installing global OpenCode plugin    '));
-      console.log(chalk.cyan('══════════════════════════════════════════'));
-      console.log('');
+      printBanner('Installing global OpenCode plugin', { color: chalk.cyan });
 
       const result = await injectGlobalOpencodePlugin();
 
@@ -122,11 +107,7 @@ export async function injectCommand(options: {
     }
 
     // Inject into global CLAUDE.md
-    console.log('');
-    console.log(chalk.cyan('══════════════════════════════════════════'));
-    console.log(chalk.cyan('     Injecting global rules              '));
-    console.log(chalk.cyan('══════════════════════════════════════════'));
-    console.log('');
+    printBanner('Injecting global rules', { color: chalk.cyan });
 
     const result = await injectGlobalRules();
 
@@ -148,11 +129,7 @@ export async function injectCommand(options: {
   const targetPath = options.target || process.cwd();
   const claudeMd = path.join(targetPath, 'CLAUDE.md');
 
-  console.log('');
-  console.log(chalk.cyan('══════════════════════════════════════════'));
-  console.log(chalk.cyan('     Injecting project rules             '));
-  console.log(chalk.cyan('══════════════════════════════════════════'));
-  console.log('');
+  printBanner('Injecting project rules', { color: chalk.cyan });
 
   const hasExisting = await hasCorivoRules(claudeMd);
   if (hasExisting && !options.force) {

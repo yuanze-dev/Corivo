@@ -148,6 +148,6 @@ interface Block {
 
 **新增提取器**：在 `src/cold-scan/extractors/` 实现 `Extractor` 接口，在 `src/cold-scan/index.ts` 中引入。
 
-**守护进程传参**：密钥通过环境变量 `CORIVO_DB_KEY`（base64）和 `CORIVO_DB_PATH` 注入心跳子进程，不走命令行参数。
+**守护进程传参**：仅通过环境变量 `CORIVO_DB_PATH` 注入心跳子进程，不走命令行参数，也不再传递 `db_key`。
 
 **ESM 注意**：所有内部导入必须带 `.js` 扩展名（TypeScript 编译后的 ESM 要求）。

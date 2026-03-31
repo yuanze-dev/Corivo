@@ -9,6 +9,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { Heartbeat } from '../../engine/heartbeat.js';
 import { getConfigDir, getDefaultDatabasePath } from '@/storage/database';
+import { printBanner } from '@/utils/banner';
 
 export const firstRunCommand = new Command('first-run');
 
@@ -20,15 +21,7 @@ firstRunCommand
   .option('--no-cold-zone', 'Skip cold-zone consolidation')
   .action(async (options) => {
     try {
-      console.log('');
-      console.log(
-        chalk.cyan('══════════════════════════════════════════')
-      );
-      console.log(chalk.cyan('     Organizing memories...              '));
-      console.log(
-        chalk.cyan('══════════════════════════════════════════')
-      );
-      console.log('');
+      printBanner('Organizing memories...', { color: chalk.cyan });
 
       // Read configuration
       const configDir = getConfigDir();
@@ -55,11 +48,7 @@ firstRunCommand
         skipColdZone: options.coldZone === false,
       });
 
-      console.log('');
-      console.log(chalk.green('══════════════════════════════════════════'));
-      console.log(chalk.green('     Organization complete!              '));
-      console.log(chalk.green('══════════════════════════════════════════'));
-      console.log('');
+      printBanner('Organization complete!', { color: chalk.green });
       console.log(`Processed ${result.processedBlocks} memories`);
       console.log(`Elapsed time: ${result.elapsedTime}ms`);
       console.log('');

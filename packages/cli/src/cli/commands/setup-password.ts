@@ -9,6 +9,7 @@ import path from 'node:path';
 import chalk from 'chalk';
 import { KeyManager } from '../../crypto/keys.js';
 import { getConfigDir } from '@/storage/database';
+import { printBanner } from '@/utils/banner';
 import { ConfigError, ValidationError } from '../../errors/index.js';
 import { readPassword } from '../utils/password.js';
 
@@ -38,9 +39,7 @@ export async function setupPasswordCommand(options: SetupPasswordOptions = {}): 
     return;
   }
 
-  console.log('\\n═══════════════════════════════════════════════════════');
-  console.log('           Set Master Password');
-  console.log('═══════════════════════════════════════════════════════\\n');
+  printBanner('Set Master Password', { width: 55 });
 
   console.log('The master password is used for:');
   console.log('  • Protecting database encryption (for cloud sync security)');

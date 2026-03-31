@@ -54,8 +54,8 @@ import { KeyManager } from '../crypto/keys.js';
 interface DatabaseConfig {
   /** Database file path */
   path: string;
-  /** database key */
-  key: Buffer;
+  /** Optional database key for legacy encrypted databases */
+  key?: Buffer;
   /** Whether to enable encryption (default false) */
   enableEncryption?: boolean;
 }
@@ -188,6 +188,13 @@ export class CorivoDatabase {
     this.createSchema();
   }
 
+  private getContentKey(): Buffer {
+    if (!this.config.key) {
+      throw new DatabaseError('Missing database key for encrypted content operations');
+    }
+    return this.config.key;
+  }
+
   /**
    * Try setting up SQLCipher encryption
    *
@@ -195,6 +202,9 @@ export class CorivoDatabase {
    */
   private trySetupSQLCipher(): boolean {
     try {
+      if (!this.config.key) {
+        throw new Error('Missing database key');
+      }
       const hexKey = this.config.key.toString('hex');
 
       // Set encryption key
@@ -438,7 +448,7 @@ export class CorivoDatabase {
 
     // If encryption is enabled but SQLCipher is not available, use application layer encryption
     const contentToStore = (this.enableEncryption && !this.useSQLCipher)
-      ? KeyManager.encryptContent(input.content, this.config.key)
+      ? KeyManager.encryptContent(input.content, this.getContentKey())
       : input.content;
 
     const stmt = this.db.prepare(`
@@ -503,7 +513,7 @@ export class CorivoDatabase {
     const existing = this.getBlock(input.id);
     const now = Math.floor(Date.now() / 1000);
     const contentToStore = (this.enableEncryption && !this.useSQLCipher)
-      ? KeyManager.encryptContent(input.content, this.config.key)
+      ? KeyManager.encryptContent(input.content, this.getContentKey())
       : input.content;
 
     const merged: Block = {
@@ -590,7 +600,7 @@ export class CorivoDatabase {
       fields.push('content = ?');
       // If encryption is enabled but SQLCipher is not available, encrypt content
       const contentToStore = (this.enableEncryption && !this.useSQLCipher)
-        ? KeyManager.encryptContent(updates.content, this.config.key)
+        ? KeyManager.encryptContent(updates.content, this.getContentKey())
         : updates.content;
       values.push(contentToStore);
     }
@@ -1272,7 +1282,7 @@ export class CorivoDatabase {
       recentBlocks: recentRows.map(r => ({
         ...r,
         content: (this.enableEncryption && !this.useSQLCipher)
-          ? KeyManager.decryptContent(r.content, this.config.key)
+          ? KeyManager.decryptContent(r.content, this.getContentKey())
           : r.content,
       })),
       dbSize: (pageSize || 0) * (pageCount || 0),
@@ -1295,7 +1305,7 @@ export class CorivoDatabase {
   private rowToBlock(row: any): Block {
     // If encryption is enabled but SQLCipher is not available, decrypt content
     const content = (this.enableEncryption && !this.useSQLCipher)
-      ? KeyManager.decryptContent(row.content, this.config.key)
+      ? KeyManager.decryptContent(row.content, this.getContentKey())
       : row.content;
 
     return {

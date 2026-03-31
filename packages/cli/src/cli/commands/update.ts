@@ -4,6 +4,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { printBanner } from '@/utils/banner';
 import {
   checkForUpdate,
   performUpdate,
@@ -38,11 +39,7 @@ updateCommand
   });
 
 async function handleUpdateCommand(options: { check?: boolean }) {
-  console.log('');
-  console.log(chalk.cyan('══════════════════════════════════════════'));
-  console.log(chalk.cyan('     Corivo Update                       '));
-  console.log(chalk.cyan('══════════════════════════════════════════'));
-  console.log('');
+  printBanner('Corivo Update', { color: chalk.cyan });
 
   const currentVersion = getCurrentVersion();
   console.log(`Current version: ${currentVersion}`);

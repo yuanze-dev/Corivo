@@ -7,8 +7,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { coldScan } from '../../cold-scan/index.js';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
+import { coldScan } from '@/cold-scan';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
+import { printBanner } from '@/utils/banner';
 
 export const coldScanCommand = new Command('cold-scan');
 
@@ -19,17 +20,10 @@ coldScanCommand
   .option('--skip <sources...>', 'Skip specified scan sources')
   .action(async (options) => {
     try {
-      console.log('');
-      console.log(
-        chalk.cyan('══════════════════════════════════════════')
-      );
-      console.log(chalk.cyan('     Getting to know you...              '));
-      console.log(
-        chalk.cyan('══════════════════════════════════════════')
-      );
-      console.log('');
-      console.log(chalk.gray('Let me take a look at your workspace...'));
-      console.log('');
+      printBanner('Getting to know you...', {
+        subtitle: chalk.gray('Let me take a look at your workspace...'),
+        color: chalk.cyan,
+      });
 
       const result = await coldScan({
         verbose: options.verbose || false,
@@ -53,10 +47,9 @@ coldScanCommand
           console.log('');
         }
 
-        if (config?.db_key) {
-          const dbKey = Buffer.from(config.db_key, 'base64');
+        if (config && !config.encrypted_db_key) {
           const dbPath = process.env.CORIVO_DB_PATH || getDefaultDatabasePath();
-          const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
+          const db = CorivoDatabase.getInstance({ path: dbPath, enableEncryption: false });
 
           // Use transactions to save blocks in batches to ensure data persistence
           let saved = 0;
@@ -84,11 +77,7 @@ coldScanCommand
         }
       }
 
-      console.log('');
-      console.log(chalk.green('══════════════════════════════════════════'));
-      console.log(chalk.green('     Profile scan complete!              '));
-      console.log(chalk.green('══════════════════════════════════════════'));
-      console.log('');
+      printBanner('Profile scan complete!', { color: chalk.green });
       console.log(`Places scanned: ${result.totalScanned}`);
       console.log(`Items remembered: ${result.totalFound}`);
       console.log('');

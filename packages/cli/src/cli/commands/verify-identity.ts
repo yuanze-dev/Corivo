@@ -12,6 +12,7 @@ import { JointVerifier } from '../../identity/auth.js';
 import { IdentityManager } from '../../identity/identity.js';
 import { DynamicFingerprintCollector, initializeDefaultSoftwareConfigs } from '../../identity/collector.js';
 import { getConfigDir } from '@/storage/database';
+import { printBanner } from '@/utils/banner';
 import { ConfigError } from '../../errors/index.js';
 import { readPassword } from '../utils/password.js';
 
@@ -43,9 +44,7 @@ export async function verifyIdentityCommand(options: VerifyIdentityOptions = {})
     throw new ConfigError('Identity information not found. Please run: corivo init');
   }
 
-  console.log('\\n═══════════════════════════════════════════════════════');
-  console.log('           Cross-Device Identity Verification');
-  console.log('═══════════════════════════════════════════════════════\\n');
+  printBanner('Cross-Device Identity Verification', { width: 55 });
 
   // Show current identity information
   console.log(chalk.gray('Current identity ID: ') + chalk.white(identity.identity_id));

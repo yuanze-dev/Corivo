@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
+import { printBanner } from '@/utils/banner';
 import { ConfigError } from '../../errors/index.js';
 import { loadSolverConfig } from '../../config.js';
 import { ContextPusher } from '../../push/context.js';
@@ -41,10 +42,7 @@ export async function statusCommand(_options: { noPassword?: boolean } = {}): Pr
   const health = db.checkHealth();
   const solverConfig = await loadSolverConfig(configDir);
 
-  console.log('');
-  console.log(chalk.cyan('═══════════════════════════════════════════════════════'));
-  console.log(chalk.cyan('                     Corivo Status'));
-  console.log(chalk.cyan('═══════════════════════════════════════════════════════\n'));
+  printBanner('Corivo Status', { width: 55, color: chalk.cyan });
 
   console.log(chalk.cyan('📊 Memory Stats'));
   console.log(chalk.gray('  Total:    ') + chalk.white(stats.total.toString()));

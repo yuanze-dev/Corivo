@@ -1,7 +1,6 @@
 export interface ServiceConfig {
   /** corivo binary path, or command string in the format "node /path/to/cli.js" */
   corivoBin: string
-  dbKey: string
   dbPath: string
 }
 

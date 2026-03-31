@@ -68,7 +68,6 @@ program
   .option('-a, --annotation <text>', 'Annotation (type · domain · tag)')
   .option('-s, --source <text>', 'Source')
   .option('--pending', 'Save in pending mode (the heartbeat process will annotate it later)')
-  .option('--no-password', 'Skip password prompt (development mode)')
   .action((options) => saveCommand(options));
 
 program
@@ -78,7 +77,6 @@ program
   .option('-l, --limit <number>', 'Result limit', '10')
   .option('-v, --verbose', 'Show detailed information')
   .option('-p, --pattern', 'Show decision patterns')
-  .option('--no-password', 'Skip password prompt (development mode)')
   .action((query, options) => queryCommand(query, options));
 
 program

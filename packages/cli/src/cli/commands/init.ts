@@ -27,6 +27,7 @@ import { startCommand } from './start.js';
 import { registerWithSolver, post } from './sync.js';
 import { createCliContext } from '../context/create-context.js';
 import { readConfirm } from '../utils/password.js';
+import { printBanner } from '@/utils/banner';
 
 /**
  * Exit the process with the given code.
@@ -42,9 +43,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
   const context = createCliContext();
   const logger = context.logger;
 
-  console.log('\n═══════════════════════════════════════════════════════');
-  console.log('           Corivo - a digital companion that lives for you');
-  console.log('═══════════════════════════════════════════════════════\n');
+  printBanner('Corivo - a digital companion that lives for you', { width: 55 });
 
   // Skip existence check when --join is provided; the user will be prompted to confirm merging identities.
   const dbPath = getDefaultDatabasePath();
@@ -159,9 +158,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
     };
     await saveSolverConfig(solverConfig, configDir);
 
-    console.log('\n═══════════════════════════════════════════════════════');
-    console.log('                  ✅ Joined successfully!');
-    console.log('═══════════════════════════════════════════════════════\n');
+    printBanner('✅ Joined successfully!', { width: 55 });
     console.log('🎯 Corivo is ready');
     console.log('   Identity ID: ' + identityId);
     console.log('   Database:    ' + dbPath);
@@ -245,9 +242,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
     exit(1);
   }
 
-  console.log('\n═══════════════════════════════════════════════════════');
-  console.log('                  ✅ Initialization complete!');
-  console.log('═══════════════════════════════════════════════════════\n');
+  printBanner('✅ Initialization complete!', { width: 55 });
 
   console.log('🎯 Corivo is ready');
   console.log('   Identity ID: ' + identityId);

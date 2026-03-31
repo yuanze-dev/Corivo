@@ -18,7 +18,6 @@ describe('loadRuntimeDb', () => {
 
   afterEach(async () => {
     process.env.HOME = previousHome;
-    delete process.env.CORIVO_DB_KEY;
     await fs.rm(tempHome, { recursive: true, force: true });
   });
 

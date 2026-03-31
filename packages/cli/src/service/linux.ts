@@ -36,7 +36,6 @@ After=default.target
 [Service]
 Type=simple
 ExecStart=${execStart}
-Environment=CORIVO_DB_KEY=${config.dbKey}
 Environment=CORIVO_DB_PATH=${config.dbPath}
 StandardOutput=append:${LOG_FILE}
 StandardError=append:${ERR_FILE}

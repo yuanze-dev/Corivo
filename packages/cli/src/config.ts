@@ -62,8 +62,6 @@ export interface CorivoConfig {
   created_at: string;
   /** Identity ID */
   identity_id: string;
-  /** Database key (base64 encoded) */
-  db_key: string;
   features?: CorivoFeatures;
   settings?: CorivoSettings;
   /** Enabled plugin package names (installed globally via `npm install -g <pkg>`) */
@@ -85,7 +83,7 @@ export async function loadConfig(configDir?: string): Promise<CorivoConfig | nul
     const config = JSON.parse(content) as CorivoConfig;
 
     // Validate required fields
-    if (!config.db_key || !config.identity_id) {
+    if (!config.identity_id) {
       return null;
     }
 
@@ -117,25 +115,6 @@ export async function saveConfig(
       success: false,
       error: error instanceof Error ? error.message : String(error)
     };
-  }
-}
-
-/**
- * Get database key
- *
- * @param configDir - configuration directory
- * @returns database key (Buffer), or null if the configuration is invalid
- */
-export async function getDatabaseKey(configDir?: string): Promise<Buffer | null> {
-  const config = await loadConfig(configDir);
-  if (!config) {
-    return null;
-  }
-
-  try {
-    return Buffer.from(config.db_key, 'base64');
-  } catch {
-    return null;
   }
 }
 
@@ -195,6 +174,5 @@ export async function saveSolverConfig(
 export default {
   loadConfig,
   saveConfig,
-  getDatabaseKey,
   isInitialized
 };

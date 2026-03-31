@@ -121,6 +121,7 @@ CLI Commands（save / query / status / push / inject …）
 ```
 src/
   cli/commands/     CLI 命令实现（commander）
+  application/hosts/ Host install / doctor / uninstall use case
   cold-scan/        一次性扫描提取器（Codex, cursor, git, package.json…）
   engine/           核心引擎
     heartbeat.ts    后台守护进程主循环
@@ -130,15 +131,24 @@ src/
   ingestors/        实时摄取器（当前只有 Codex）
   identity/         身份标识（平台指纹，无需密码）
   crypto/           密钥管理与内容加密
+  hosts/            HostAdapter / HostRegistry（Codex / Cursor / OpenCode / Claude）
   storage/          数据库封装
   models/           Block / Association / Pattern 类型定义
   push/             上下文推送（注入到 AI 工具）
-  inject/           Codex Rules 注入
+  inject/           具体宿主安装 helper（被 HostAdapter 复用）
 ```
 
 **守护进程运行方式：**
 
 `corivo start` 通过 service manager 将心跳进程注册为后台服务。当前只通过环境变量 `CORIVO_DB_PATH` 传入数据库路径，不再传递 `db_key`。
+
+**宿主集成入口：**
+
+- `corivo host ...` 是新的宿主管理入口
+- `corivo inject ...` 保留为兼容 alias
+- `src/hosts/*` 负责宿主注册与薄适配层
+- `src/application/hosts/*` 负责 install / doctor / uninstall 编排
+- `src/inject/*` 保留具体宿主的安装实现，不再作为 CLI 主编排中心
 
 ---
 

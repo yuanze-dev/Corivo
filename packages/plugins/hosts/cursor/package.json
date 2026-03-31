@@ -1,0 +1,18 @@
+{
+  "name": "@corivo/cursor",
+  "version": "0.1.0",
+  "description": "Corivo Cursor host integration bundle assets",
+  "type": "module",
+  "files": [
+    "hooks",
+    "README.md"
+  ],
+  "keywords": [
+    "corivo",
+    "cursor",
+    "hooks",
+    "memory"
+  ],
+  "author": "Corivo Team",
+  "license": "MIT"
+}

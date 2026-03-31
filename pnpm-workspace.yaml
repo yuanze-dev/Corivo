@@ -1,6 +1,7 @@
 packages:
   - 'packages/*'
-  - 'packages/plugins/*'
+  - 'packages/plugins/hosts/*'
+  - 'packages/plugins/runtime/*'
 allowBuilds:
   better-sqlite3: true
   esbuild: true

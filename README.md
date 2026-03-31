@@ -51,7 +51,7 @@ Corivo is in active beta. The project is usable today, but still evolving quickl
 | Local memory engine (SQLite + heartbeat) | Available |
 | Claude Code integration | Available |
 | Sync relay (`packages/solver`) | Early-stage package |
-| Codex / OpenClaw plugin packages | Experimental package surface |
+| Host integration bundles + runtime plugins | Mixed maturity by package |
 | Official platform support | macOS arm64 first |
 
 ## Quick Start
@@ -78,6 +78,18 @@ Notes:
 - `scripts/install.sh` can detect and configure Claude Code, Codex, Cursor, and OpenCode on the same machine.
 - Some integrations shown in the repository are still in progress or experimental.
 
+## Single Installation Path
+
+Corivo keeps one installation control path: the local `corivo` CLI.
+
+- `scripts/install.sh` is the one-command bootstrap entry that installs and then delegates to CLI flows.
+- `corivo inject --global --<host>` is the stable host install entry for Claude Code, Codex, and Cursor.
+- OpenCode install is handled by `corivo inject --global --opencode`, which installs the packaged runtime asset from `packages/plugins/runtime/opencode/assets/corivo.ts`.
+- Host packages under `packages/plugins/hosts/*` are host integration bundles consumed by the CLI installer where host assets are CLI-backed.
+- `packages/plugins/hosts/opencode` is currently a reserved host boundary and is not CLI asset-backed in this stage.
+- Runtime packages under `packages/plugins/runtime/*` are executable runtime plugins; they are not host installers.
+
+This boundary exists so install behavior stays centralized while host/runtime packaging evolves.
 ## Install by Host
 
 Corivo supports multiple AI coding agents. You can either use the one-command installer to auto-detect local hosts, or install a specific host adapter yourself.
@@ -188,6 +200,7 @@ corivo inject --global --opencode
 What the installer does:
 
 - installs a local `corivo.ts` plugin into `~/.config/opencode/plugins/`
+- installs a local `corivo.ts` plugin into `~/.config/opencode/plugins/` from the packaged runtime asset path
 - connects native OpenCode events to Corivo carry-over, recall, and review calls
 
 Notes:
@@ -226,14 +239,25 @@ CLI commands and optional sync
 
 Memory is modeled as blocks with vitality (`active -> cooling -> cold -> archived`). Decisions decay slower than lightweight knowledge, so long-lived project choices remain easier to recover.
 
+## Plugin Directory Model
+
+Corivo uses a two-boundary plugin tree:
+
+- `packages/plugins/hosts/*`: packaged host integration bundles (hooks, skills, templates, assets, adapter scripts).
+- `packages/plugins/runtime/*`: executable runtime plugins (TypeScript code, runtime event adapters, build/testable packages).
+
+Host integration bundles define install surfaces for host environments. Runtime plugins define runtime behavior. They are complementary but distinct.
+
 | Package | Description |
 |---------|-------------|
 | [`@corivo/cli`](packages/cli) | Core CLI, local database, heartbeat engine |
 | [`@corivo/solver`](packages/solver) | CRDT sync relay server (Fastify v5) |
-| [`@corivo/claude-code`](packages/plugins/claude-code) | Claude Code plugin integration |
-| [`@corivo/cursor`](packages/plugins/cursor) | Cursor hook adapter for active memory |
-| [`@corivo/opencode`](packages/plugins/opencode) | OpenCode plugin adapter for active memory |
-| [`@corivo/codex`](packages/plugins/codex) | Codex instruction-driven active memory integration |
+| [`@corivo/claude-code`](packages/plugins/hosts/claude-code) | Claude Code host integration bundle |
+| [`@corivo/cursor`](packages/plugins/hosts/cursor) | Cursor host integration bundle |
+| [`@corivo/codex`](packages/plugins/hosts/codex) | Codex host integration bundle |
+| [`hosts/opencode`](packages/plugins/hosts/opencode) | Reserved OpenCode host boundary (not CLI asset-backed in this stage) |
+| [`@corivo/opencode`](packages/plugins/runtime/opencode) | OpenCode executable runtime plugin |
+| [`@corivo/openclaw`](packages/plugins/runtime/openclaw) | OpenClaw executable runtime plugin |
 
 Each public-facing package now has its own README so contributors can orient themselves without reverse-engineering the tree.
 

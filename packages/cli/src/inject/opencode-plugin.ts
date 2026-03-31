@@ -1,117 +1,16 @@
+import { existsSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { resolvePreferredAssetRoot } from './host-assets.js';
 
-export const OPENCODE_PLUGIN_TEMPLATE = `
-import { promisify } from 'node:util'
-import { execFile } from 'node:child_process'
-
-const execFileAsync = promisify(execFile)
-
-async function runCorivo(command: 'carry-over' | 'recall' | 'review', args: string[]): Promise<string> {
-  try {
-    const { stdout } = await execFileAsync('corivo', [command, ...args], {
-      env: process.env,
-    })
-    return stdout.trim()
-  } catch {
-    return ''
-  }
-}
-
-async function getLatestAssistantMessage(client: any, sessionID: string): Promise<string | null> {
-  try {
-    const messages = await client.session.messages({ path: { id: sessionID } })
-    const list = Array.isArray(messages) ? messages : messages?.data
-    if (!Array.isArray(list)) return null
-    for (let index = list.length - 1; index >= 0; index -= 1) {
-      const item = list[index]
-      if (item?.info?.role !== 'assistant') continue
-      const text = (item.parts ?? [])
-        .filter((part: any) => part?.type === 'text' && typeof part.text === 'string')
-        .map((part: any) => part.text.trim())
-        .filter(Boolean)
-        .join('\\n')
-        .trim()
-      if (text) return text
-    }
-  } catch {
-    return null
-  }
-  return null
-}
-
-export default async function corivoPlugin(input: any) {
-  const sessionState = new Map<string, {
-    carryOver?: string
-    recall?: string
-    review?: string
-    lastReviewedMessage?: string
-  }>()
-
-  const getState = (sessionID: string) => {
-    if (!sessionState.has(sessionID)) sessionState.set(sessionID, {})
-    return sessionState.get(sessionID)!
-  }
-
-  const getTextFromParts = (parts: Array<{ type?: string; text?: string }>) => {
-    return parts
-      .filter((part) => part.type === 'text' && typeof part.text === 'string')
-      .map((part) => part.text!.trim())
-      .filter(Boolean)
-      .join('\\n')
-      .trim()
-  }
-
-  return {
-    event: async ({ event }: any) => {
-      if (event?.type === 'session.created') {
-        const sessionID = event.properties?.info?.id
-        if (!sessionID) return
-        const output = await runCorivo('carry-over', ['--format', 'hook-text'])
-        if (output) getState(sessionID).carryOver = output
-      }
-
-      if (event?.type === 'session.idle' || event?.type === 'message.updated') {
-        const assistantRole = event?.properties?.info?.role
-        const sessionID = event.properties?.sessionID
-        if (event?.type === 'message.updated' && assistantRole !== 'assistant') return
-        if (!sessionID) return
-        const state = getState(sessionID)
-        const lastAssistantMessage = await getLatestAssistantMessage(input.client, sessionID)
-        if (!lastAssistantMessage) return
-        if (state.lastReviewedMessage === lastAssistantMessage) return
-        const output = await runCorivo('review', ['--last-message', lastAssistantMessage, '--format', 'hook-text'])
-        if (output) {
-          state.review = output
-          state.lastReviewedMessage = lastAssistantMessage
-        }
-      }
-    },
-
-    'chat.message': async (eventInput: any, output: any) => {
-      if (output.message?.role && output.message.role !== 'user') return
-      const prompt = getTextFromParts(output.parts ?? [])
-      if (!prompt) return
-      const recall = await runCorivo('recall', ['--prompt', prompt, '--format', 'hook-text'])
-      if (recall) getState(eventInput.sessionID).recall = recall
-    },
-
-    'experimental.chat.system.transform': async (eventInput: any, output: any) => {
-      const sessionID = eventInput.sessionID
-      if (!sessionID) return
-      const state = sessionState.get(sessionID)
-      if (!state) return
-      for (const value of [state.carryOver, state.recall, state.review]) {
-        if (value) output.system.push(value)
-      }
-      state.carryOver = undefined
-      state.recall = undefined
-      state.review = undefined
-    },
-  }
-}
-`.trimStart();
+const ASSET_ROOT_OVERRIDE_ENV = 'CORIVO_HOST_ASSETS_ROOT';
+const OPENCODE_RUNTIME_BUNDLED_ROOT = path.join('dist', 'host-assets', 'runtime', 'opencode');
+const OPENCODE_RUNTIME_REPO_ROOT = path.join('..', 'plugins', 'runtime', 'opencode', 'assets');
+const OPENCODE_RUNTIME_ASSET_FILE = 'corivo.ts';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export async function injectGlobalOpencodePlugin(): Promise<{
   success: boolean;
@@ -123,8 +22,9 @@ export async function injectGlobalOpencodePlugin(): Promise<{
   const filePath = path.join(pluginDir, 'corivo.ts');
 
   try {
+    const packagedPluginPath = resolvePackagedOpencodePluginAssetPath();
     await fs.mkdir(pluginDir, { recursive: true });
-    await fs.writeFile(filePath, OPENCODE_PLUGIN_TEMPLATE, 'utf8');
+    await fs.copyFile(packagedPluginPath, filePath);
     return { success: true, path: filePath };
   } catch (error) {
     return {
@@ -132,4 +32,47 @@ export async function injectGlobalOpencodePlugin(): Promise<{
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+export function resolvePackagedOpencodePluginAssetPath(options: {
+  packageRoot?: string;
+  overrideRoot?: string | null;
+} = {}): string {
+  const packageRoot = options.packageRoot ?? resolvePackageRoot(__dirname);
+  const configuredOverrideRoot = options.overrideRoot ?? process.env[ASSET_ROOT_OVERRIDE_ENV] ?? null;
+  const selectedRoot = resolvePreferredAssetRoot({
+    overrideRoot: configuredOverrideRoot ? path.join(configuredOverrideRoot, 'runtime', 'opencode') : null,
+    bundledRoot: path.join(packageRoot, OPENCODE_RUNTIME_BUNDLED_ROOT),
+    repoRoot: path.join(packageRoot, OPENCODE_RUNTIME_REPO_ROOT),
+    scopeLabel: 'Corivo OpenCode runtime assets',
+  });
+  const assetPath = path.join(selectedRoot.root, OPENCODE_RUNTIME_ASSET_FILE);
+
+  if (existsSync(assetPath)) {
+    return assetPath;
+  }
+
+  throw new Error(
+    `Missing packaged OpenCode runtime asset. Checked paths: ${assetPath}. Rebuild or reinstall corivo if published assets are missing.`,
+  );
+}
+
+function resolvePackageRoot(startDir: string): string {
+  let currentDir = startDir;
+
+  while (true) {
+    const packageJsonPath = path.join(currentDir, 'package.json');
+    if (existsSync(packageJsonPath)) {
+      return currentDir;
+    }
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      break;
+    }
+
+    currentDir = parentDir;
+  }
+
+  return path.resolve(startDir, '../..');
 }

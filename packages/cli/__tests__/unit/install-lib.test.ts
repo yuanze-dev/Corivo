@@ -2,11 +2,10 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fileURLToPath } from 'node:url';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, '../../../..');
+const repoRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 const installLibPath = path.join(repoRoot, 'scripts', 'install-lib.sh');
 const installScriptPath = path.join(repoRoot, 'scripts', 'install.sh');
 const bashPath = '/bin/bash';

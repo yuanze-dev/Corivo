@@ -21,6 +21,11 @@
     "prepublishOnly": "npm run build",
     "package": "npm run build && pkg . --targets node18-macos-arm64,node18-macos-x64,node18-linux-x64 --output ../../binaries/corivo"
   },
+  "pkg": {
+    "assets": [
+      "dist/host-assets/**/*"
+    ]
+  },
   "keywords": [
     "memory",
     "ai",

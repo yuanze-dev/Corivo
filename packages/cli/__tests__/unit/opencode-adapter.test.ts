@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createOpencodeCorivoHooks,
   type OpencodeAdapterDeps,
-} from '../../../plugins/opencode/src/adapter.js';
-import opencodePlugin from '../../../plugins/opencode/src/index.js';
+} from '../../../plugins/runtime/opencode/src/adapter.js';
+import opencodePlugin from '../../../plugins/runtime/opencode/src/index.js';
 
 describe('OpenCode Corivo adapter', () => {
   let deps: OpencodeAdapterDeps;
@@ -61,6 +61,42 @@ describe('OpenCode Corivo adapter', () => {
 
     expect(runCorivo).toHaveBeenCalledWith('carry-over', ['--format', 'hook-text']);
     expect(output.system).toContain('[corivo] carry-over context');
+  });
+
+  it('clears carry-over after the first system transform to match packaged behavior', async () => {
+    const hooks = createOpencodeCorivoHooks(deps);
+
+    await hooks.event?.({
+      event: {
+        type: 'session.created',
+        properties: {
+          info: {
+            id: 'ses_repeat',
+          },
+        },
+      } as any,
+    });
+
+    const firstOutput = { system: [] as string[] };
+    await hooks['experimental.chat.system.transform']?.(
+      {
+        sessionID: 'ses_repeat',
+        model: {} as any,
+      },
+      firstOutput,
+    );
+
+    const secondOutput = { system: [] as string[] };
+    await hooks['experimental.chat.system.transform']?.(
+      {
+        sessionID: 'ses_repeat',
+        model: {} as any,
+      },
+      secondOutput,
+    );
+
+    expect(firstOutput.system).toContain('[corivo] carry-over context');
+    expect(secondOutput.system).not.toContain('[corivo] carry-over context');
   });
 
   it('stores recall on chat.message and appends it to later system transform', async () => {

@@ -6,7 +6,7 @@ export default defineConfig({
     'cli/index': 'src/cli/index.ts',
     'engine/heartbeat': 'src/engine/heartbeat.ts',
     'service/index': 'src/service/index.ts',
-    // Cold scan module
+    // Cold scan 模块
     'cold-scan/index': 'src/cold-scan/index.ts',
     'cold-scan/extractors/openclaw': 'src/cold-scan/extractors/openclaw.ts',
   },
@@ -15,6 +15,7 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   clean: true,
+  onSuccess: 'node scripts/copy-host-assets.mjs',
   dts: {
     entry: { index: 'src/index.ts' },
     resolve: true,

@@ -1,0 +1,32 @@
+{
+  "name": "@corivo/opencode",
+  "version": "0.1.0",
+  "description": "Corivo OpenCode executable runtime plugin",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "assets"
+  ],
+  "scripts": {
+    "build": "npm run sync:asset && tsc",
+    "sync:asset": "node ./scripts/sync-asset.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "corivo",
+    "opencode",
+    "memory",
+    "plugin"
+  ],
+  "author": "Corivo Team",
+  "license": "MIT",
+  "peerDependencies": {
+    "@opencode-ai/plugin": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.37",
+    "typescript": "^5.5.4"
+  }
+}

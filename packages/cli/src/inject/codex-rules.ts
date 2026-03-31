@@ -1,61 +1,27 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { copyHostAsset, readHostTemplateText } from './host-assets.js';
 
 const START_MARKER = '<!-- CORIVO CODEX START -->';
 const END_MARKER = '<!-- CORIVO CODEX END -->';
 const REVIEW_SCRIPT_NAME = 'notify-review.sh';
 const DISPATCH_SCRIPT_NAME = 'notify-dispatch.sh';
-const TEMPLATE_TEXT = `
-## Corivo 记忆层（Codex）
 
-你有一个名为 Corivo 的记忆伙伴。请遵循以下规则：
-
-### 开场 carry-over
-
-在会话开始或开始一个新任务时，如果需要回忆上次没收尾的事项，运行：
-
-\`\`\`bash
-corivo carry-over --format text
-\`\`\`
-
-### 答前 recall
-
-当用户问题可能涉及历史决策、偏好、上下文、项目约定时，先运行：
-
-\`\`\`bash
-corivo recall --prompt "<用户问题>" --format text
-\`\`\`
-
-如果你采纳了这条来自 Corivo 的记忆，请在回答中明确说“根据 Corivo 的记忆”或“从 Corivo 中查到”。
-
-### 答后 review
-
-在给出一段 substantive answer 或做出决策后，运行：
-
-\`\`\`bash
-corivo review --last-message "<你的回答摘要>" --format text
-\`\`\`
-
-### 保存记忆
-
-当用户要求记住，或当你识别到重要决策、偏好、事实时，运行：
-
-\`\`\`bash
-corivo save --content "内容" --annotation "类型 · 领域 · 标签"
-\`\`\`
-`.trim();
-
-export const CODEX_RULES = `
+export async function getCodexRules(): Promise<string> {
+  const templateText = (await readHostTemplateText('codex', 'templates/AGENTS.codex.md')).trim();
+  return `
 ${START_MARKER}
-${TEMPLATE_TEXT}
+${templateText}
 ${END_MARKER}
 `.trim();
+}
 
 export async function injectCodexRules(
   filePath: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const codexRules = await getCodexRules();
     await fs.mkdir(path.dirname(filePath), { recursive: true });
 
     let content = '';
@@ -67,12 +33,12 @@ export async function injectCodexRules(
 
     if (content.includes(START_MARKER) && content.includes(END_MARKER)) {
       const regex = new RegExp(`${escapeRegExp(START_MARKER)}[\\s\\S]*${escapeRegExp(END_MARKER)}`, 'g');
-      content = content.replace(regex, CODEX_RULES);
+      content = content.replace(regex, codexRules);
     } else {
       if (content && !content.endsWith('\n')) {
         content += '\n';
       }
-      content += `\n${CODEX_RULES}\n`;
+      content += `\n${codexRules}\n`;
     }
 
     await fs.writeFile(filePath, content, 'utf8');
@@ -106,8 +72,7 @@ export async function injectGlobalCodexRules(): Promise<{
     const wrappedNotify = shouldWrapNotify(existingNotify, dispatchPath) ? existingNotify : null;
     const existingDispatch = await readFileIfExists(dispatchPath);
 
-    await fs.writeFile(reviewPath, REVIEW_SCRIPT_TEXT, 'utf8');
-    await fs.chmod(reviewPath, 0o755);
+    await copyHostAsset('codex', 'adapters/notify-review.sh', reviewPath, { mode: 0o755 });
 
     const dispatchContent = wrappedNotify
       ? buildDispatchScript(wrappedNotify)
@@ -289,29 +254,3 @@ function buildDispatchScript(existingNotify: string[] | null): string {
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
-
-const REVIEW_SCRIPT_TEXT = `
-#!/usr/bin/env bash
-set -euo pipefail
-
-INPUT=""
-
-if [ ! -t 0 ]; then
-  INPUT="$(cat)"
-fi
-
-if ! command -v corivo &>/dev/null; then
-  exit 0
-fi
-
-SUMMARY=$(printf '%s' "$INPUT" | jq -r '.transcript_summary // .summary // empty' 2>/dev/null || echo "")
-
-if [ -n "$SUMMARY" ]; then
-  OUTPUT=$(corivo review --last-message "$SUMMARY" --format hook-text 2>/dev/null || true)
-  if [ -n "$OUTPUT" ]; then
-    printf '%s\n' "$OUTPUT"
-  fi
-fi
-
-exit 0
-`.trimStart();

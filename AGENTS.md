@@ -16,13 +16,22 @@ Corivo 是一个融入用户已有工作流的赛博**伙伴**。它不是一个
 
 相关 package 的本地开发说明分散在各自文档中：
 
-- [`packages/cli/AGENTS.md`](./packages/cli/AGENTS.md) — CLI 工具、数据库、心跳引擎
-- [`packages/solver/AGENTS.md`](./packages/solver/AGENTS.md) — CRDT 同步服务器
-- [`packages/plugins/Codex/AGENTS.md`](./packages/plugins/Codex/AGENTS.md) — Codex 插件
-- `packages/plugins/cursor` — Cursor 主动记忆适配
-- `packages/plugins/opencode` — OpenCode 主动记忆适配
+- [`packages/cli/README.md`](./packages/cli/README.md) — CLI 工具、数据库、心跳引擎
+- [`packages/solver/README.md`](./packages/solver/README.md) — CRDT 同步服务器
+- [`packages/plugins/hosts/codex/README.md`](./packages/plugins/hosts/codex/README.md) — Codex host integration bundle（主机侧集成资产）
+- [`packages/plugins/hosts/claude-code/README.md`](./packages/plugins/hosts/claude-code/README.md) — Claude Code host integration bundle
+- [`packages/plugins/hosts/cursor/README.md`](./packages/plugins/hosts/cursor/README.md) — Cursor host integration bundle
+- [`packages/plugins/hosts/opencode/README.md`](./packages/plugins/hosts/opencode/README.md) — OpenCode host integration asset bundle
+- [`packages/plugins/runtime/opencode/README.md`](./packages/plugins/runtime/opencode/README.md) — OpenCode executable runtime plugin
+- [`packages/plugins/runtime/openclaw/README.md`](./packages/plugins/runtime/openclaw/README.md) — OpenClaw executable runtime plugin
 
 **进入某个 package 工作时，优先阅读该 package 的本地说明文档。**
+
+### plugins 目录边界（必须遵守）
+
+- `packages/plugins/hosts/*`：host integration bundle。只放主机安装与集成资产（hooks、skills、templates、assets、adapter scripts）。
+- `packages/plugins/runtime/*`：runtime plugin。只放可执行运行时代码（TS/JS 源码、构建配置、运行时事件适配逻辑）。
+- 安装入口保持单一路径：通过 `corivo inject`（或 `scripts/install.sh` 委托到 CLI）完成，不在 host/runtime 包内扩展第二套安装逻辑。
 
 ---
 
@@ -43,8 +52,8 @@ npm run dev            # tsx watch src/index.ts（开发热重载）
 npm run build          # tsc
 npm run start          # node dist/index.js
 
-# packages/plugins/codex
-cd packages/plugins/codex
+# packages/plugins/hosts/codex
+cd packages/plugins/hosts/codex
 # 配置/文档型 package，无独立构建步骤
 ```
 
@@ -156,28 +165,31 @@ Changeset 存储于服务端 SQLite（`src/db/server-db.ts`），每条记录按
 
 ---
 
-### packages/plugins/codex（`@corivo/codex`）
+### packages/plugins/hosts/codex（`@corivo/codex`）
 
-Codex 主动记忆适配包。当前以技能、指令模板和 notify 适配器为主。
+Codex host integration bundle。当前为纯主机侧资产包，不承载可执行 runtime 代码。
 
 **组成：**
 
-- `src/api.ts`：`CorivoAPI` 类，通过 `execSync('corivo ...')` 调用本地 CLI
-- `skills/`：Codex 保存/查询相关技能
+- `.codex-plugin/plugin.json`：Codex marketplace manifest
+- `skills/`：Codex 保存/查询技能提示词
+- `commands/`：命令文档模板
+- `hooks/`：hooks 配置与脚本
 - `templates/AGENTS.codex.md`：Codex 全局指令模板
 - `adapters/notify-review.sh`：Codex notify 适配器
+- `assets/`：插件展示资产
 
-### packages/plugins/cursor（`@corivo/cursor`）
+### packages/plugins/hosts/cursor（`@corivo/cursor`）
 
-Cursor 的主动记忆 hook 适配包。目标是与 Claude Code 保持相同生命周期：
+Cursor host integration bundle。目标是与 Claude Code 保持相同生命周期：
 
 - `SessionStart`
 - `UserPromptSubmit`
 - `Stop`
 
-### packages/plugins/opencode（`@corivo/opencode`）
+### packages/plugins/runtime/opencode（`@corivo/opencode`）
 
-OpenCode 的主动记忆插件适配包。通过原生 plugin/event API 接入：
+OpenCode executable runtime plugin。通过原生 plugin/event API 接入：
 
 - `session.created`
 - `chat.message`

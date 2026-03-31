@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'node:events';
+import packageJson from '../../package.json';
 
 const httpsGetMock = vi.fn();
 const execFileSyncMock = vi.fn();
@@ -46,23 +47,23 @@ describe('update checker', () => {
   it('returns the current package version', async () => {
     const { getCurrentVersion } = await import('../../src/update/checker');
 
-    expect(getCurrentVersion()).toBe('0.12.1');
+    expect(getCurrentVersion()).toBe(packageJson.version);
   });
 
   it('checks the latest version from npm registry metadata', async () => {
     const { checkForUpdate } = await import('../../src/update/checker');
 
     mockRegistryResponse(200, {
-      'dist-tags': { latest: '0.12.1' },
+      'dist-tags': { latest: packageJson.version },
       time: {
-        '0.12.1': '2026-03-25T19:36:51.972Z',
+        [packageJson.version]: '2026-03-25T19:36:51.972Z',
       },
     });
 
     const status = await checkForUpdate();
 
-    expect(status.currentVersion).toBe('0.12.1');
-    expect(status.latestVersion).toBe('0.12.1');
+    expect(status.currentVersion).toBe(packageJson.version);
+    expect(status.latestVersion).toBe(packageJson.version);
     expect(status.hasUpdate).toBe(false);
     expect(status.isBreaking).toBe(false);
   });

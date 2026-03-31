@@ -83,13 +83,13 @@ describe('ClaudeCodeIngestor (Integration)', () => {
       const content = await fs.readFile(claudeMdPath, 'utf-8');
 
       // Check the key parts
-      expect(content).toContain('性质（nature）');
+      expect(content).toContain('nature - required');
       expect(content).toContain('事实');
       expect(content).toContain('知识');
       expect(content).toContain('决策');
       expect(content).toContain('指令');
 
-      expect(content).toContain('领域（domain）');
+      expect(content).toContain('domain - required');
       expect(content).toContain('self');
       expect(content).toContain('people');
       expect(content).toContain('project');

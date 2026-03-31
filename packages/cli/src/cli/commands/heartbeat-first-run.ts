@@ -8,7 +8,7 @@ import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { Heartbeat } from '../../engine/heartbeat.js';
-import { getConfigDir, getDefaultDatabasePath } from '../../storage/database.js';
+import { getConfigDir, getDefaultDatabasePath } from '@/storage/database';
 
 export const firstRunCommand = new Command('first-run');
 
@@ -45,22 +45,8 @@ firstRunCommand
         return;
       }
 
-      // Get database key
-      let dbKey = process.env.CORIVO_DB_KEY;
       const dbPath = process.env.CORIVO_DB_PATH || getDefaultDatabasePath();
-
-      if (!dbKey && config.db_key) {
-        dbKey = config.db_key;
-      }
-
-      if (!dbKey) {
-        console.log('');
-        console.log(chalk.yellow('Database is not initialized, please run: corivo init'));
-        console.log('');
-        return;
-      }
-
-      const heartbeat = new Heartbeat({ dbKey, dbPath });
+      const heartbeat = new Heartbeat({ dbPath });
 
       const result = await heartbeat.runFirstRun({
         maxPendingBlocks: parseInt(options.maxPending, 10),

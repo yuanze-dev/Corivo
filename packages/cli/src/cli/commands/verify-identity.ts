@@ -11,7 +11,7 @@ import { KeyManager } from '../../crypto/keys.js';
 import { JointVerifier } from '../../identity/auth.js';
 import { IdentityManager } from '../../identity/identity.js';
 import { DynamicFingerprintCollector, initializeDefaultSoftwareConfigs } from '../../identity/collector.js';
-import { getConfigDir } from '../../storage/database.js';
+import { getConfigDir } from '@/storage/database';
 import { ConfigError } from '../../errors/index.js';
 import { readPassword } from '../utils/password.js';
 

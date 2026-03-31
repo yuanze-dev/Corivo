@@ -99,7 +99,7 @@ describe('E2E: Solver 同步链路', () => {
 
   it('设备 A: 初始化 + 自动注册到 solver', () => {
     const out = cli('init', DEVICE_A);
-    expect(out).toContain('初始化完成');
+    expect(out).toContain('Initialization complete');
     expect(fsSync.existsSync(path.join(DEVICE_A, '.corivo', 'config.json'))).toBe(true);
     // At the end of init, it will automatically try to register the solver (CORIVO_SOLVER_URL points to the test server)
     expect(fsSync.existsSync(path.join(DEVICE_A, '.corivo', 'solver.json'))).toBe(true);
@@ -116,7 +116,7 @@ describe('E2E: Solver 同步链路', () => {
 
   it('设备 A: push 数据到 solver', () => {
     const out = cli(`sync --server ${SOLVER_URL}`, DEVICE_A);
-    expect(out).toContain('同步完成');
+    expect(out).toContain('Sync complete');
     const match = out.match(/Push:\s*(\d+)/);
     expect(match, '输出中应包含 "Push: N"').not.toBeNull();
     expect(parseInt(match![1])).toBeGreaterThan(0);
@@ -139,15 +139,15 @@ describe('E2E: Solver 同步链路', () => {
     fsSync.writeFileSync(solverPath, JSON.stringify(solverConfig, null, 2));
 
     const out = cli(`sync --pair --server ${SOLVER_URL}`, DEVICE_A);
-    const match = out.match(/配对码:\s*([A-Z2-9]{6})/);
-    expect(match, '输出中应包含 "配对码: XXXXXX"').not.toBeNull();
+    const match = out.match(/Pairing code:\s*([A-Z2-9]{6})/);
+    expect(match, '输出中应包含 "Pairing code: XXXXXX"').not.toBeNull();
     state.pairingCode = match![1];
   }, 15_000);
 
   it('设备 B: 通过配对码加入同一 identity', () => {
     expect(state.pairingCode, '需要先获取配对码').toHaveLength(6);
     const out = cli(`init --join ${state.pairingCode} --server ${SOLVER_URL}`, DEVICE_B);
-    expect(out).toContain('加入成功');
+    expect(out).toContain('Joined successfully');
 
     const configA = JSON.parse(
       fsSync.readFileSync(path.join(DEVICE_A, '.corivo', 'config.json'), 'utf-8'),
@@ -160,7 +160,7 @@ describe('E2E: Solver 同步链路', () => {
 
   it('设备 B: pull 拉取到设备 A 的数据', () => {
     const out = cli(`sync --server ${SOLVER_URL}`, DEVICE_B);
-    expect(out).toContain('同步完成');
+    expect(out).toContain('Sync complete');
     const match = out.match(/Pull:\s*(\d+)/);
     expect(match, '输出中应包含 "Pull: N"').not.toBeNull();
     expect(parseInt(match![1])).toBeGreaterThan(0);

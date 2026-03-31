@@ -3,13 +3,16 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { fileURLToPath } from 'node:url';
 
-const repoRoot = '/Users/liuzhengyanshuo/workspace/yuanze/02 研发管理/15-corivo/Corivo';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, '../../../..');
 const installLibPath = path.join(repoRoot, 'scripts', 'install-lib.sh');
 const installScriptPath = path.join(repoRoot, 'scripts', 'install.sh');
+const bashPath = '/bin/bash';
 
 function bashEval(script: string, env: NodeJS.ProcessEnv = {}) {
-  return execFileSync('bash', ['-lc', `source "${installLibPath}"; ${script}`], {
+  return execFileSync(bashPath, ['-lc', `source "${installLibPath}"; ${script}`], {
     cwd: repoRoot,
     env: {
       ...process.env,

@@ -8,7 +8,7 @@ import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { generateFirstPush, getWelcomeMessage } from '../../first-push/index.js';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 
 export const pushCommand = new Command('push');
 
@@ -41,23 +41,16 @@ pushCommand
         return;
       }
 
-      // Get database key
-      let dbKeyBase64 = process.env.CORIVO_DB_KEY;
       const dbPath = process.env.CORIVO_DB_PATH || getDefaultDatabasePath();
 
-      if (!dbKeyBase64 && config.db_key) {
-        dbKeyBase64 = config.db_key;
-      }
-
-      if (!dbKeyBase64) {
+      if (config.encrypted_db_key) {
         console.log('');
-        console.log(chalk.yellow('Database is not initialized, please run: corivo init'));
+        console.log(chalk.yellow('Detected a legacy password-based config. Please run: corivo init'));
         console.log('');
         return;
       }
 
-      const dbKey = Buffer.from(dbKeyBase64, 'base64');
-      const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
+      const db = CorivoDatabase.getInstance({ path: dbPath, enableEncryption: false });
 
       if (options.firstActivation) {
         // Output self-introduction for first activation

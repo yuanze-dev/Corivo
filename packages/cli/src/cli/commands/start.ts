@@ -6,7 +6,7 @@
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { getConfigDir, getDefaultDatabasePath } from '../../storage/database.js'
+import { getConfigDir, getDefaultDatabasePath } from '@/storage/database'
 import { ConfigError } from '../../errors/index.js'
 import { getServiceManager, resolveCorivoBin } from '../../service/index.js'
 
@@ -22,9 +22,7 @@ export async function startCommand(): Promise<void> {
     throw new ConfigError('Corivo is not initialized. Please run: corivo init')
   }
 
-  const dbKey = config.db_key
-
-  if (!dbKey && config.encrypted_db_key) {
+  if (config.encrypted_db_key) {
     console.log('⚠️  Detected legacy config format (password-based)')
     console.log('')
     console.log('Corivo v0.10+ removed the password system. Please migrate using these steps:')
@@ -33,17 +31,13 @@ export async function startCommand(): Promise<void> {
     return
   }
 
-  if (!dbKey) {
-    throw new ConfigError('Invalid config file: missing db_key')
-  }
-
   const manager = getServiceManager()
   const corivoBin = await resolveCorivoBin()
   const dbPath = getDefaultDatabasePath()
 
   console.log('Starting heartbeat daemon...')
 
-  const result = await manager.install({ corivoBin, dbKey, dbPath })
+  const result = await manager.install({ corivoBin, dbPath })
 
   if (result.success) {
     console.log('✅ Heartbeat daemon started')

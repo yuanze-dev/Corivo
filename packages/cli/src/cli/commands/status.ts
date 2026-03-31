@@ -8,9 +8,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 import { ConfigError } from '../../errors/index.js';
-import { getDatabaseKey, loadSolverConfig } from '../../config.js';
+import { loadSolverConfig } from '../../config.js';
 import { ContextPusher } from '../../push/context.js';
 import { getServiceManager } from '../../service/index.js';
 
@@ -30,13 +30,12 @@ export async function statusCommand(_options: { noPassword?: boolean } = {}): Pr
   const serviceManager = getServiceManager()
   const serviceStatus = await serviceManager.getStatus()
 
-  const dbKey = await getDatabaseKey(configDir);
-  if (!dbKey) {
-    throw new ConfigError('Unable to get database key. Please re-initialize with: corivo init');
+  if (config.encrypted_db_key) {
+    throw new ConfigError('Detected a legacy password-based config. Corivo v0.10+ no longer supports passwords here; please run: corivo init');
   }
 
   const dbPath = getDefaultDatabasePath();
-  const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey, enableEncryption: config.encrypted_db_key !== undefined });
+  const db = CorivoDatabase.getInstance({ path: dbPath, enableEncryption: false });
 
   const stats = db.getStats();
   const health = db.checkHealth();

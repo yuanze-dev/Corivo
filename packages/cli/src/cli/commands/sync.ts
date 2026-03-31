@@ -7,12 +7,9 @@
 import { Command } from 'commander';
 import { createHmac, randomBytes } from 'node:crypto';
 import os from 'node:os';
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { loadConfig, loadSolverConfig, saveSolverConfig, getDatabaseKey } from '@/config';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
-import { createLogger } from '@/utils/logging';
-import type { Logger as SyncLogger, LogTarget } from '@/utils/logging';
+import type { CorivoDatabase } from '@/storage/database';
+import { createCliContext } from '../context/create-context.js';
+import type { Logger as SyncLogger } from '../../utils/logging.js';
 
 interface RegisterResponse {
   shared_secret: string;
@@ -57,10 +54,6 @@ function summarizeChangesets(changesets: PulledChangeset[]): string {
   );
 }
 
-export function createSyncLogger(logLevel?: string, target?: LogTarget): SyncLogger {
-  return createLogger(target, logLevel);
-}
-
 function buildDeviceName(): string {
   const platformNames: Record<string, string> = { darwin: 'Mac', win32: 'Windows', linux: 'Linux' };
   const name = platformNames[process.platform] || process.platform;
@@ -71,8 +64,8 @@ function buildDeviceName(): string {
 export async function post(
   url: string,
   body: unknown,
+  logger: SyncLogger,
   token?: string,
-  logger: SyncLogger = createSyncLogger(),
   label = 'request'
 ): Promise<unknown> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -108,13 +101,13 @@ export async function authenticate(
   serverUrl: string,
   identityId: string,
   sharedSecret: string,
-  logger: SyncLogger = createSyncLogger()
+  logger: SyncLogger
 ): Promise<string> {
   const { challenge } = await post(
     `${serverUrl}/auth/challenge`,
     { identity_id: identityId },
-    undefined,
     logger,
+    undefined,
     'auth-challenge'
   ) as { challenge: string };
   const response = createHmac('sha256', sharedSecret).update(challenge).digest('hex');
@@ -125,8 +118,8 @@ export async function authenticate(
       challenge,
       response,
     },
-    undefined,
     logger,
+    undefined,
     'auth-verify'
   ) as { token: string };
   return token;
@@ -135,7 +128,7 @@ export async function authenticate(
 export function applyPulledChangesets(
   db: CorivoDatabase,
   changesets: PulledChangeset[],
-  logger: SyncLogger = createSyncLogger()
+  logger: SyncLogger
 ): number {
   let applied = 0;
   logger.debug(`[sync:pull] received ${changesets.length} pull changesets preview=${summarizeChangesets(changesets)}`);
@@ -176,7 +169,8 @@ export function applyPulledChangesets(
  */
 export async function registerWithSolver(
   serverUrl: string,
-  identityId: string
+  identityId: string,
+  logger: SyncLogger
 ): Promise<import('../../config.js').SolverConfig | null> {
   const { randomBytes } = await import('node:crypto');
   const siteId = randomBytes(16).toString('hex');
@@ -191,7 +185,7 @@ export async function registerWithSolver(
       platform: process.platform,
       arch: process.arch,
       site_id: siteId,
-    }) as RegisterResponse;
+    }, logger) as RegisterResponse;
 
     return {
       server_url: serverUrl,
@@ -213,15 +207,18 @@ export function createSyncCommand(): Command {
   cmd.option('--pair', 'Generate a pairing code for a new device');
 
   cmd.action(async (options, command: Command) => {
+    const bootstrapContext = createCliContext();
+
     // --pair: generate pairing code
     if (options.pair) {
-      const config = await loadConfig();
+      const config = await bootstrapContext.config.load();
       if (!config) {
         console.error('Corivo is not initialized, please run corivo init');
         process.exit(1);
       }
-      const logger = createSyncLogger(config.settings?.logLevel);
-      const solverConfig = await loadSolverConfig();
+      const context = createCliContext({ logLevel: config.settings?.logLevel });
+      const { logger } = context;
+      const solverConfig = await context.config.loadSolver();
       if (!solverConfig) {
         console.error('Not connected to a sync server, please run corivo sync --register');
         process.exit(1);
@@ -236,7 +233,7 @@ export function createSyncCommand(): Command {
         console.error('Authentication failed:', err instanceof Error ? err.message : String(err));
         process.exit(1);
       }
-      const result = await post(`${pairServerUrl}/auth/pair`, {}, token, logger, 'pair') as { pairing_code: string; expires_at: number };
+      const result = await post(`${pairServerUrl}/auth/pair`, {}, logger, token, 'pair') as { pairing_code: string; expires_at: number };
       const expiresIn = Math.round((result.expires_at - Date.now()) / 60000);
       console.log(`\nPairing code: ${result.pairing_code}  (valid for ${expiresIn} minutes)\n`);
       console.log('Run this on the new device:');
@@ -244,14 +241,15 @@ export function createSyncCommand(): Command {
       return;
     }
 
-    const config = await loadConfig();
+    const config = await bootstrapContext.config.load();
     if (!config) {
       console.error('Corivo is not initialized, please run corivo init');
       process.exit(1);
     }
-    const logger = createSyncLogger(config.settings?.logLevel);
+    const context = createCliContext({ logLevel: config.settings?.logLevel });
+    const { logger } = context;
 
-    let solverConfig = await loadSolverConfig();
+    let solverConfig = await context.config.loadSolver();
 
     // If there is no solver.json or registration is explicitly required
     if (!solverConfig || options.register) {
@@ -270,7 +268,7 @@ export function createSyncCommand(): Command {
           platform: process.platform,
           arch: process.arch,
           site_id: siteId,
-        }) as RegisterResponse;
+        }, logger) as RegisterResponse;
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
         if (errMsg.includes('409')) {
@@ -290,7 +288,7 @@ export function createSyncCommand(): Command {
       };
 
       try {
-        await saveSolverConfig(solverConfig);
+        await context.config.saveSolver(solverConfig);
       } catch (err: unknown) {
         console.error('Failed to save solver.json:', err instanceof Error ? err.message : String(err));
         // Continue execution without terminating the process
@@ -313,16 +311,8 @@ export function createSyncCommand(): Command {
     }
     console.log('Authentication successful');
 
-    // Get local database
-    const dbKey = await getDatabaseKey();
-    if (!dbKey) {
-      console.error('Unable to get database key');
-      process.exit(1);
-    }
-
-    const db = CorivoDatabase.getInstance({
-      path: getDefaultDatabasePath(),
-      key: dbKey,
+    const db = context.db.get({
+      path: context.paths.databasePath(),
     });
 
     // Push: Get local changes
@@ -347,8 +337,8 @@ export function createSyncCommand(): Command {
         const pushResult = await post(
           `${server_url}/sync/push`,
           { site_id, db_version: changesets.length, changesets },
-          token,
           logger,
+          token,
           'push'
         ) as { stored: number };
         pushStored = pushResult.stored;
@@ -356,7 +346,7 @@ export function createSyncCommand(): Command {
 
         solverConfig!.last_push_version = blocks.length;  // Record the total amount pushed and no longer add it up
         try {
-          await saveSolverConfig(solverConfig!);
+          await context.config.saveSolver(solverConfig!);
           logger.debug(`[sync:cli] updated last_push_version=${solverConfig!.last_push_version}`);
         } catch (err: any) {
           console.error('Failed to save solver.json:', err.message);
@@ -373,8 +363,8 @@ export function createSyncCommand(): Command {
       const pullResult = await post(
         `${server_url}/sync/pull`,
         { site_id, since_version: solverConfig.last_pull_version },
-        token,
         logger,
+        token,
         'pull'
       ) as { changesets: PulledChangeset[]; current_version: number };
       logger.debug(
@@ -388,7 +378,7 @@ export function createSyncCommand(): Command {
       if (pullResult.current_version > solverConfig!.last_pull_version) {
         solverConfig!.last_pull_version = pullResult.current_version;
         try {
-          await saveSolverConfig(solverConfig!);
+          await context.config.saveSolver(solverConfig!);
           logger.debug(`[sync:cli] updated last_pull_version=${solverConfig!.last_pull_version}`);
         } catch (err: any) {
           console.error('Failed to save solver.json:', err.message);
@@ -409,11 +399,20 @@ export function createSyncCommand(): Command {
       })();
       logger.debug(`[sync:cli] fetched device list successfully devices=${devicesResult.devices.length}`);
 
-      const configDir = getConfigDir();
-      const identityPath = path.join(configDir, 'identity.json');
+      const identityPath = context.paths.identityPath();
       try {
-        const raw = await fs.readFile(identityPath, 'utf-8');
-        const identity = JSON.parse(raw);
+        const identity = await context.fs.readJson<{
+          devices?: Record<string, {
+            id: string;
+            name: string;
+            platform: string;
+            arch: string;
+            first_seen: string;
+            last_seen: string;
+          }>;
+          updated_at?: string;
+          [key: string]: unknown;
+        }>(identityPath);
         identity.devices = {};
         for (const d of devicesResult.devices) {
           identity.devices[d.deviceId] = {
@@ -426,7 +425,7 @@ export function createSyncCommand(): Command {
           };
         }
         identity.updated_at = new Date().toISOString();
-        await fs.writeFile(identityPath, JSON.stringify(identity, null, 2));
+        await context.fs.writeJson(identityPath, identity);
       } catch { /* ignore if identity.json does not exist */ }
     } catch { /* failure to fetch devices does not affect the main flow */ }
 

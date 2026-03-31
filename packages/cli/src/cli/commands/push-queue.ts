@@ -7,7 +7,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
-import { getConfigDir } from '../../storage/database.js';
+import { getConfigDir } from '@/storage/database';
 import { PushQueue } from '../../engine/push-queue.js';
 
 export const pushQueueCommand = new Command('push-queue');

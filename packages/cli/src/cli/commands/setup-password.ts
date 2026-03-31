@@ -8,7 +8,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
 import { KeyManager } from '../../crypto/keys.js';
-import { getConfigDir } from '../../storage/database.js';
+import { getConfigDir } from '@/storage/database';
 import { ConfigError, ValidationError } from '../../errors/index.js';
 import { readPassword } from '../utils/password.js';
 
@@ -87,11 +87,6 @@ export async function setupPasswordCommand(options: SetupPasswordOptions = {}): 
   // Update configuration
   config.salt = salt.toString('base64');
   config.encrypted_db_key = encryptedDbKey;
-
-  // Remove plaintext key
-  if (config.db_key) {
-    delete config.db_key;
-  }
 
   await fs.writeFile(configPath, JSON.stringify(config, null, 2));
 

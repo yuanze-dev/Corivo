@@ -8,8 +8,10 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const CLI = path.join(process.cwd(), 'dist/cli/index.js');
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const CLI = path.join(__dirname, '../../dist/cli/index.js');
 const TEST_DIR = `/tmp/corivo-e2e-${Date.now()}`;
 
 describe('E2E: CLI Basic Workflow', () => {
@@ -44,7 +46,7 @@ describe('E2E: CLI Basic Workflow', () => {
       stdio: 'pipe',
       env: { ...process.env, HOME: TEST_DIR }
     });
-    expect(result).toContain('配置文件不存在');
+    expect(result).toContain('Config file not found');
   });
 
   it('should show error for missing init', () => {

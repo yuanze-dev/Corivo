@@ -7,11 +7,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
-import { KeyManager } from '../../crypto/keys.js';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 import { ConfigError, ValidationError } from '../../errors/index.js';
 import { validateAnnotation } from '../../models/index.js';
-import { readPassword } from '../utils/password.js';
 import { ConflictDetector } from '../../engine/conflict-detector.js';
 
 interface SaveOptions {
@@ -19,7 +17,6 @@ interface SaveOptions {
   annotation?: string;
   source?: string;
   pending?: boolean;
-  noPassword?: boolean;
 }
 
 export async function saveCommand(options: SaveOptions): Promise<void> {
@@ -55,51 +52,13 @@ export async function saveCommand(options: SaveOptions): Promise<void> {
     );
   }
 
-  // Decrypt database key (optional password)
-  let dbKey: Buffer;
-  const skipPassword = options.password === false || process.env.CORIVO_NO_PASSWORD === '1';
-
-  if (skipPassword) {
-    // Passwordless mode: use db_key from config if available
-    if (config.db_key) {
-      dbKey = Buffer.from(config.db_key, 'base64');
-    } else if (config.encrypted_db_key) {
-      // Encryption key available but password skipped: prompt user
-      throw new ConfigError('The database is encrypted. Enter a password or remove --no-password');
-    } else {
-      // Old version compatibility: generate and save new keys
-      dbKey = KeyManager.generateDatabaseKey();
-      config.db_key = dbKey.toString('base64');
-      await fs.writeFile(configPath, JSON.stringify(config, null, 2));
-    }
-  } else {
-    const password = await readPassword('Enter master password: ', { allowEmpty: !process.stdin.isTTY });
-    if (password === '') {
-      // Empty password: try using db_key from config
-      if (config.db_key) {
-        dbKey = Buffer.from(config.db_key, 'base64');
-      } else if (config.encrypted_db_key) {
-        throw new ConfigError('The database is encrypted. Please enter the password');
-      } else {
-        dbKey = KeyManager.generateDatabaseKey();
-        config.db_key = dbKey.toString('base64');
-        await fs.writeFile(configPath, JSON.stringify(config, null, 2));
-      }
-    } else {
-      // Decrypt using password
-      const salt = Buffer.from(config.salt, 'base64');
-      const masterKey = KeyManager.deriveMasterKey(password, salt);
-      const encryptedDbKey = config.encrypted_db_key;
-      if (!encryptedDbKey) {
-        throw new ConfigError('Password is not set. Please run: corivo setup-password');
-      }
-      dbKey = KeyManager.decryptDatabaseKey(encryptedDbKey, masterKey);
-    }
+  if (config.encrypted_db_key) {
+    throw new ConfigError('Detected a legacy password-based config. Corivo v0.10+ no longer supports passwords here; please run: corivo init');
   }
 
   // Open database
   const dbPath = getDefaultDatabasePath();
-  const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey, enableEncryption: config.encrypted_db_key !== undefined });
+  const db = CorivoDatabase.getInstance({ path: dbPath, enableEncryption: false });
 
   // Create Block
   const block = db.createBlock({

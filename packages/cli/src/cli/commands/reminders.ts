@@ -7,7 +7,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { getConfigDir } from '../../storage/database.js';
+import { getConfigDir } from '@/storage/database';
 
 const REMINDERS_FILE = 'reminders.json';
 

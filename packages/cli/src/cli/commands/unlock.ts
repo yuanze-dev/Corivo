@@ -8,7 +8,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
 import { KeyManager } from '../../crypto/keys.js';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 import { ConfigError, ValidationError } from '../../errors/index.js';
 import { readPassword } from '../utils/password.js';
 
@@ -72,13 +72,7 @@ export async function unlockCommand(options: UnlockOptions = {}): Promise<void> 
       throw new ValidationError('Incorrect password');
     }
   } else {
-    // Passwordless mode: uses stored key
-    if (config.db_key) {
-      dbKey = Buffer.from(config.db_key, 'base64');
-    } else {
-      // Generate default key
-      dbKey = KeyManager.generateDatabaseKey();
-    }
+    dbKey = KeyManager.generateDatabaseKey();
   }
 
   // Open database

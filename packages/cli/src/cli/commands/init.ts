@@ -13,8 +13,7 @@
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
-import { KeyManager } from '../../crypto/keys.js';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 import { FileSystemError } from '../../errors/index.js';
 import {
   initializeIdentity,
@@ -26,6 +25,7 @@ import { saveConfig, saveSolverConfig, loadConfig, type CorivoConfig, type Solve
 import os from 'node:os';
 import { startCommand } from './start.js';
 import { registerWithSolver, post } from './sync.js';
+import { createCliContext } from '../context/create-context.js';
 import { readConfirm } from '../utils/password.js';
 
 /**
@@ -39,6 +39,9 @@ function exit(code = 0): never {
  * Main init command handler.
  */
 export async function initCommand(options: { join?: string; server?: string } = {}): Promise<void> {
+  const context = createCliContext();
+  const logger = context.logger;
+
   console.log('\n═══════════════════════════════════════════════════════');
   console.log('           Corivo - a digital companion that lives for you');
   console.log('═══════════════════════════════════════════════════════\n');
@@ -86,7 +89,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
         platform: process.platform,
         arch: process.arch,
         site_id: siteId,
-      }) as { identity_id: string; shared_secret: string };
+      }, logger) as { identity_id: string; shared_secret: string };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('404')) {
@@ -105,8 +108,6 @@ export async function initCommand(options: { join?: string; server?: string } = 
 
     // Detect whether a local identity already exists (conflict scenario).
     const existingConfig = await loadConfig(configDir);
-    let dbKey: Buffer;
-    let dbKeyBase64: string;
 
     if (existingConfig && existingConfig.identity_id !== identityId) {
       console.log('\n⚠️  An existing Corivo identity was detected on this machine:');
@@ -121,13 +122,6 @@ export async function initCommand(options: { join?: string; server?: string } = 
         exit(0);
       }
 
-      // Reuse the existing db_key so the database stays intact; only the identity is updated.
-      dbKey = Buffer.from(existingConfig.db_key, 'base64');
-      dbKeyBase64 = existingConfig.db_key;
-    } else {
-      // Brand-new device: generate a fresh db_key.
-      dbKey = KeyManager.generateDatabaseKey();
-      dbKeyBase64 = dbKey.toString('base64');
     }
 
     // Create the local identity with the specified ID, overwriting any existing one.
@@ -137,7 +131,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
 
     if (!existingConfig || existingConfig.identity_id !== identityId) {
       console.log('\nCreating encrypted database...');
-      const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
+      const db = CorivoDatabase.getInstance({ path: dbPath });
       const health = db.checkHealth();
       if (!health.ok) {
         console.log('❌ Failed to create database');
@@ -149,7 +143,6 @@ export async function initCommand(options: { join?: string; server?: string } = 
       version: '0.11.0',
       created_at: existingConfig?.created_at ?? new Date().toISOString(),
       identity_id: identityId,
-      db_key: dbKeyBase64,
     };
     const saveResult = await saveConfig(config, configDir);
     if (!saveResult.success) {
@@ -228,17 +221,9 @@ export async function initCommand(options: { join?: string; server?: string } = 
   console.log('');
   // ========== End identity resolution ==========
 
-  // Generate a database key without requiring a password.
-  console.log('Generating keys...');
+  console.log('Creating local database...');
 
-  const dbKey = KeyManager.generateDatabaseKey();
-  // Store the key as base64 in plaintext — security relies on filesystem permissions.
-  const dbKeyBase64 = dbKey.toString('base64');
-
-  // Create the encrypted database.
-  console.log('Creating encrypted database...');
-
-  const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
+  const db = CorivoDatabase.getInstance({ path: dbPath });
 
   // Verify that the database was created and is healthy.
   const health = db.checkHealth();
@@ -252,7 +237,6 @@ export async function initCommand(options: { join?: string; server?: string } = 
     version: '0.11.0',
     created_at: new Date().toISOString(),
     identity_id: identityId,
-    db_key: dbKeyBase64,
   };
 
   const saveResult = await saveConfig(config, configDir);
@@ -268,14 +252,12 @@ export async function initCommand(options: { join?: string; server?: string } = 
   console.log('🎯 Corivo is ready');
   console.log('   Identity ID: ' + identityId);
   console.log('   Database:    ' + dbPath);
-  console.log('\n💡 Tip:');
-  console.log('   The database key is stored locally in plaintext and relies on filesystem permissions for protection');
-  console.log('   Make sure your user directory is secure and not shared with others\n');
+  console.log('');
 
   // ========== Auto-register with solver ==========
   const defaultSolverUrl = process.env.CORIVO_SOLVER_URL || 'http://localhost:3141';
   try {
-    const solverConfig = await registerWithSolver(defaultSolverUrl, identityId);
+    const solverConfig = await registerWithSolver(defaultSolverUrl, identityId, logger);
     if (solverConfig) {
       await saveSolverConfig(solverConfig, configDir);
       console.log('🔗 Connected to sync server\n');

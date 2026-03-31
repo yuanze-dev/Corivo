@@ -8,9 +8,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../../storage/database.js';
+import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 import { ConfigError } from '../../errors/index.js';
-import { getDatabaseKey } from '../../config.js';
 import type { BlockFilter, BlockStatus } from '../../models/block.js';
 
 const VALID_STATUSES: BlockStatus[] = ['active', 'cooling', 'cold', 'archived'];
@@ -73,16 +72,14 @@ listCommand
       throw new ConfigError('Corivo is not initialized. Please run: corivo init');
     }
 
-    const dbKey = await getDatabaseKey(configDir);
-    if (!dbKey) {
-      throw new ConfigError('Unable to get database key. Please re-initialize with: corivo init');
+    if (config.encrypted_db_key) {
+      throw new ConfigError('Detected a legacy password-based config. Corivo v0.10+ no longer supports passwords here; please run: corivo init');
     }
 
     const dbPath = getDefaultDatabasePath();
     const db = CorivoDatabase.getInstance({
       path: dbPath,
-      key: dbKey,
-      enableEncryption: config.encrypted_db_key !== undefined,
+      enableEncryption: false,
     });
 
     // Build filter

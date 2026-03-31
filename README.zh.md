@@ -74,7 +74,125 @@ corivo inject
 
 说明：
 - `corivo inject` 会把规则写入当前项目的 `.claude/CLAUDE.md`。
+- `scripts/install.sh` 已经可以检测并配置同一台机器上的 Claude Code、Codex、Cursor 和 OpenCode。
 - 路线图中的部分集成还在推进中，暂不承诺全量可用。
+
+## 按宿主安装
+
+Corivo 支持多个 AI coding agent。你既可以使用一次性安装脚本自动探测本机宿主，也可以按需单独安装某一个宿主适配器。
+
+### 一次性安装脚本
+
+```bash
+curl -fsSL https://i.corivo.ai/install.sh | bash
+```
+
+这个安装脚本会：
+
+- 在缺少 Node.js 时自动补装
+- 安装 `corivo` CLI
+- 执行 `corivo init`
+- 检测你机器上的 Claude Code、Codex、Cursor 和 OpenCode
+- 自动安装匹配到的 Corivo 宿主适配器
+
+### Claude Code
+
+你会得到什么：
+
+- 用于 carry-over、recall、review 的 Claude Code hooks
+- 面向 Claude Code 工作流的 Corivo skills 和命令文档
+- 通过 Corivo CLI 完成的全局 Claude Code 适配
+
+安装命令：
+
+```bash
+corivo inject --global --claude-code
+```
+
+安装脚本会做什么：
+
+- 安装 Claude Code 的 hook 脚本和 skills
+- 更新 Claude Code 设置，让生命周期 hooks 调用 Corivo
+- 启用 Claude Code 的主主动记忆流程
+
+注意事项：
+
+- 这是当前仓库里最成熟的一条集成路径。
+- 如果你希望检测到 Claude Code 后自动配置，直接使用一次性安装脚本即可。
+
+### Codex
+
+你会得到什么：
+
+- 全局 Codex 主动记忆指令
+- 用于答后 review 的 notify 适配器
+- 仓库内可直接使用的本地插件资产和 marketplace 打包结构
+
+安装命令：
+
+```bash
+corivo inject --global --codex
+```
+
+安装脚本会做什么：
+
+- 写入全局 Codex Corivo 指令
+- 把 Codex notify 适配器安装到 `~/.codex/corivo/`
+- 更新 Codex 全局配置，让 Corivo 参与主动记忆流程
+
+注意事项：
+
+- 安装完成后需要重启 Codex，配置才会生效。
+- 如果脚本检测到 `codex` 命令或 `~/.codex` 目录，一次性安装脚本会自动配置 Codex。
+
+### Cursor
+
+你会得到什么：
+
+- 用于 carry-over、recall、review 的全局 Cursor rules
+- 原生 Cursor 生命周期 hooks 接线
+- 允许 Cursor 调用 `corivo` 的 CLI 权限配置
+
+安装命令：
+
+```bash
+corivo inject --global --cursor
+```
+
+安装脚本会做什么：
+
+- 写入全局 `corivo.mdc` 规则文件
+- 把 Corivo hook 脚本安装到 `~/.cursor/corivo/`
+- 更新 `~/.cursor/settings.json`，写入 Cursor 生命周期 hooks
+- 确保 Cursor CLI 权限允许 `Shell(corivo)`
+
+注意事项：
+
+- 如果 Cursor Agent 已安装但尚未登录，安装结果会提示你还需要额外处理。
+- 如果脚本检测到 `cursor` 命令或 `~/.cursor` 目录，一次性安装脚本会自动配置 Cursor。
+
+### OpenCode
+
+你会得到什么：
+
+- 一个把 OpenCode 原生事件映射到 Corivo 记忆流程的插件
+- 通过本地 Corivo CLI 接入的 carry-over、recall、review 能力
+
+安装命令：
+
+```bash
+corivo inject --global --opencode
+```
+
+安装脚本会做什么：
+
+- 把本地 `corivo.ts` 插件安装到 `~/.config/opencode/plugins/`
+- 将 OpenCode 原生事件接入 Corivo 的 carry-over、recall、review 调用
+
+注意事项：
+
+- 安装后你可能还需要检查默认 OpenCode provider 配置。
+- 如果脚本检测到 `opencode` 命令或 `~/.config/opencode` 目录，一次性安装脚本会自动配置 OpenCode。
 
 ## 为什么会有 Corivo
 

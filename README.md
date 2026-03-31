@@ -75,8 +75,125 @@ corivo inject
 Notes:
 - `corivo inject` writes Corivo rules into `.claude/CLAUDE.md` in your current project.
 - The local CLI is the main product surface today.
-- `scripts/install.sh` is being upgraded into a host-aware installer that can prepare Claude Code, Codex, Cursor, and OpenCode on the same machine.
+- `scripts/install.sh` can detect and configure Claude Code, Codex, Cursor, and OpenCode on the same machine.
 - Some integrations shown in the repository are still in progress or experimental.
+
+## Install by Host
+
+Corivo supports multiple AI coding agents. You can either use the one-command installer to auto-detect local hosts, or install a specific host adapter yourself.
+
+### One-command installer
+
+```bash
+curl -fsSL https://i.corivo.ai/install.sh | bash
+```
+
+This installer:
+
+- installs Node.js if it is missing
+- installs the `corivo` CLI
+- runs `corivo init`
+- detects Claude Code, Codex, Cursor, and OpenCode on your machine
+- installs the matching Corivo host adapters automatically
+
+### Claude Code
+
+What you get:
+
+- Claude Code hooks for carry-over, recall, and review
+- Corivo skills and command docs for Claude Code workflows
+- global Claude Code host wiring through the Corivo CLI
+
+Install:
+
+```bash
+corivo inject --global --claude-code
+```
+
+What the installer does:
+
+- installs Claude Code hook scripts and skills
+- updates Claude Code settings so lifecycle hooks call Corivo
+- enables the primary Corivo active-memory flow for Claude Code
+
+Notes:
+
+- This is the most mature integration in the repository today.
+- Use the one-command installer if you want Claude Code to be configured automatically when detected.
+
+### Codex
+
+What you get:
+
+- global Codex active-memory instructions
+- notify adapter wiring for post-response review
+- local plugin assets and marketplace-ready packaging in this repository
+
+Install:
+
+```bash
+corivo inject --global --codex
+```
+
+What the installer does:
+
+- writes the global Codex Corivo instructions
+- installs the Codex notify adapters under `~/.codex/corivo/`
+- updates Codex global configuration so Corivo participates in the active-memory flow
+
+Notes:
+
+- Restart Codex after installation so the new configuration takes effect.
+- The one-command installer will configure Codex automatically if it detects `codex` or `~/.codex`.
+
+### Cursor
+
+What you get:
+
+- global Cursor rules for carry-over, recall, and review
+- native Cursor lifecycle hook wiring
+- CLI permission setup so Cursor can call `corivo`
+
+Install:
+
+```bash
+corivo inject --global --cursor
+```
+
+What the installer does:
+
+- writes the global `corivo.mdc` rule file
+- installs Corivo hook scripts under `~/.cursor/corivo/`
+- updates `~/.cursor/settings.json` with Cursor lifecycle hooks
+- ensures Cursor CLI permissions allow `Shell(corivo)`
+
+Notes:
+
+- If Cursor Agent is installed but not logged in yet, the installer will report that extra attention is required.
+- The one-command installer will configure Cursor automatically if it detects `cursor` or `~/.cursor`.
+
+### OpenCode
+
+What you get:
+
+- an OpenCode plugin that maps native OpenCode events to Corivo memory flows
+- carry-over, recall, and review integration through the local Corivo CLI
+
+Install:
+
+```bash
+corivo inject --global --opencode
+```
+
+What the installer does:
+
+- installs a local `corivo.ts` plugin into `~/.config/opencode/plugins/`
+- connects native OpenCode events to Corivo carry-over, recall, and review calls
+
+Notes:
+
+- The installer may ask you to verify your default OpenCode provider configuration after setup.
+- The one-command installer will configure OpenCode automatically if it detects `opencode` or `~/.config/opencode`.
 
 ## Why It Exists
 

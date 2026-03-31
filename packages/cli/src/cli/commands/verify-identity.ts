@@ -1,7 +1,7 @@
 /**
- * CLI 命令 - verify-identity
+ * CLI command - verify-identity
  *
- * 跨设备身份验证（指纹 + 密码联合验证）
+ * Cross-device authentication (fingerprint + password federation)
  */
 
 import fs from 'node:fs/promises';
@@ -25,7 +25,7 @@ export async function verifyIdentityCommand(options: VerifyIdentityOptions = {})
   const configPath = path.join(configDir, 'config.json');
   const identityPath = path.join(configDir, 'identity.json');
 
-  // 读取配置
+  // Read configuration
   let config: any;
   try {
     const content = await fs.readFile(configPath, 'utf-8');
@@ -34,7 +34,7 @@ export async function verifyIdentityCommand(options: VerifyIdentityOptions = {})
     throw new ConfigError('Corivo 未初始化。请先运行: corivo init');
   }
 
-  // 读取身份
+  // read identity
   let identity: any;
   try {
     const content = await fs.readFile(identityPath, 'utf-8');
@@ -47,12 +47,12 @@ export async function verifyIdentityCommand(options: VerifyIdentityOptions = {})
   console.log('           跨设备身份验证');
   console.log('═══════════════════════════════════════════════════════\\n');
 
-  // 显示当前身份信息
+  // Show current identity information
   console.log(chalk.gray('当前身份 ID: ') + chalk.white(identity.identity_id));
   console.log(chalk.gray('创建时间: ') + chalk.gray(new Date(identity.created_at).toLocaleString('zh-CN')));
   console.log();
 
-  // 初始化指纹采集器
+  // Initialize the fingerprint collector
   initializeDefaultSoftwareConfigs();
   const currentFingerprints = await DynamicFingerprintCollector.collectAll();
   const fingerprintValues = currentFingerprints.map(fp => fp.value);
@@ -64,11 +64,11 @@ export async function verifyIdentityCommand(options: VerifyIdentityOptions = {})
   }
   console.log();
 
-  // 加载目标身份
+  // Load target identity
   const identityManager = new IdentityManager(configDir);
   await identityManager.load();
 
-  // 匹配指纹
+  // Match fingerprint
   const matchResult = identityManager.matchIdentity(currentFingerprints);
 
   console.log(chalk.cyan('🔍 指纹匹配结果:'));
@@ -77,22 +77,22 @@ export async function verifyIdentityCommand(options: VerifyIdentityOptions = {})
   console.log(`  匹配状态: ${matchResult.matched ? chalk.green('✓ 匹配') : chalk.red('✗ 不匹配')}`);
   console.log();
 
-  // 如果指纹匹配不足，请求密码验证
+  // If fingerprint match is insufficient, request password verification
   if (!matchResult.matched || matchResult.confidence < 0.6) {
     console.log(chalk.yellow('⚠️  指纹匹配不足，需要密码验证\\n'));
 
-    // 如果设置了密码
+    // If a password is set
     if (config.encrypted_db_key) {
       const password = options.password || await readPassword('请输入主密码: ');
 
-      // 验证密码
+      // Verify password
       const salt = Buffer.from(config.salt, 'base64');
       const masterKey = KeyManager.deriveMasterKey(password, salt);
 
       try {
         KeyManager.decryptDatabaseKey(config.encrypted_db_key, masterKey);
 
-        // 密码正确，使用联合验证
+        // Password is correct, use federated authentication
         const verifier = new JointVerifier();
         const result = await verifier.verify(
           fingerprintValues,

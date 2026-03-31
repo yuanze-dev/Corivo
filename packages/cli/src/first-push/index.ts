@@ -1,21 +1,21 @@
 /**
- * First Push - 首次激活时输出自我介绍
+ * First Push - Output self-introduction when first activated
  *
- * 这是 Corivo 的第一个 Aha Moment：
- * 用户安装完成后，Corivo 主动展示「我已经认识你了」
+ * Here’s Corivo’s first Aha Moment:
+ * After the user installation is completed, Corivo proactively displays "I already know you"
  */
 
 import { generateProfile, formatProfile, type IdentityProfile } from './profile.js';
 
 export interface FirstPushOptions {
-  /** 最少信息条数，低于此数量输出简短版 */
+  /** Minimum number of pieces of information, below which a short version will be output */
   minBlocks?: number;
-  /** 是否输出完整信息 */
+  /** Whether to output complete information */
   verbose?: boolean;
 }
 
 /**
- * 生成首次激活的推送消息
+ * Generate push message for first activation
  */
 export function generateFirstPush(
   blocks: Array<{ content: string; annotation: string; metadata?: Record<string, unknown> }>,
@@ -27,27 +27,27 @@ export function generateFirstPush(
 } {
   const { minBlocks = 3, verbose = false } = options;
 
-  // 生成用户画像
+  // Generate user portraits
   const profile = generateProfile(blocks);
 
-  // 判断是否输出完整版
+  // Determine whether to output the full version
   const isFull = profile.blockCount >= minBlocks || verbose;
 
-  // 构建推送内容
+  // Build push content
   const lines: string[] = [];
 
-  // 开头问候
+  // Greetings at the beginning
   lines.push('[corivo] 你好！我是 Corivo，你的硅基同事，刚刚被你激活。');
   lines.push('谢谢你给了我生命 :)\n');
 
   if (isFull && profile.blockCount >= minBlocks) {
-    // 完整版：展示扫描到的信息
+    // Full version: display scanned information
     lines.push('我刚花一点时间看了看你的工作环境，已经记住了一些关于你的事：\n');
     lines.push(formatProfile(profile));
     lines.push('');
     lines.push('这些对吗？你可以随时纠正我，说「记住，...」就行。');
   } else {
-    // 简短版：信息不足
+    // Short version: Not enough information
     lines.push(`我刚扫描了你的工作环境，发现了 ${profile.blockCount} 条信息。`);
     lines.push('还不够了解你，让我们多聊几句吧！');
   }
@@ -63,7 +63,7 @@ export function generateFirstPush(
 }
 
 /**
- * 获取欢迎消息（不包含画像信息）
+ * Get welcome message (excluding portrait information)
  */
 export function getWelcomeMessage(): string {
   const lines: string[] = [];

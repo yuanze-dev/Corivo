@@ -1,7 +1,7 @@
 /**
- * CLI 命令 - identity
+ * CLI command-identity
  *
- * 查看和管理用户身份信息
+ * View and manage user identity information
  */
 
 import fs from 'node:fs/promises';
@@ -10,7 +10,7 @@ import { getConfigDir } from '../../storage/database.js';
 import { IdentityManager, FingerprintCollector } from '../../identity/index.js';
 
 /**
- * 显示身份信息
+ * Show identity information
  */
 export async function identityCommand(options: {
   verbose?: boolean;
@@ -34,7 +34,7 @@ export async function identityCommand(options: {
       console.log(`显示名称: ${identity.display_name}`);
     }
 
-    // 显示平台指纹
+    // Display platform fingerprint
     if (Object.keys(identity.fingerprints).length > 0) {
       console.log('\n关联的平台：');
       const platformNames: Record<string, string> = {
@@ -55,7 +55,7 @@ export async function identityCommand(options: {
       }
     }
 
-    // 显示设备列表
+    // Show device list
     if (Object.keys(identity.devices).length > 0) {
       console.log('\n已授权设备：');
       for (const [deviceId, data] of Object.entries(identity.devices)) {
@@ -79,7 +79,7 @@ export async function identityCommand(options: {
 
     console.log('');
 
-    // 检查是否可以检测到新的指纹
+    // Check if the new fingerprint can be detected
     if (options.verbose) {
       console.log('正在扫描新的平台指纹...\n');
       const fingerprints = await FingerprintCollector.collectAll();

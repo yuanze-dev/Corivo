@@ -1,41 +1,41 @@
 /**
- * 推送去重机制
+ * Push deduplication mechanism
  */
 
 import crypto from 'node:crypto';
 
 /**
- * 去重管理器
+ * Deduplication manager
  */
 export class DedupManager {
   private pushed = new Set<string>();
   private lastPushed = new Map<string, number>();
-  private readonly timeWindow = 5 * 60 * 1000; // 5 分钟
+  private readonly timeWindow = 5 * 60 * 1000; // 5 minutes
 
   /**
-   * 生成内容哈希
+   * Generate a content hash
    */
   private hash(content: string): string {
     return crypto.createHash('md5').update(content).digest('hex');
   }
 
   /**
-   * 检查是否应该推送
+   * Check whether the given content should be pushed (i.e., not a duplicate)
    *
-   * @param content 推送内容
-   * @param sessionId 会话 ID（可选，用于会话级别去重）
-   * @returns 是否应该推送
+   * @param content - The content to evaluate
+   * @param sessionId - Optional session ID for session-scoped deduplication
+   * @returns Whether the content should be pushed
    */
   shouldPush(content: string, sessionId?: string): boolean {
     const contentHash = this.hash(content);
     const key = sessionId ? `${sessionId}:${contentHash}` : contentHash;
 
-    // 检查会话级别去重
+    // Deduplicate within the current session
     if (this.pushed.has(key)) {
       return false;
     }
 
-    // 检查时间窗口去重
+    // Deduplicate within the sliding time window
     const lastTime = this.lastPushed.get(contentHash) || 0;
     const now = Date.now();
 
@@ -43,7 +43,7 @@ export class DedupManager {
       return false;
     }
 
-    // 记录推送
+    // Record this push so future calls can detect duplicates
     this.pushed.add(key);
     this.lastPushed.set(contentHash, now);
 
@@ -51,20 +51,20 @@ export class DedupManager {
   }
 
   /**
-   * 批量过滤推送项
+   * Filter a list of push items, removing duplicates
    *
-   * @param items 推送项列表
-   * @param sessionId 会话 ID（可选）
-   * @returns 过滤后的推送项
+   * @param items - List of push items to filter
+   * @param sessionId - Optional session ID
+   * @returns Filtered list with duplicates removed
    */
   filter(items: string[], sessionId?: string): string[] {
     return items.filter(item => this.shouldPush(item, sessionId));
   }
 
   /**
-   * 清空会话级别的去重记录
+   * Clear all deduplication records for a given session
    *
-   * @param sessionId 会话 ID
+   * @param sessionId - The session ID to clear
    */
   clearSession(sessionId: string): void {
     const prefix = `${sessionId}:`;
@@ -82,7 +82,7 @@ export class DedupManager {
   }
 
   /**
-   * 清空所有记录
+   * Clear all deduplication records
    */
   clearAll(): void {
     this.pushed.clear();
@@ -90,7 +90,7 @@ export class DedupManager {
   }
 
   /**
-   * 清理过期的时间窗口记录
+   * Remove time-window records that have expired
    */
   cleanup(): void {
     const now = Date.now();
@@ -108,7 +108,7 @@ export class DedupManager {
   }
 }
 
-// 全局单例
+// Global singleton instance shared across the process lifetime
 let globalInstance: DedupManager | null = null;
 
 export function getDedupManager(): DedupManager {

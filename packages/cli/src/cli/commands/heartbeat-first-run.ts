@@ -1,6 +1,6 @@
 /**
- * 首次运行命令
- * 安装后立即执行，加速处理 Cold Scan 结果
+ * First run command
+ * Executed immediately after installation to speed up processing of Cold Scan results
  */
 
 import fs from 'node:fs/promises';
@@ -30,7 +30,7 @@ firstRunCommand
       );
       console.log('');
 
-      // 读取配置
+      // Read configuration
       const configDir = getConfigDir();
       const configPath = path.join(configDir, 'config.json');
 
@@ -45,7 +45,7 @@ firstRunCommand
         return;
       }
 
-      // 获取数据库密钥
+      // Get database key
       let dbKey = process.env.CORIVO_DB_KEY;
       const dbPath = process.env.CORIVO_DB_PATH || getDefaultDatabasePath();
 

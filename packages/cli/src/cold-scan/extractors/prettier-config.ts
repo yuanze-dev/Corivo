@@ -1,6 +1,6 @@
 /**
- * Prettier Config 提取器
- * 提取代码风格偏好
+ * Prettier Config Extractor
+ * Extract coding style preferences
  */
 
 import { readFileSafe, expandHome, createBlock } from '../utils.js';
@@ -12,12 +12,12 @@ async function extractPrettierConfig(content: string, filePath: string) {
   if (!content) return blocks;
 
   try {
-    // 可能是 JSON 或 JS 文件
+    // May be a JSON or JS file
     let config: Record<string, unknown> = {};
 
     if (filePath.endsWith('.js') || filePath.endsWith('.cjs')) {
-      // JS 配置文件，尝试简单提取（不执行代码）
-      // 提取常见的键值对
+      // JS configuration file, try simple extraction (no code execution)
+      // Extract common key-value pairs
       const matches = content.match(/(\w+):\s*(['"`])(.+?)\2/g);
       if (matches) {
         for (const match of matches) {
@@ -28,11 +28,11 @@ async function extractPrettierConfig(content: string, filePath: string) {
         }
       }
     } else {
-      // JSON 配置文件
+      // JSON configuration file
       config = JSON.parse(content);
     }
 
-    // 提取缩进风格
+    // Extract indent style
     if (config.tabWidth !== undefined) {
       const tabWidthStr =
         config.useTabs === true
@@ -49,7 +49,7 @@ async function extractPrettierConfig(content: string, filePath: string) {
       );
     }
 
-    // 提取引号偏好
+    // Extract quote preferences
     if (config.singleQuote !== undefined) {
       const quoteStyle = config.singleQuote === true ? '单引号' : '双引号';
       blocks.push(
@@ -63,7 +63,7 @@ async function extractPrettierConfig(content: string, filePath: string) {
       );
     }
 
-    // 提取分号偏好
+    // Extract semicolon preferences
     if (config.semi !== undefined) {
       const semiStr = config.semi === true ? '使用分号' : '不使用分号';
       blocks.push(
@@ -77,7 +77,7 @@ async function extractPrettierConfig(content: string, filePath: string) {
       );
     }
 
-    // 提取尾随逗号
+    // Extract trailing commas
     if (config.trailingComma !== undefined && config.trailingComma !== 'none') {
       blocks.push(
         createBlock({
@@ -90,7 +90,7 @@ async function extractPrettierConfig(content: string, filePath: string) {
       );
     }
   } catch {
-    // 解析失败，跳过
+    // Parsing failed, skipped
   }
 
   return blocks;
@@ -99,7 +99,7 @@ async function extractPrettierConfig(content: string, filePath: string) {
 export const source: ScanSource = {
   name: 'prettier-config',
   path: async () => {
-    // 查找多个可能的位置
+    // Find multiple possible locations
     const paths = [
       '.prettierrc',
       '.prettierrc.json',
@@ -113,7 +113,7 @@ export const source: ScanSource = {
 
     const results: string[] = [];
 
-    // 先检查当前目录
+    // Check the current directory first
     for (const p of paths) {
       try {
         const { existsSync } = await import('fs');
@@ -125,7 +125,7 @@ export const source: ScanSource = {
       }
     }
 
-    // 检查全局配置
+    // Check global configuration
     const globalConfig = `~/.prettierrc`;
     try {
       const { existsSync } = await import('fs');

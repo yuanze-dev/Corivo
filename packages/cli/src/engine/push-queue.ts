@@ -1,7 +1,7 @@
 /**
- * 推送队列管理
+ * Push queue management
  *
- * 持久化存储推送项，供会话启动时读取
+ * Persistent storage of push items for reading when the session starts
  */
 
 import fs from 'node:fs/promises';
@@ -10,7 +10,7 @@ import { getConfigDir } from '../storage/database.js';
 import type { PushItem } from '../engine/trigger-decision.js';
 
 /**
- * 推送队列存储
+ * Push queue storage
  */
 interface PushQueueStore {
   version: string;
@@ -19,7 +19,7 @@ interface PushQueueStore {
 }
 
 /**
- * 推送队列管理器
+ * push queue manager
  */
 export class PushQueue {
   private queuePath: string;
@@ -32,23 +32,23 @@ export class PushQueue {
   }
 
   /**
-   * 加载队列
+   * load queue
    */
   async load(): Promise<void> {
     try {
       const content = await fs.readFile(this.queuePath, 'utf-8');
       this.store = JSON.parse(content);
 
-      // 清理过期和已忽略的项
+      // Clean up expired and ignored items
       this.cleanup();
     } catch {
-      // 文件不存在或解析失败，使用空队列
+      // File does not exist or parsing failed, use empty queue
       this.store = this.emptyStore();
     }
   }
 
   /**
-   * 保存队列
+   * save queue
    */
   async save(): Promise<void> {
     const dir = path.dirname(this.queuePath);
@@ -57,10 +57,10 @@ export class PushQueue {
   }
 
   /**
-   * 添加推送项
+   * Add push item
    */
   async add(item: PushItem): Promise<void> {
-    // 检查是否已存在（基于 ID 或内容哈希）
+    // Check if already exists (based on ID or content hash)
     const exists = this.store.items.some(existing => {
       if (existing.id === item.id) {
         return true;
@@ -72,7 +72,7 @@ export class PushQueue {
     });
 
     if (exists) {
-      return; // 已存在，不重复添加
+      return; // Already exists, do not add again
     }
 
     this.store.items.push(item);
@@ -81,7 +81,7 @@ export class PushQueue {
   }
 
   /**
-   * 批量添加推送项
+   * Add push items in batches
    */
   async addAll(items: PushItem[]): Promise<void> {
     for (const item of items) {
@@ -90,16 +90,16 @@ export class PushQueue {
   }
 
   /**
-   * 获取待显示的推送
+   * Get the push to be displayed
    *
-   * 过滤规则：
-   * - 已忽略的不显示
-   * - 过期的不显示
-   * - 创建时间超过 24 小时的 "上下文" 类推送不显示（避免过时）
+   * Filter rules:
+   * - Ignored items are not displayed
+   * - Expired ones will not be displayed
+   * - "Context" class push created more than 24 hours ago will not be displayed (to avoid obsolescence)
    */
   getPending(limit = 5): PushItem[] {
     const now = Math.floor(Date.now() / 1000);
-    const staleThreshold = now - 86400; // 24 小时
+    const staleThreshold = now - 86400; // 24 hours
 
     return this.store.items
       .filter(item => {
@@ -109,7 +109,7 @@ export class PushQueue {
         if (item.expires_at > 0 && item.expires_at < now) {
           return false;
         }
-        // 上下文类推送超过 24 小时不显示（避免过时内容）
+        // Contextual push will not be displayed for more than 24 hours (to avoid outdated content)
         if (item.type === 'relevant' && item.created_at < staleThreshold) {
           return false;
         }
@@ -120,7 +120,7 @@ export class PushQueue {
   }
 
   /**
-   * 标记推送已显示
+   * Flag push shown
    */
   async markShown(id: string): Promise<void> {
     const item = this.store.items.find(i => i.id === id);
@@ -131,7 +131,7 @@ export class PushQueue {
   }
 
   /**
-   * 标记所有推送已显示
+   * Mark all feeds as shown
    */
   async markAllShown(): Promise<void> {
     for (const item of this.store.items) {
@@ -141,14 +141,14 @@ export class PushQueue {
   }
 
   /**
-   * 清理过期和已忽略的项
+   * Clean up expired and ignored items
    */
   private cleanup(): void {
     const now = Math.floor(Date.now() / 1000);
     const retentionDays = 30;
     const cutoffTime = now - (retentionDays * 86400);
 
-    // 保留：未忽略 且（未过期 或 创建时间在保留期内）
+    // Retention: not ignored and (not expired or created within the retention period)
     this.store.items = this.store.items.filter(item => {
       if (!item.dismissed && (item.expires_at === 0 || item.expires_at >= now)) {
         return true;
@@ -158,7 +158,7 @@ export class PushQueue {
   }
 
   /**
-   * 清空队列
+   * Clear the queue
    */
   async clear(): Promise<void> {
     this.store = this.emptyStore();
@@ -166,7 +166,7 @@ export class PushQueue {
   }
 
   /**
-   * 获取队列统计
+   * Get queue statistics
    */
   getStats(): { total: number; pending: number; dismissed: number } {
     const now = Math.floor(Date.now() / 1000);
@@ -179,7 +179,7 @@ export class PushQueue {
   }
 
   /**
-   * 创建空队列
+   * Create empty queue
    */
   private emptyStore(): PushQueueStore {
     return {

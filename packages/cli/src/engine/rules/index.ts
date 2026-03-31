@@ -1,43 +1,43 @@
 /**
- * 规则引擎
+ * rules engine
  *
- * 从自然语言内容中提取结构化决策模式
+ * Extract structured decision patterns from natural language content
  */
 
 import type { Pattern } from '../../models/pattern.js';
 
 /**
- * 规则接口
+ * Rule interface
  */
 export interface Rule {
-  /** 规则名称 */
+  /** Rule name */
   name: string;
-  /** 匹配模式列表 */
+  /** Match pattern list */
   patterns: RegExp[];
-  /** 从内容中提取模式 */
+  /** Extract patterns from content */
   extract(content: string): Pattern | null;
 }
 
 /**
- * 规则引擎
+ * rules engine
  *
- * 管理多个规则，依次尝试匹配并提取模式
+ * Manage multiple rules, sequentially trying to match and extract patterns
  */
 export class RuleEngine {
   private rules: Rule[] = [];
 
   /**
-   * 注册规则
+   * Registration rules
    */
   register(rule: Rule): void {
     this.rules.push(rule);
   }
 
   /**
-   * 从内容中提取模式
+   * Extract patterns from content
    *
-   * @param content - 自然语言内容
-   * @returns 提取的模式，如果没有匹配则返回 null
+   * @param content - natural language content
+   * @returns the extracted pattern, or null if there is no match
    */
   extract(content: string): Pattern | null {
     for (const rule of this.rules) {
@@ -50,17 +50,17 @@ export class RuleEngine {
   }
 
   /**
-   * 批量提取（用于测试）
+   * Batch extraction (for testing)
    *
-   * @param contents - 内容数组
-   * @returns 提取的模式数组
+   * @param contents - content array
+   * @returns extracted pattern array
    */
   extractAll(contents: string[]): (Pattern | null)[] {
     return contents.map((c) => this.extract(c));
   }
 
   /**
-   * 获取已注册的规则数量
+   * Get the number of registered rules
    */
   get ruleCount(): number {
     return this.rules.length;

@@ -1,17 +1,17 @@
 /**
- * 身份验证模块
+ * Identity authentication module
  *
- * 提供可选的找回密码/身份验证功能
+ * Provides optional passphrase-based identity verification.
  *
- * 设计理念：
- * - 可选功能，用户主动选择是否设置
- * - 验证优先级高于所有指纹采集
- * - 用于跨设备身份恢复或手动身份确认
+ * Design principles:
+ * - Opt-in feature; the user explicitly enables it
+ * - Auth takes precedence over all fingerprint-based matching
+ * - Used for cross-device identity recovery or manual identity confirmation
  *
- * 使用场景：
- * 1. 换新设备后，指纹无法自动匹配时
- * 2. 多人共用设备时，手动确认身份
- * 3. 身份被盗时，通过验证码夺回控制权
+ * Use cases:
+ * 1. After switching to a new device where fingerprints cannot auto-match
+ * 2. On shared devices where manual identity confirmation is needed
+ * 3. Recovering control after an identity compromise
  */
 
 import crypto from 'node:crypto';
@@ -20,35 +20,35 @@ import path from 'node:path';
 import type { IdentityConfig } from './identity.js';
 
 /**
- * 身份验证配置
+ * Identity authentication configuration stored on disk
  */
 export interface IdentityAuthConfig {
-  /** 是否启用身份验证 */
+  /** Whether authentication is currently enabled */
   enabled: boolean;
-  /** 验证码哈希（经过 PBKDF2 处理） */
+  /** PBKDF2-derived verifier hash of the passphrase */
   verifier: string;
-  /** 盐值 */
+  /** Random salt used for key derivation */
   salt: string;
-  /** 提示问题（可选） */
+  /** Optional hint question shown to the user before entry */
   hint?: string;
-  /** 设置时间 */
+  /** ISO timestamp when the auth config was created */
   created_at: string;
-  /** 最后使用时间 */
+  /** ISO timestamp of the most recent successful verification */
   last_used_at?: string;
 }
 
 /**
- * 验证结果
+ * Result returned by a verification attempt
  */
 export interface VerifyResult {
-  /** 是否验证成功 */
+  /** Whether the verification succeeded */
   success: boolean;
-  /** 剩余尝试次数（失败时） */
+  /** Remaining allowed attempts (provided on failure) */
   remaining_attempts?: number;
 }
 
 /**
- * 身份验证器
+ * Identity authenticator — manages passphrase setup, verification, and rotation
  */
 export class IdentityAuth {
   private authConfigPath: string;
@@ -62,7 +62,7 @@ export class IdentityAuth {
   }
 
   /**
-   * 检查是否已设置身份验证
+   * Returns true if authentication has been set up and is currently enabled
    */
   async isEnabled(): Promise<boolean> {
     try {
@@ -75,20 +75,20 @@ export class IdentityAuth {
   }
 
   /**
-   * 设置身份验证码
+   * Sets up a new passphrase for identity authentication
    *
-   * @param code - 验证码（用户提供的密码/短语）
-   * @param hint - 提示问题（可选）
+   * @param code - The passphrase chosen by the user
+   * @param hint - Optional hint question shown before entry
    */
   async setup(code: string, hint?: string): Promise<void> {
     if (code.length < 4) {
       throw new Error('验证码至少需要 4 个字符');
     }
 
-    // 生成盐值
+    // Generate a fresh random salt for this passphrase
     const salt = crypto.randomBytes(16).toString('hex');
 
-    // 使用 PBKDF2 派生密钥（与数据库密钥相同的强度）
+    // Derive a verifier using PBKDF2 — same strength as the database key derivation
     const verifier = crypto.pbkdf2Sync(code, salt, 100000, 32, 'sha256').toString('hex');
 
     const config: IdentityAuthConfig = {
@@ -104,10 +104,10 @@ export class IdentityAuth {
   }
 
   /**
-   * 验证身份验证码
+   * Verifies a passphrase against the stored verifier
    *
-   * @param code - 用户输入的验证码
-   * @returns 验证结果
+   * @param code - The passphrase entered by the user
+   * @returns Verification result indicating success or failure
    */
   async verify(code: string): Promise<VerifyResult> {
     try {
@@ -118,12 +118,12 @@ export class IdentityAuth {
         return { success: false };
       }
 
-      // 验证码匹配
+      // Derive the hash from the supplied code and compare to the stored verifier
       const hash = crypto.pbkdf2Sync(code, config.salt, 100000, 32, 'sha256').toString('hex');
       const success = hash === config.verifier;
 
       if (success) {
-        // 更新最后使用时间
+        // Record the timestamp of this successful verification
         config.last_used_at = new Date().toISOString();
         await fs.writeFile(this.authConfigPath, JSON.stringify(config, null, 2));
       }
@@ -135,10 +135,10 @@ export class IdentityAuth {
   }
 
   /**
-   * 更新验证码
+   * Rotates the passphrase — requires the current passphrase to authorize the change
    *
-   * @param oldCode - 旧验证码（用于验证）
-   * @param newCode - 新验证码
+   * @param oldCode - The current passphrase (used for verification)
+   * @param newCode - The new passphrase to set
    */
   async update(oldCode: string, newCode: string): Promise<boolean> {
     const verifyResult = await this.verify(oldCode);
@@ -151,9 +151,9 @@ export class IdentityAuth {
   }
 
   /**
-   * 禁用身份验证
+   * Disables authentication — requires the current passphrase to authorize
    *
-   * @param code - 当前验证码（需要验证）
+   * @param code - The current passphrase (required to prevent unauthorized disabling)
    */
   async disable(code: string): Promise<boolean> {
     const verifyResult = await this.verify(code);
@@ -173,7 +173,7 @@ export class IdentityAuth {
   }
 
   /**
-   * 获取提示问题
+   * Returns the hint question, or null if none was set
    */
   async getHint(): Promise<string | null> {
     try {
@@ -186,7 +186,7 @@ export class IdentityAuth {
   }
 
   /**
-   * 获取验证配置（不包含敏感信息）
+   * Returns non-sensitive auth metadata (excludes verifier and salt)
    */
   async getPublicInfo(): Promise<{
     enabled: boolean;
@@ -211,18 +211,16 @@ export class IdentityAuth {
 }
 
 /**
- * 身份合并器
- *
- * 使用验证码合并身份
+ * Utility for merging identities via passphrase verification
  */
 export class IdentityMerger {
   /**
-   * 通过验证码证明身份并合并
+   * Proves ownership of a target identity using a passphrase, enabling a merge
    *
-   * @param targetIdentity - 目标身份配置
-   * @param code - 验证码
-   * @param auth - 身份验证器
-   * @returns 是否合并成功
+   * @param targetIdentity - The identity configuration to merge into
+   * @param code - The passphrase to verify
+   * @param auth - The authenticator holding the stored verifier
+   * @returns true if the passphrase is valid and the merge is authorized
    */
   static async mergeWithAuth(
     targetIdentity: IdentityConfig,
@@ -234,11 +232,11 @@ export class IdentityMerger {
   }
 
   /**
-   * 通过验证码恢复身份
+   * Recover identity via verification code
    *
-   * @param code - 验证码
-   * @param auth - 身份验证器
-   * @returns 身份配置（如果验证成功）
+   * @param code - Verification code
+   * @param auth - authenticator
+   * @returns identity configuration (if verification is successful)
    */
   static async recoverWithAuth(
     code: string,
@@ -249,8 +247,8 @@ export class IdentityMerger {
       return null;
     }
 
-    // 验证成功，返回一个临时身份标识
-    // 实际使用中，应该从备份或其他来源恢复完整身份
+    // Verification is successful and a temporary identity is returned.
+    // In practice, the complete identity should be restored from backup or other sources
     return {
       identity_id: `id_recovered_${Date.now()}`,
       created_at: new Date().toISOString(),
@@ -262,11 +260,11 @@ export class IdentityMerger {
 }
 
 /**
- * CLI 辅助函数
+ * CLI helper functions
  */
 
 /**
- * 设置身份验证码（交互式）
+ * Set authentication code (interactive)
  */
 export async function setupAuthPrompt(): Promise<void> {
   console.log('\n═══════════════════════════════════════════════════════');
@@ -283,30 +281,30 @@ export async function setupAuthPrompt(): Promise<void> {
   console.log('  • 请使用容易记住但不易被猜到的短语');
   console.log('  • 忘记验证码无法找回，只能禁用后重新设置\n');
 
-  // TODO: 实际实现需要交互式输入
-  // 这里只展示说明
+  // TODO: Actual implementation requires interactive input
+  // Only the description is shown here
 }
 
 /**
- * 联合验证结果
+ * Joint verification results
  */
 export interface JointVerificationResult {
-  /** 是否验证成功 */
+  /** Is the verification successful? */
   success: boolean;
-  /** 指纹匹配分数 (0-100) */
+  /** Fingerprint match score (0-100) */
   fingerprintScore?: number;
-  /** 密码是否正确 */
+  /** Is the password correct? */
   passwordValid?: boolean;
-  /** 综合置信度 */
+  /** Overall confidence */
   confidence: 'low' | 'medium' | 'high' | 'very_high';
-  /** 验证方法 */
+  /** Verification method */
   method: 'fingerprint_only' | 'password_only' | 'joint';
 }
 
 /**
- * 联合验证器
+ * federated validator
  *
- * 结合指纹和密码进行身份验证，提供更强的安全保障
+ * Combine fingerprint and password for authentication to provide stronger security
  */
 export class JointVerifier {
   private auth: IdentityAuth;
@@ -317,38 +315,38 @@ export class JointVerifier {
   }
 
   /**
-   * 联合验证：指纹 + 密码
+   * Joint verification: fingerprint + password
    *
-   * @param fingerprints - 当前设备的指纹列表
-   * @param targetIdentity - 目标身份配置
-   * @param password - 用户输入的密码（可选）
-   * @returns 验证结果
+   * @param fingerprints - List of fingerprints for the current device
+   * @param targetIdentity - target identity configuration
+   * @param password - the password entered by the user (optional)
+   * @returns verification results
    */
   async verify(
     fingerprints: string[],
     targetIdentity: IdentityConfig,
     password?: string
   ): Promise<JointVerificationResult> {
-    // 1. 指纹匹配
+    // 1. Fingerprint matching
     const fingerprintResult = this.matchFingerprints(fingerprints, targetIdentity);
 
-    // 2. 如果提供了密码，验证密码
+    // 2. If a password is provided, verify the password
     let passwordValid = false;
     if (password) {
       const authResult = await this.auth.verify(password);
       passwordValid = authResult.success;
     }
 
-    // 3. 计算综合置信度
+    // 3. Calculate comprehensive confidence
     return this.calculateConfidence(fingerprintResult, passwordValid);
   }
 
   /**
-   * 匹配指纹
+   * Match fingerprint
    *
-   * @param currentFingerprints - 当前设备指纹
-   * @param targetIdentity - 目标身份
-   * @returns 匹配分数 (0-100)
+   * @param currentFingerprints - Current device fingerprints
+   * @param targetIdentity - target identity
+   * @returns match score (0-100)
    */
   private matchFingerprints(
     currentFingerprints: string[],
@@ -363,13 +361,13 @@ export class JointVerifier {
 
     for (const currentFp of currentFingerprints) {
       for (const [platform, storedFp] of Object.entries(targetIdentity.fingerprints)) {
-        // 检查当前指纹和历史指纹
+        // Check current and historical fingerprints
         if (storedFp.current === currentFp) {
           matchCount++;
           totalScore += this.getConfidenceScore(storedFp.confidence);
         } else if (storedFp.historical?.includes(currentFp)) {
           matchCount++;
-          totalScore += this.getConfidenceScore(storedFp.confidence) * 0.5; // 历史指纹减半
+          totalScore += this.getConfidenceScore(storedFp.confidence) * 0.5; // Historical fingerprints halved
         }
       }
     }
@@ -378,7 +376,7 @@ export class JointVerifier {
   }
 
   /**
-   * 获取置信度分数
+   * Get confidence score
    */
   private getConfidenceScore(confidence: string): number {
     switch (confidence) {
@@ -390,13 +388,13 @@ export class JointVerifier {
   }
 
   /**
-   * 计算综合置信度
+   * Calculate overall confidence
    */
   private calculateConfidence(
     fingerprintScore: number,
     passwordValid: boolean
   ): JointVerificationResult {
-    // 只有指纹
+    // Only fingerprints
     if (!passwordValid) {
       if (fingerprintScore >= 80) {
         return {
@@ -421,7 +419,7 @@ export class JointVerifier {
       };
     }
 
-    // 只有密码
+    // only password
     if (fingerprintScore === 0) {
       return {
         success: true,
@@ -432,8 +430,8 @@ export class JointVerifier {
       };
     }
 
-    // 指纹 + 密码联合验证
-    const jointScore = fingerprintScore + 50; // 密码额外加 50 分
+    // Fingerprint + password joint verification
+    const jointScore = fingerprintScore + 50; // Additional 50 points for password
     if (jointScore >= 130) {
       return {
         success: true,
@@ -453,13 +451,13 @@ export class JointVerifier {
   }
 
   /**
-   * 跨设备身份恢复
+   * Cross-device identity recovery
    *
-   * 当指纹完全不匹配时，通过密码证明身份
+   * Prove identity via password when fingerprints don't match at all
    *
-   * @param password - 用户密码
-   * @param deviceId - 新设备 ID
-   * @returns 是否恢复成功
+   * @param password - user password
+   * @param deviceId - the new device ID
+   * @returns Whether the recovery is successful
    */
   async recoverAcrossDevice(
     password: string,
@@ -470,15 +468,15 @@ export class JointVerifier {
       return false;
     }
 
-    // 密码正确，记录新设备
-    // 实际实现应该更新身份配置，添加新设备指纹
-    // 这里返回 true 表示密码验证通过
+    // Password is correct, record new device
+    // The actual implementation should update the identity configuration to add the new device fingerprint
+    // Returning true here indicates that the password verification is passed
     return true;
   }
 }
 
 /**
- * 验证身份码（交互式）
+ * Verify ID code (interactive)
  */
 export async function verifyAuthPrompt(hint?: string): Promise<boolean> {
   console.log('\n请输入身份验证码以确认身份');
@@ -486,6 +484,6 @@ export async function verifyAuthPrompt(hint?: string): Promise<boolean> {
     console.log(`提示: ${hint}`);
   }
 
-  // TODO: 实际实现需要交互式输入
+  // TODO: Actual implementation requires interactive input
   return false;
 }

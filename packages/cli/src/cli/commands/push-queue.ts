@@ -1,7 +1,7 @@
 /**
- * Push-Queue 命令
+ * Push-Queue command
  *
- * 管理推送队列（内部命令，供 hooks 调用）
+ * Manages the push queue (internal command, called by hooks).
  */
 
 import fs from 'node:fs/promises';
@@ -24,46 +24,46 @@ pushQueueCommand
       const queue = new PushQueue();
       await queue.load();
 
-      // 处理清空
+      // Handle clear
       if (options.clear) {
         await queue.clear();
         console.log('推送队列已清空');
         return;
       }
 
-      // 处理忽略所有
+      // handle ignore all
       if (options.dismissAll) {
         await queue.markAllShown();
         console.log('所有推送已忽略');
         return;
       }
 
-      // 处理忽略单个
+      // Processing ignores single
       if (options.dismiss) {
         await queue.markShown(options.dismiss);
         console.log(`推送 ${options.dismiss} 已忽略`);
         return;
       }
 
-      // 默认：显示待处理的推送
+      // Default: Show pending pushes
       const pending = queue.getPending(options.pending === true ? undefined : 5);
 
       if (pending.length === 0) {
         if (options.json) {
           console.log(JSON.stringify({ items: [] }));
         } else {
-          // 空输出
+          // Empty output
         }
         return;
       }
 
-      // JSON 输出
+      // JSON output
       if (options.json) {
         console.log(JSON.stringify({ items: pending }, null, 2));
         return;
       }
 
-      // 人类可读输出
+      // human readable output
       console.log('');
       console.log(`📬 待处理提醒 (${pending.length} 条):`);
       console.log('');

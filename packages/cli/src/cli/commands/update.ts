@@ -1,5 +1,5 @@
 /**
- * Update 命令 - 手动更新和检查
+ * Update command - manual update check and installation.
  */
 
 import { Command } from 'commander';
@@ -48,7 +48,7 @@ async function handleUpdateCommand(options: { check?: boolean }) {
   console.log(`当前版本: ${currentVersion}`);
   console.log('');
 
-  // 检查更新
+  // Check for updates
   console.log('正在检查更新...');
 
   const status = await checkForUpdate();
@@ -72,7 +72,7 @@ async function handleUpdateCommand(options: { check?: boolean }) {
     console.log(chalk.yellow('注意: 此更新包含破坏性变更'));
   }
 
-  // 如果只是检查，不安装
+  // If you just check, don’t install
   if (options.check) {
     console.log('');
     console.log('要安装更新，请运行: corivo update');
@@ -80,7 +80,7 @@ async function handleUpdateCommand(options: { check?: boolean }) {
     return;
   }
 
-  // 破坏性更新需要确认
+  // Breaking updates require confirmation
   if (status.isBreaking) {
     console.log('');
     console.log(chalk.yellow('破坏性更新需要手动确认'));
@@ -89,7 +89,7 @@ async function handleUpdateCommand(options: { check?: boolean }) {
     return;
   }
 
-  // 执行更新
+  // perform update
   console.log('');
   console.log('正在下载更新...');
 

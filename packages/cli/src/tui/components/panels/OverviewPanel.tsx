@@ -9,7 +9,7 @@ interface OverviewPanelProps {
   panelHeight: number;
 }
 
-// ─── 格式化工具 ────────────────────────────────────────────────────
+// ─── Format tools ─────────────────────────────────────────────────
 
 function fmtNum(n: number) {
   return n.toLocaleString('en-US');
@@ -29,7 +29,7 @@ function relTime(unixSec: number): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-// ─── 颜色映射 ────────────────────────────────────────────────────
+// ─── Colors mapping ────────────────────────────────────────────────
 
 const NATURE_COLOR: Record<string, string> = {
   decision:   'green',
@@ -49,7 +49,7 @@ function toNature(annotation: string): string {
   return 'other';
 }
 
-// ─── 进度条 ───────────────────────────────────────────────────────
+// ─── Progress bar ──────────────────────────────────────────────────
 
 function HBar({ value, max, width, color }: { value: number; max: number; width: number; color: string }) {
   const filled = max > 0 ? Math.round((value / max) * width) : 0;
@@ -77,20 +77,20 @@ function CompositeBar({ segments, width }: { segments: Array<{ count: number; co
   );
 }
 
-// ─── 估算分组模式所需行数 ────────────────────────────────────────
+// ─── Estimate the number of rows required for grouping mode ──────────────────────────────────────
 
 function estimateGroupedRows(stats: DbStats): number {
   const activeTypes = NATURE_ORDER.filter(n => (stats.byNature[n] || 0) > 0).length;
   const recentCount = stats.recentBlocks.length;
-  // 每个 section: 2(边框) + 1(标题) + N(内容) + 1(间距，最后一个无)
+  // Each section: 2(border) + 1(title) + N(content) + 1(spacing, last none)
   const memSection    = 2 + 1 + 3;               // Total / Associations / DB
-  const typeSection   = 2 + 1 + activeTypes + 1;  // 每种类型一行
+  const typeSection   = 2 + 1 + activeTypes + 1;  // One line per type
   const cycleSection  = 2 + 1 + 3 + 1;            // dots + bar + pct
   const recentSection = recentCount > 0 ? 2 + 1 + recentCount : 0;
   return memSection + typeSection + cycleSection + recentSection;
 }
 
-// ─── 平铺行（虚拟滚动用） ────────────────────────────────────────
+// ─── Tile rows (for virtual scrolling) ──────────────────────────────────────
 
 type FlatRow = { key: string; node: React.ReactNode };
 
@@ -106,7 +106,7 @@ function buildRows(stats: DbStats, barW: number): FlatRow[] {
   ];
   const vTotal = vCounts.reduce((s, v) => s + v.count, 0) || 1;
 
-  // 计算 pct 括号宽度
+  // Calculate pct bracket width
   let usedW = 0;
   const vSegWidths = vCounts.map((v, i) => {
     const isLast = i === vCounts.length - 1;
@@ -238,7 +238,7 @@ function buildRows(stats: DbStats, barW: number): FlatRow[] {
   return rows;
 }
 
-// ─── 分组 bordered 样式（高度充足时） ────────────────────────────
+// ─── Grouped bordered style (when the height is sufficient) ─────────────────────────────
 
 function FullView({ stats, sectionW, barW }: { stats: DbStats; sectionW: number; barW: number }) {
   const { byStatus } = stats;
@@ -360,7 +360,7 @@ function FullView({ stats, sectionW, barW }: { stats: DbStats; sectionW: number;
   );
 }
 
-// ─── 主组件 ─────────────────────────────────────────────────────
+// ─── Main component ──────────────────────────────────────────────────
 
 export const OverviewPanel = React.memo(function OverviewPanel({ stats, loading, scrollOffset, panelHeight }: OverviewPanelProps) {
   const { stdout } = useStdout();
@@ -369,7 +369,7 @@ export const OverviewPanel = React.memo(function OverviewPanel({ stats, loading,
   const sectionW = cols - 4;
   const barW = Math.max(20, sectionW - 28);
 
-  // 模式滞后 ref：±2 行缓冲，防止数据刷新时在临界点反复切换
+  // Mode hysteresis ref: ±2 lines of buffering to prevent repeated switching at critical points when data is refreshed
   const scrollModeRef = React.useRef<boolean | null>(null);
 
   if (loading) {
@@ -379,7 +379,7 @@ export const OverviewPanel = React.memo(function OverviewPanel({ stats, loading,
     return <Box paddingX={2}><Text color="red">  Database unavailable</Text></Box>;
   }
 
-  // 估算分组模式所需行数，应用 hysteresis 决定是否进入滚动模式
+  // Estimate the number of rows required for grouping mode and apply hysteresis to decide whether to enter rolling mode
   const neededRows = estimateGroupedRows(stats);
   if (scrollModeRef.current === null) {
     scrollModeRef.current = availableRows < neededRows;
@@ -393,7 +393,7 @@ export const OverviewPanel = React.memo(function OverviewPanel({ stats, loading,
     return <FullView stats={stats} sectionW={sectionW} barW={barW} />;
   }
 
-  // 高度不足：虚拟滚动
+  // Not enough height: virtual scrolling
   const rows = buildRows(stats, barW);
   const innerH = Math.max(2, availableRows - 3);
   const maxScroll = Math.max(0, rows.length - innerH);

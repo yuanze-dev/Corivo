@@ -9,7 +9,7 @@ interface StatusBarProps {
   savedFlash?: boolean;
 }
 
-// 仅在 props 变化时重渲染，避免后台 hook 刷新导致的无效渲染
+// Only re-render when props change to avoid invalid rendering caused by background hook refresh
 export const StatusBar = React.memo(function StatusBar({ daemonRunning, syncConfigured, dbHealthy, pid, savedFlash }: StatusBarProps) {
   return (
     <Box paddingX={1} marginTop={1}>

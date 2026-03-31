@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Corivo 安装脚本
-# 用法: curl -fsSL https://i.corivo.ai/install.sh | bash
+# Corivo installation script
+# Usage: curl -fsSL https://i.corivo.ai/install.sh | bash
 #      curl -fsSL https://i.corivo.ai/install.sh | bash -s -- --lang en
 
 set -e
@@ -26,7 +26,7 @@ load_install_lib() {
 
 load_install_lib
 
-# ── 颜色 ───────────────────────────────────────────────────────────────────
+# ── Colors ──────────────────────────────────────────────────────────
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
@@ -40,7 +40,7 @@ log_error() { echo -e "${RED}✖${NC} $1"; }
 log_step()  { echo -e "${BLUE}⏳${NC} $1"; }
 log_corivo(){ echo -e "${CYAN}[corivo]${NC} $1"; }
 
-# ── 配置 ───────────────────────────────────────────────────────────────────
+# ── Configuration ────────────────────────────────────────────────────────────
 CORIVO_CONFIG_DIR="$HOME/.corivo"
 CORIVO_HOOKS_DIR="$CORIVO_CONFIG_DIR/hooks"
 CORIVO_INSTALL_CLI_SOURCE="${CORIVO_INSTALL_CLI_SOURCE:-corivo}"
@@ -52,15 +52,15 @@ CODEX_MARKETPLACE_DIR="$HOME/.agents/plugins"
 CODEX_PLUGIN_DIR="$CODEX_PLUGINS_DIR/corivo"
 CODEX_HOOKS_FILE="$CODEX_CONFIG_DIR/hooks.json"
 
-# ── 1. 安装 Node.js（如未安装）────────────────────────────────────────────
+# ── 1. Install Node.js (if needed) ───────────────────────────────────────────
 install_node_via_nvm() {
   log_step "$(msg install_node)"
-  # 下载并执行 nvm 安装脚本
+  # Download and execute the nvm installation script
   if ! curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash; then
     log_error "nvm 安装失败"
     exit 1
   fi
-  # 加载 nvm 到当前 shell（不依赖新开终端）
+  # Load nvm into the current shell (does not rely on opening a new terminal)
   export NVM_DIR="$HOME/.nvm"
   # shellcheck disable=SC1091
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
@@ -75,7 +75,7 @@ install_node_via_nvm() {
 }
 
 check_node() {
-  # 尝试加载 nvm（用户可能已装但未激活）
+  # Try to load nvm (the user may have installed it but not activated it)
   export NVM_DIR="$HOME/.nvm"
   # shellcheck disable=SC1091
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
@@ -97,9 +97,9 @@ check_node() {
   log_info "$(msg node_ready) ($(node -v))"
 }
 
-# ── 2. 安装构建依赖（better-sqlite3 需要 Python + gcc）──────────────────────
+# ── 2. Install build dependencies (better-sqlite3 needs Python + gcc) ───────
 install_build_deps() {
-  # 已有 python3 和 gcc 则跳过
+  # If you already have python3 and gcc, skip it
   if command -v python3 &>/dev/null && command -v gcc &>/dev/null; then
     log_info "$(msg build_deps_ready)"
     return
@@ -107,14 +107,14 @@ install_build_deps() {
 
   log_step "$(msg install_build_deps)"
 
-  # 非 root 用户需要 sudo
+  # Non-root users require sudo
   SUDO=""
   if [ "$(id -u)" -ne 0 ]; then
     if command -v sudo &>/dev/null; then
       SUDO="sudo"
     else
-    log_warn "需要 root 权限安装构建依赖，但未找到 sudo"
-  fi
+      log_warn "Root privileges are required to install build dependencies, but sudo is unavailable"
+    fi
   fi
 
   if command -v apt-get &>/dev/null; then
@@ -136,17 +136,17 @@ install_build_deps() {
   log_info "$(msg build_deps_ready)"
 }
 
-# ── 3. 安装 Corivo CLI ────────────────────────────────────────────────────
+# ── 3. Install Corivo CLI ─────────────────────────────────────────────────
 install_corivo_cli() {
   log_step "$(msg install_cli)"
   npm install -g "$CORIVO_INSTALL_CLI_SOURCE"
-  # npm 有时不设置执行权限，手动补上
+  # npm sometimes does not set execution permissions and needs to be added manually
   CORIVO_BIN="$(npm root -g)/../bin/corivo"
   [ -f "$CORIVO_BIN" ] && chmod +x "$CORIVO_BIN" 2>/dev/null || true
   log_info "$(msg cli_ready) ($(corivo --version 2>/dev/null || echo 'latest'))"
 }
 
-# ── 3. 初始化数据库 + 启动守护进程 ─────────────────────────────────────────
+# ── 3. Initialize the database + start the daemon process ────────────────────────────────────────
 init_corivo() {
   if [ -f "$CORIVO_CONFIG_DIR/corivo.db" ]; then
     log_info "$(msg corivo_inited)"
@@ -154,10 +154,10 @@ init_corivo() {
   fi
   log_step "$(msg init_corivo)"
   corivo init
-  # corivo init 内部会自动调用 corivo start 启动心跳守护进程
+  # Corivo init will automatically call corivo start internally to start the heartbeat daemon.
 }
 
-# ── 4. 找到 Claude Code 配置目录 ───────────────────────────────────────────
+# ── 4. Find the Claude Code configuration directory ──────────────────────────────────────────
 find_claude_dir() {
   for dir in "$HOME/.claude" "$HOME/.config/claude" "$HOME/Library/Application Support/claude"; do
     if [ -d "$dir" ]; then
@@ -170,7 +170,7 @@ find_claude_dir() {
   return 1
 }
 
-# ── 5. 安装 Skills ─────────────────────────────────────────────────────────
+# ── 5. Install Skills ────────────────────────────────────────────────────
 install_skills() {
   local skills_dir="$CLAUDE_DIR/skills"
   log_step "$(msg install_claude_skills)"
@@ -188,7 +188,7 @@ install_skills() {
   done
 }
 
-# ── 6. 安装 Hook 脚本 ──────────────────────────────────────────────────────
+# ── 6. Install Hook script ───────────────────────────────────────────────────
 install_hook_scripts() {
   log_step "$(msg install_claude_hooks)"
   mkdir -p "$CORIVO_HOOKS_DIR"
@@ -206,19 +206,19 @@ install_hook_scripts() {
   done
 }
 
-# ── 7. 写入 Claude Code settings.json ─────────────────────────────────────
+# ── 7. Write Claude Code settings.json ────────────────────────────────────
 install_hooks_config() {
   local settings_file="$CLAUDE_DIR/settings.json"
   log_step "$(msg configure_claude_hooks)"
 
-  # 确保 settings.json 存在
+  # Make sure settings.json exists
   if [ ! -f "$settings_file" ]; then
     echo '{}' > "$settings_file"
   fi
 
   local hooks_dir="$CORIVO_HOOKS_DIR"
 
-  # 用 node 合并 hooks（避免覆盖用户已有配置）
+  # Use node to merge hooks (to avoid overwriting the user's existing configuration)
   node - <<EOF
 const fs = require('fs');
 const path = '$settings_file';
@@ -227,7 +227,7 @@ const settings = JSON.parse(raw);
 
 if (!settings.hooks) settings.hooks = {};
 
-// 检查是否已有 corivo hooks（防止重复写入）
+// Check if there are existing corivo hooks (to prevent repeated writing)
 const isCorivHook = (h) => h.hooks && h.hooks.some(x => x.command && x.command.includes('corivo'));
 
 const merge = (event, newEntry) => {
@@ -266,7 +266,7 @@ EOF
   log_info "hooks 已配置: $settings_file"
 }
 
-# ── 8. 安装 Codex 插件文件 ─────────────────────────────────────────────────
+# ── 8. Install the Codex plug-in file ──────────────────────────────────────────────
 install_codex_plugin_files() {
   log_step "安装 Codex 插件文件..."
 
@@ -540,7 +540,7 @@ install_codex_plugin() {
   install_codex_hooks_config
 }
 
-# ── 9. 检查 Claude Code 进程 ───────────────────────────────────────────────
+# ── 9. Check the Claude Code process ─────────────────────────────────────────────
 check_claude_process() {
   if pgrep -f "claude" &>/dev/null; then
     echo ""
@@ -553,7 +553,7 @@ check_claude_process() {
   fi
 }
 
-# ── 10. 检查 Codex 进程 ───────────────────────────────────────────────────
+# ── 10. Check the Codex process ─────────────────────────────────────────────────
 check_codex_process() {
   if pgrep -f "codex" &>/dev/null; then
     echo ""
@@ -566,7 +566,7 @@ check_codex_process() {
   fi
 }
 
-# ── 完成提示 ───────────────────────────────────────────────────────────────
+# ──Completion Tips────────────────────────────────────────────────────────
 show_success() {
   echo ""
   echo -e "${GREEN}══════════════════════════════════════════${NC}"
@@ -583,7 +583,7 @@ show_success() {
   echo ""
 }
 
-# ── 主流程 ─────────────────────────────────────────────────────────────────
+# ── Main process ───────────────────────────────────────────────────────────
 main() {
   parse_install_args "$@"
   resolve_install_lang

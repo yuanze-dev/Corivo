@@ -1,7 +1,7 @@
 /**
- * CLI E2E 测试
+ * CLI end-to-end tests
  *
- * 测试完整的 CLI 流程
+ * Verifies the complete CLI workflow
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -14,12 +14,12 @@ const TEST_DIR = `/tmp/corivo-e2e-${Date.now()}`;
 
 describe('E2E: CLI Basic Workflow', () => {
   beforeAll(async () => {
-    // 创建测试目录
+    // Create test directory
     await fs.mkdir(TEST_DIR, { recursive: true });
   });
 
   afterAll(async () => {
-    // 清理
+    // clean up
     await fs.rm(TEST_DIR, { recursive: true, force: true }).catch(() => {});
   });
 

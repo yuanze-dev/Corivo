@@ -1,5 +1,5 @@
 /**
- * Inject 模块 - 规则注入
+ * Inject module - rule injection
  */
 
 export * from './claude-rules.js';

@@ -1,6 +1,6 @@
 /**
- * Identity Profile 生成器
- * 从扫描结果中聚合用户画像
+ * Identity Profile Generator
+ * Aggregate user profiles from scan results
  */
 
 export interface TechStack {
@@ -42,7 +42,7 @@ export interface IdentityProfile {
 }
 
 /**
- * 从扫描的 blocks 中聚合用户画像
+ * Aggregate user personas from scanned blocks
  */
 export function generateProfile(blocks: Array<{ content: string; annotation: string; metadata?: Record<string, unknown> }>): IdentityProfile {
   const profile: IdentityProfile = {
@@ -78,7 +78,7 @@ export function generateProfile(blocks: Array<{ content: string; annotation: str
   const seenSources = new Set<string>();
 
   for (const block of blocks) {
-    // 记录来源
+    // record source
     if (block.metadata?.scan_source) {
       seenSources.add(block.metadata.scan_source as string);
     }
@@ -86,7 +86,7 @@ export function generateProfile(blocks: Array<{ content: string; annotation: str
     const annotation = block.annotation.toLowerCase();
     const content = block.content.toLowerCase();
 
-    // 解析身份信息
+    // Parse identity information
     if (annotation.includes('身份') || annotation.includes('姓名')) {
       if (annotation.includes('姓名')) {
         const match = block.content.match(/用户名为\s+(.+)/);
@@ -98,7 +98,7 @@ export function generateProfile(blocks: Array<{ content: string; annotation: str
       }
     }
 
-    // 解析技术栈 - 语言
+    // Parsing Technology Stack - Language
     if (annotation.includes('技术栈') && annotation.includes('语言')) {
       const languages = block.content.toLowerCase();
       if (languages.includes('typescript')) profile.techStack.languages.push('TypeScript');
@@ -109,7 +109,7 @@ export function generateProfile(blocks: Array<{ content: string; annotation: str
       else if (languages.includes('java')) profile.techStack.languages.push('Java');
     }
 
-    // 解析前端框架
+    // Parse front-end framework
     if (annotation.includes('前端框架')) {
       const frameworks = block.content.toLowerCase();
       if (frameworks.includes('react')) profile.techStack.frameworks.push('React');
@@ -120,7 +120,7 @@ export function generateProfile(blocks: Array<{ content: string; annotation: str
       if (frameworks.includes('nuxt')) profile.techStack.frameworks.push('Nuxt');
     }
 
-    // 解析基础设施
+    // parsing infrastructure
     if (annotation.includes('基础设施')) {
       if (content.includes('postgres')) profile.techStack.infra.push('PostgreSQL');
       if (content.includes('mysql')) profile.techStack.infra.push('MySQL');
@@ -130,31 +130,31 @@ export function generateProfile(blocks: Array<{ content: string; annotation: str
       if (content.includes('rabbitmq') || content.includes('kafka')) profile.techStack.infra.push('消息队列');
     }
 
-    // 解析代码风格 - 缩进
+    // Parsing code style - indentation
     if (annotation.includes('缩进')) {
       if (content.includes('2 空格')) profile.codeStyle.indent = '2 空格';
       else if (content.includes('4 空格')) profile.codeStyle.indent = '4 空格';
       else if (content.includes('tab')) profile.codeStyle.indent = 'Tab';
     }
 
-    // 解析代码风格 - 引号
+    // Parsing code style - quotes
     if (annotation.includes('引号')) {
       if (content.includes('单引号')) profile.codeStyle.quotes = '单引号';
       else if (content.includes('双引号')) profile.codeStyle.quotes = '双引号';
     }
 
-    // 解析代码风格 - 分号
+    // Parsing code style - semicolon
     if (annotation.includes('分号')) {
       profile.codeStyle.semicolons = content.includes('使用分号');
     }
 
-    // 解析代码风格 - 尾随逗号
+    // Parsing code style - trailing commas
     if (annotation.includes('尾随逗号')) {
       const match = block.content.match(/尾随逗号:\s*(.+)/);
       if (match) profile.codeStyle.trailingComma = match[1].trim();
     }
 
-    // 解析项目信息
+    // Parse project information
     if (annotation.includes('项目')) {
       if (annotation.includes('当前')) {
         const nameMatch = block.content.match(/当前项目:\s*(.+)/);
@@ -171,7 +171,7 @@ export function generateProfile(blocks: Array<{ content: string; annotation: str
       }
     }
 
-    // 解析团队信息
+    // Parse team information
     if (annotation.includes('团队') || annotation.includes('协作')) {
       if (content.includes('github')) profile.team.platform = 'GitHub';
       if (content.includes('gitlab')) profile.team.platform = 'GitLab';
@@ -180,12 +180,12 @@ export function generateProfile(blocks: Array<{ content: string; annotation: str
       if (content.includes('钉钉')) profile.team.communication.push('钉钉');
       if (content.includes('微信')) profile.team.communication.push('微信');
 
-      // 提取 GitHub org
+      // Fetch GitHub org
       const orgMatch = block.content.match(/github org:\s*(\w+)/i);
       if (orgMatch) profile.team.org = orgMatch[1];
     }
 
-    // 解析角色/职位
+    // Analyze roles/positions
     if (annotation.includes('事实') && annotation.includes('身份')) {
       if (content.includes('产品经理')) profile.role = '产品经理';
       else if (content.includes('工程师')) profile.role = '工程师';
@@ -194,7 +194,7 @@ export function generateProfile(blocks: Array<{ content: string; annotation: str
     }
   }
 
-  // 去重
+  // Remove duplicates
   profile.techStack.languages = [...new Set(profile.techStack.languages)];
   profile.techStack.frameworks = [...new Set(profile.techStack.frameworks)];
   profile.techStack.infra = [...new Set(profile.techStack.infra)];
@@ -206,18 +206,18 @@ export function generateProfile(blocks: Array<{ content: string; annotation: str
 }
 
 /**
- * 格式化用户画像为可读文本
+ * Format user portrait into readable text
  */
 export function formatProfile(profile: IdentityProfile): string {
   const lines: string[] = [];
 
-  // 身份
+  // identity
   if (profile.name) {
     const roleStr = profile.role ? `，是一名${profile.role}` : '';
     lines.push(`· 你叫${profile.name}${roleStr}（来自 .gitconfig）`);
   }
 
-  // 技术栈 - 语言
+  // Technology Stack - Language
   if (profile.techStack.languages.length > 0) {
     const primary = profile.techStack.languages[0];
     const others = profile.techStack.languages.slice(1);
@@ -225,12 +225,12 @@ export function formatProfile(profile: IdentityProfile): string {
     lines.push(`· 你主要写 ${primary}${othersStr}（来自最近的项目）`);
   }
 
-  // 技术栈 - 前端框架
+  // Technology stack - front-end framework
   if (profile.techStack.frameworks.length > 0) {
     lines.push(`· 使用前端框架: ${profile.techStack.frameworks.join('、')}（来自项目配置）`);
   }
 
-  // 代码风格
+  // coding style
   const styleItems: string[] = [];
   if (profile.codeStyle.indent) styleItems.push(profile.codeStyle.indent);
   if (profile.codeStyle.quotes) styleItems.push(`${profile.codeStyle.quotes}引号`);
@@ -241,12 +241,12 @@ export function formatProfile(profile: IdentityProfile): string {
     lines.push(`· 你偏好 ${styleItems.join('、')}（来自配置文件）`);
   }
 
-  // 基础设施
+  // infrastructure
   if (profile.techStack.infra.length > 0) {
     lines.push(`· 你在用 ${profile.techStack.infra.join(' 和 ')}（来自 docker-compose）`);
   }
 
-  // 团队
+  // team
   if (profile.team.org || profile.team.communication.length > 0) {
     const parts: string[] = [];
     if (profile.team.communication.length > 0) {
@@ -263,7 +263,7 @@ export function formatProfile(profile: IdentityProfile): string {
     }
   }
 
-  // 当前项目
+  // Current project
   if (profile.currentProject.name) {
     const descStr = profile.currentProject.description
       ? ` — ${profile.currentProject.description.substring(0, 50)}`

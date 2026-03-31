@@ -1,5 +1,5 @@
 /**
- * 规则引擎模块导出
+ * Rule engine module export
  */
 
 export * from './rules/index';

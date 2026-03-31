@@ -8,7 +8,7 @@ interface DevicePanelProps {
   panelHeight: number;
 }
 
-// ─── 平铺行类型（虚拟滚动用） ─────────────────────────────────────
+// ───Tile row type (for virtual scrolling) ────────────────────────────────────
 
 type FlatRow = { key: string; node: React.ReactNode };
 
@@ -62,7 +62,7 @@ function buildRows(device: DeviceInfo): FlatRow[] {
   return rows;
 }
 
-// ─── 分组 bordered 样式（高度充足时） ────────────────────────────
+// ─── Grouped bordered style (when the height is sufficient) ─────────────────────────────
 
 function FullView({ device }: { device: DeviceInfo }) {
   const { identity } = device;
@@ -116,18 +116,18 @@ function FullView({ device }: { device: DeviceInfo }) {
   );
 }
 
-// ─── 主组件 ─────────────────────────────────────────────────────
+// ─── Main component ──────────────────────────────────────────────────
 
 export const DevicePanel = React.memo(function DevicePanel({ device, scrollOffset, panelHeight }: DevicePanelProps) {
   const availableRows = Math.max(5, panelHeight);
   const rows = buildRows(device);
   const scrollModeRef = React.useRef<boolean | null>(null);
 
-  // 估算分组模式所需行数：sections × (2边框+1标题+间距) + 内容行
+  // Estimated number of rows required for grouping mode: sections × (2 borders + 1 title + spacing) + content rows
   const sectionsCount = device.identity && Object.values(device.identity.devices).length > 0 ? 4 : 3;
   const threshold = rows.length + sectionsCount * 3;
 
-  // hysteresis：±2 行缓冲防止临界抖动
+  // hysteresis: ±2 line buffering to prevent critical jitter
   if (scrollModeRef.current === null) {
     scrollModeRef.current = availableRows < threshold;
   } else if (scrollModeRef.current && availableRows >= threshold + 2) {
@@ -140,7 +140,7 @@ export const DevicePanel = React.memo(function DevicePanel({ device, scrollOffse
     return <FullView device={device} />;
   }
 
-  // 高度不足：虚拟滚动
+  // Not enough height: virtual scrolling
   const innerH = Math.max(2, availableRows - 3);
   const maxScroll = Math.max(0, rows.length - innerH);
   const offset = Math.min(scrollOffset, maxScroll);

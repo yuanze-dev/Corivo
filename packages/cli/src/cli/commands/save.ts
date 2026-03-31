@@ -1,7 +1,7 @@
 /**
- * CLI 命令 - save
+ * CLI command - save
  *
- * 保存信息到 Corivo
+ * Saves information to Corivo as a memory block.
  */
 
 import fs from 'node:fs/promises';
@@ -23,7 +23,7 @@ interface SaveOptions {
 }
 
 export async function saveCommand(options: SaveOptions): Promise<void> {
-  // 读取配置
+  // Read configuration
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');
 
@@ -35,12 +35,12 @@ export async function saveCommand(options: SaveOptions): Promise<void> {
     throw new ConfigError('Corivo 未初始化。请先运行: corivo init');
   }
 
-  // 验证输入
+  // Validate input
   if (!options.content) {
     throw new ValidationError('缺少 --content 参数');
   }
 
-  // 如果没有标注且不是 pending 模式，提示用户
+  // If there is no label and it is not in pending mode, prompt the user
   const annotation = options.annotation || (options.pending ? 'pending' : '');
 
   if (!options.pending && !annotation) {
@@ -48,26 +48,26 @@ export async function saveCommand(options: SaveOptions): Promise<void> {
     console.log(chalk.gray('心跳守护进程稍后会尝试自动标注\n'));
   }
 
-  // 只有非 pending 模式才验证标注格式
+  // Only non-pending mode will verify the annotation format.
   if (annotation && annotation !== 'pending' && !validateAnnotation(annotation)) {
     throw new ValidationError(
       '标注格式无效。格式应为 "性质 · 领域 · 标签"，例如: "决策 · project · corivo"'
     );
   }
 
-  // 解密数据库密钥（可选密码）
+  // Decrypt database key (optional password)
   let dbKey: Buffer;
   const skipPassword = options.password === false || process.env.CORIVO_NO_PASSWORD === '1';
 
   if (skipPassword) {
-    // 无密码模式：使用 config 中的 db_key（如果有）
+    // Passwordless mode: use db_key from config if available
     if (config.db_key) {
       dbKey = Buffer.from(config.db_key, 'base64');
     } else if (config.encrypted_db_key) {
-      // 有加密密钥但跳过密码：提示用户
+      // Encryption key available but password skipped: prompt user
       throw new ConfigError('数据库已加密，请输入密码或移除 --no-password 选项');
     } else {
-      // 旧版本兼容：生成并保存新密钥
+      // Old version compatibility: generate and save new keys
       dbKey = KeyManager.generateDatabaseKey();
       config.db_key = dbKey.toString('base64');
       await fs.writeFile(configPath, JSON.stringify(config, null, 2));
@@ -75,7 +75,7 @@ export async function saveCommand(options: SaveOptions): Promise<void> {
   } else {
     const password = await readPassword('请输入主密码: ', { allowEmpty: !process.stdin.isTTY });
     if (password === '') {
-      // 空密码：尝试使用 config 中的 db_key
+      // Empty password: try using db_key from config
       if (config.db_key) {
         dbKey = Buffer.from(config.db_key, 'base64');
       } else if (config.encrypted_db_key) {
@@ -86,7 +86,7 @@ export async function saveCommand(options: SaveOptions): Promise<void> {
         await fs.writeFile(configPath, JSON.stringify(config, null, 2));
       }
     } else {
-      // 使用密码解密
+      // Decrypt using password
       const salt = Buffer.from(config.salt, 'base64');
       const masterKey = KeyManager.deriveMasterKey(password, salt);
       const encryptedDbKey = config.encrypted_db_key;
@@ -97,23 +97,23 @@ export async function saveCommand(options: SaveOptions): Promise<void> {
     }
   }
 
-  // 打开数据库
+  // Open database
   const dbPath = getDefaultDatabasePath();
   const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey, enableEncryption: config.encrypted_db_key !== undefined });
 
-  // 创建 Block
+  // Create Block
   const block = db.createBlock({
     content: options.content,
     annotation: annotation || 'pending',
     source: options.source || 'cli',
   });
 
-  // 检测矛盾（像朋友一样提醒）
+  // Detect inconsistencies (alert like a friend)
   const conflictDetector = new ConflictDetector();
   const existingBlocks = db.queryBlocks({ limit: 50 });
   const conflictReminder = conflictDetector.detect(options.content, existingBlocks);
 
-  // 显示结果
+  // Show results
   console.log(chalk.green(`\n✅ 记忆已保存\n`));
   console.log(chalk.gray('ID:       ') + chalk.white(block.id));
   console.log(chalk.gray('内容:     ') + chalk.white(block.content));
@@ -121,7 +121,7 @@ export async function saveCommand(options: SaveOptions): Promise<void> {
   console.log(chalk.gray('生命力:   ') + chalk.yellow('100 (活跃)'));
   console.log();
 
-  // 如果有矛盾，友好提醒
+  // If there is any conflict, please give a friendly reminder
   if (conflictReminder && conflictReminder.hasConflict) {
     console.log(chalk.yellow(conflictReminder.message));
     console.log();

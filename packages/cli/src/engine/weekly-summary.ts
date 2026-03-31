@@ -1,13 +1,13 @@
 /**
- * 周总结模块
+ * Weekly summary module
  *
- * 每周一发送简短总结："上周做了 3 个决策"
+ * Send a short summary every Monday: "3 decisions made last week"
  */
 
 import type { CorivoDatabase } from '../storage/database.js';
 
 /**
- * 周统计
+ * Weekly Statistics
  */
 export interface WeeklyStats {
   decisions: number;
@@ -17,15 +17,15 @@ export interface WeeklyStats {
 }
 
 /**
- * 周总结
+ * Weekly summary
  */
 export class WeeklySummary {
   constructor(private db: CorivoDatabase) {}
 
   /**
-   * 生成周总结
+   * Generate weekly summary
    *
-   * @returns 总结消息
+   * @returns summarizes the message
    */
   generateSummary(): string | null {
     const stats = this.getWeeklyStats();
@@ -54,13 +54,13 @@ export class WeeklySummary {
   }
 
   /**
-   * 获取上周统计
+   * Get last week's statistics
    */
   private getWeeklyStats(): WeeklyStats {
     const now = Date.now();
     const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
 
-    // 查询最近 7 天创建的 block
+    // Query blocks created in the last 7 days
     const allBlocks = this.db.queryBlocks({ limit: 1000 });
     const recentBlocks = allBlocks.filter(
       (b) => b.created_at * 1000 >= sevenDaysAgo
@@ -89,24 +89,24 @@ export class WeeklySummary {
   }
 
   /**
-   * 检查是否应该发送周总结
+   * Check if weekly summary should be sent
    *
-   * 简单实现：每周一（根据日期判断）
+   * Simple implementation: every Monday (judged based on the date)
    *
-   * @returns 是否应该发送
+   * Should @returns be sent?
    */
   shouldSend(): boolean {
     const now = new Date();
-    const dayOfWeek = now.getDay(); // 0 = 周日, 1 = 周一, ...
+    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ...
 
-    // 周一发送（也可以根据用户偏好调整）
+    // Sent on Monday (can also be adjusted according to user preference)
     return dayOfWeek === 1;
   }
 
   /**
-   * 获取下一次发送时间
+   * Get the next sending time
    *
-   * @returns 下次周一的 0 点
+   * @returns Next Monday at 0:00
    */
   getNextSendTime(): Date {
     const now = new Date();

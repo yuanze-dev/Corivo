@@ -17,7 +17,7 @@ export function useDaemon(configDir: string): DaemonStatus {
     running: false, pid: null, uptime: null, cycleCount: null,
     lastCheckAge: null, logPath: '', errPath: '',
   });
-  // 上次数据指纹，跳过无变化更新（lastCheckAge 精度降至秒，避免每秒刷新）
+  // Last data fingerprint, skip no change update (lastCheckAge accuracy is reduced to seconds to avoid refreshing every second)
   const lastFingerprintRef = useRef('');
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export function useDaemon(configDir: string): DaemonStatus {
         } catch {}
       }
 
-      // lastCheckAge 精度降至 5 秒，避免每次 check 都触发渲染
+      // The accuracy of lastCheckAge is reduced to 5 seconds to avoid triggering rendering for each check.
       const ageBucket = lastCheckAge !== null ? Math.floor(lastCheckAge / 5000) : null;
       const fingerprint = `${running}:${pid}:${uptime}:${cycleCount}:${ageBucket}`;
       if (fingerprint === lastFingerprintRef.current) return;

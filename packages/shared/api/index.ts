@@ -1,6 +1,6 @@
 /**
  * Corivo Shared API
- * 跨平台的 Corivo 核心功能封装
+ * Cross-platform encapsulation of Corivo core functions
  */
 
 import { execSync } from 'node:child_process';
@@ -40,7 +40,7 @@ export interface StatsResult {
 }
 
 /**
- * Corivo 核心 API 类
+ * Corivo core API classes
  */
 export class CorivoAPI {
   private config: CorivoConfig;
@@ -59,7 +59,7 @@ export class CorivoAPI {
   }
 
   /**
-   * 检查 Corivo CLI 是否已安装
+   * Check if Corivo CLI is installed
    */
   isInstalled(): boolean {
     try {
@@ -71,14 +71,14 @@ export class CorivoAPI {
   }
 
   /**
-   * 检查数据库是否已初始化
+   * Check if the database has been initialized
    */
   isInitialized(): boolean {
     return existsSync(this.config.dbPath);
   }
 
   /**
-   * 保存记忆
+   * save memory
    */
   save(content: string, options: SaveOptions = {}): { success: boolean; id?: string; error?: string } {
     try {
@@ -101,7 +101,7 @@ export class CorivoAPI {
         stdio: ['ignore', 'pipe', 'pipe']
       });
 
-      // 解析输出获取 block ID
+      // Parse the output to get the block ID
       const match = output.match(/ID:\s*(\w+)/);
       const id = match ? match[1] : undefined;
 
@@ -115,7 +115,7 @@ export class CorivoAPI {
   }
 
   /**
-   * 查询记忆
+   * query memory
    */
   query(query: string, options: QueryOptions = {}): QueryResult[] {
     try {
@@ -144,7 +144,7 @@ export class CorivoAPI {
   }
 
   /**
-   * 获取统计信息
+   * Get statistics
    */
   getStats(): StatsResult | null {
     try {
@@ -164,7 +164,7 @@ export class CorivoAPI {
   }
 
   /**
-   * 获取状态摘要（用于 hooks）
+   * Get status summary (for hooks)
    */
   getStatusSummary(): string {
     if (!this.isInstalled()) {
@@ -185,14 +185,14 @@ export class CorivoAPI {
   }
 
   /**
-   * 解析查询输出
+   * Parse query output
    */
   private parseQueryOutput(output: string): QueryResult[] {
     const results: QueryResult[] = [];
     const lines = output.split('\n');
 
     for (const line of lines) {
-      // 匹配: [ID] [annotation] content
+      // Match: [ID] [annotation] content
       const match = line.match(/\[([^\]]+)\]\s+\[([^\]]+)\]\s+(.+)/);
       if (match) {
         results.push({
@@ -209,7 +209,7 @@ export class CorivoAPI {
   }
 
   /**
-   * 解析统计输出
+   * Parse statistical output
    */
   private parseStatsOutput(output: string): StatsResult {
     let total = 0;
@@ -241,5 +241,5 @@ export class CorivoAPI {
   }
 }
 
-// 导出单例
+// Export singleton
 export const corivo = new CorivoAPI();

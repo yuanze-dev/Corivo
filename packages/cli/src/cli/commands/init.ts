@@ -1,13 +1,13 @@
 /**
- * CLI 命令 - init
+ * CLI command - init
  *
- * 初始化 Corivo，基于平台指纹创建身份
+ * Initializes Corivo and creates an identity based on platform fingerprints.
  *
- * v0.10+ 更新：
- * - 基于平台指纹的用户身份识别（无需密码）
- * - 跨设备身份关联
- * - 数据库密钥明文存储（依赖文件系统权限）
- * - init 后自动启动心跳守护进程
+ * Changes in v0.10+:
+ * - Platform-fingerprint-based user identity (no password required)
+ * - Cross-device identity association
+ * - Database key stored in plaintext, relying on filesystem permissions for protection
+ * - Heartbeat daemon starts automatically after init
  */
 
 import fs from 'node:fs/promises';
@@ -29,21 +29,21 @@ import { registerWithSolver, post } from './sync.js';
 import { readConfirm } from '../utils/password.js';
 
 /**
- * 退出并清理
+ * Exit the process with the given code.
  */
 function exit(code = 0): never {
   process.exit(code);
 }
 
 /**
- * 初始化命令
+ * Main init command handler.
  */
 export async function initCommand(options: { join?: string; server?: string } = {}): Promise<void> {
   console.log('\n═══════════════════════════════════════════════════════');
   console.log('           Corivo — 一个为你而活着的数字伙伴');
   console.log('═══════════════════════════════════════════════════════\n');
 
-  // 检查是否已初始化（--join 场景允许已存在，会提示用户确认合并）
+  // Skip existence check when --join is provided; the user will be prompted to confirm merging identities.
   const dbPath = getDefaultDatabasePath();
   if (!options.join) {
     try {
@@ -56,7 +56,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
     } catch {}
   }
 
-  // 创建配置目录
+  // Ensure the config directory exists before writing any files.
   const configDir = getConfigDir();
   try {
     await fs.mkdir(configDir, { recursive: true });
@@ -64,11 +64,11 @@ export async function initCommand(options: { join?: string; server?: string } = 
     throw new FileSystemError(`无法创建配置目录: ${configDir}`, { cause: error });
   }
 
-  // ========== 身份识别 ==========
+  // ========== Identity resolution ==========
   let identityId: string;
 
   if (options.join) {
-    // --join 流程：通过配对码加入已有 identity
+    // --join flow: join an existing identity using a pairing code
     const serverUrl = options.server || process.env.CORIVO_SOLVER_URL || 'http://localhost:3141';
     console.log(`正在通过配对码加入 identity...\n`);
 
@@ -103,7 +103,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
     console.log('✓ 配对成功');
     console.log(`  身份 ID: ${identityId}`);
 
-    // 检测本地是否已有 identity（冲突场景）
+    // Detect whether a local identity already exists (conflict scenario).
     const existingConfig = await loadConfig(configDir);
     let dbKey: Buffer;
     let dbKeyBase64: string;
@@ -121,18 +121,18 @@ export async function initCommand(options: { join?: string; server?: string } = 
         exit(0);
       }
 
-      // 保留现有 db_key（数据库不变，只更新 identity）
+      // Reuse the existing db_key so the database stays intact; only the identity is updated.
       dbKey = Buffer.from(existingConfig.db_key, 'base64');
       dbKeyBase64 = existingConfig.db_key;
     } else {
-      // 全新设备，生成新的 db_key
+      // Brand-new device: generate a fresh db_key.
       dbKey = KeyManager.generateDatabaseKey();
       dbKeyBase64 = dbKey.toString('base64');
     }
 
-    // 创建本地 identity（使用指定 ID，覆盖已有）
+    // Create the local identity with the specified ID, overwriting any existing one.
     const identityPath = path.join(configDir, 'identity.json');
-    try { await fs.unlink(identityPath); } catch { /* 不存在则忽略 */ }
+    try { await fs.unlink(identityPath); } catch { /* ignore if file does not exist */ }
     await initializeIdentityWithId(identityId, configDir);
 
     if (!existingConfig || existingConfig.identity_id !== identityId) {
@@ -174,7 +174,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
     console.log('   数据库:   ' + dbPath);
     console.log('   同步服务器: ' + serverUrl + '\n');
 
-    // 自动启动心跳
+    // Auto-start the heartbeat after joining.
     console.log('🫀 正在启动心跳...');
     try {
       await startCommand();
@@ -191,7 +191,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
     exit(0);
   }
 
-  // 正常初始化流程
+  // Normal (non-join) initialization flow.
   console.log('正在识别您的身份...\n');
 
   const identityResult = await initializeIdentity(configDir);
@@ -205,7 +205,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
     console.log(`  身份 ID: ${identityId}`);
   }
 
-  // 显示检测到的平台指纹
+  // Display the platform fingerprints that were detected.
   if (identityResult.fingerprints.length > 0) {
     console.log('\n检测到的平台：');
     for (const fp of identityResult.fingerprints) {
@@ -226,28 +226,28 @@ export async function initCommand(options: { join?: string; server?: string } = 
   }
 
   console.log('');
-  // ========== 身份识别结束 ==========
+  // ========== End identity resolution ==========
 
-  // 生成密钥（无需密码）
+  // Generate a database key without requiring a password.
   console.log('正在生成密钥...');
 
   const dbKey = KeyManager.generateDatabaseKey();
-  // 将密钥转换为 base64 存储（明文）
+  // Store the key as base64 in plaintext — security relies on filesystem permissions.
   const dbKeyBase64 = dbKey.toString('base64');
 
-  // 创建数据库
+  // Create the encrypted database.
   console.log('正在创建加密数据库...');
 
   const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
 
-  // 验证数据库
+  // Verify that the database was created and is healthy.
   const health = db.checkHealth();
   if (!health.ok) {
     console.log('❌ 数据库创建失败');
     exit(1);
   }
 
-  // 保存配置
+  // Persist the config to disk.
   const config: CorivoConfig = {
     version: '0.11.0',
     created_at: new Date().toISOString(),
@@ -272,7 +272,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
   console.log('   数据库密钥明文存储在本地，依赖文件系统权限保护');
   console.log('   请确保你的用户目录安全（不与他人共享）\n');
 
-  // ========== 自动注册 solver ==========
+  // ========== Auto-register with solver ==========
   const defaultSolverUrl = process.env.CORIVO_SOLVER_URL || 'http://localhost:3141';
   try {
     const solverConfig = await registerWithSolver(defaultSolverUrl, identityId);
@@ -281,15 +281,15 @@ export async function initCommand(options: { join?: string; server?: string } = 
       console.log('🔗 已连接同步服务器\n');
     }
   } catch {
-    // 服务器不可达，静默跳过；daemon 稍后会重试
+    // Server unreachable — skip silently; the daemon will retry later.
   }
-  // ========== 自动注册 solver 结束 ==========
+  // ========== End auto-register with solver ==========
 
-  // ========== 自动启动心跳 ==========
+  // ========== Auto-start heartbeat ==========
   console.log('🫀 正在启动心跳...');
 
   try {
-    // 启动心跳（无需用户交互）
+    // Start the heartbeat without requiring user interaction.
     await startCommand();
     console.log('\n✨ Corivo 已苏醒！心跳将持续跳动，自动整理你的记忆。');
   } catch (error) {
@@ -297,7 +297,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
     console.log('  corivo start\n');
   }
 
-  // 下一步提示
+  // Next-step hints for the user.
   console.log('下一步：');
   console.log('  corivo save --content "..." --annotation "性质 · 领域 · 标签"');
   console.log('  corivo query "..."');

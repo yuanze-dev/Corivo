@@ -1,7 +1,7 @@
 /**
- * CLI 命令 - inject
+ * CLI command - inject
  *
- * 注入 Corivo 规则到项目配置文件
+ * Injects Corivo rules into project configuration files.
  */
 
 import path from 'node:path';
@@ -23,7 +23,7 @@ export async function injectCommand(options: {
   opencode?: boolean;
 }): Promise<void> {
   if (options.eject) {
-    // 移除规则
+    // Remove rule
     await ejectRules(options.target);
     return;
   }
@@ -121,7 +121,7 @@ export async function injectCommand(options: {
       return;
     }
 
-    // 注入到全局 CLAUDE.md
+    // Inject into global CLAUDE.md
     console.log('');
     console.log(chalk.cyan('══════════════════════════════════════════'));
     console.log(chalk.cyan('     注入全局规则                       '));
@@ -144,7 +144,7 @@ export async function injectCommand(options: {
     return;
   }
 
-  // 注入到项目 CLAUDE.md
+  // Inject into project CLAUDE.md
   const targetPath = options.target || process.cwd();
   const claudeMd = path.join(targetPath, 'CLAUDE.md');
 
@@ -179,7 +179,7 @@ export async function injectCommand(options: {
 }
 
 /**
- * 移除注入的规则
+ * Remove injected rules
  */
 async function ejectRules(targetPath?: string): Promise<void> {
   const claudeMd = path.join(targetPath || process.cwd(), 'CLAUDE.md');
@@ -198,5 +198,5 @@ async function ejectRules(targetPath?: string): Promise<void> {
   }
 }
 
-// 导出供 CLI 使用
+// Export for CLI use
 export default { injectCommand, ejectRules };

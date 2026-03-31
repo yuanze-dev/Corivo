@@ -1,57 +1,57 @@
 /**
- * Cold Scan 类型定义
- * 用于首次安装时扫描用户本地环境，构建初始画像
+ * Cold Scan type definitions.
+ * Used on first install to scan the user's local environment and build an initial profile.
  */
 
 /**
- * 扫描源定义
+ * Defines a single scan source.
  */
 export interface ScanSource {
-  /** 来源名称 */
+  /** Source name identifier */
   name: string;
-  /** 文件路径（支持 ~ 展开）或路径生成函数 */
+  /** File path (supports ~ expansion) or a function that returns paths */
   path: string | (() => string[]) | (() => Promise<string[]>);
-  /** 提取器：从内容中提取 blocks */
+  /** Extractor: derives blocks from file content */
   extractor: (content: string, filePath: string) => Record<string, unknown>[] | Promise<Record<string, unknown>[]>;
-  /** 优先级（越高越先扫描） */
+  /** Priority — higher values are scanned first */
   priority: number;
-  /** 单源超时（毫秒） */
+  /** Per-source timeout in milliseconds */
   timeout: number;
 }
 
 /**
- * 扫描结果
+ * Result for a single scan source.
  */
 export interface ScanResult {
-  /** 来源名称 */
+  /** Source name identifier */
   source: string;
-  /** 扫描的文件路径 */
+  /** Path of the scanned file */
   path: string;
-  /** 提取到的 blocks 数量 */
+  /** Number of blocks extracted */
   count: number;
-  /** 是否成功 */
+  /** Whether the scan succeeded */
   success: boolean;
-  /** 错误信息（如果失败） */
+  /** Error message if the scan failed */
   error?: string;
 }
 
 /**
- * 扫描配置
+ * Configuration for a cold scan run.
  */
 export interface ScanConfig {
-  /** 总超时时间（毫秒） */
+  /** Total timeout for the entire scan in milliseconds */
   totalTimeout: number;
-  /** 是否显示详细输出 */
+  /** Whether to print verbose output */
   verbose: boolean;
-  /** 跳过的扫描源名称列表 */
+  /** List of source names to skip */
   skipSources: string[];
 }
 
 /**
- * 默认配置
+ * Default scan configuration.
  */
 export const DEFAULT_SCAN_CONFIG: ScanConfig = {
-  totalTimeout: 15_000, // 15 秒
+  totalTimeout: 15_000, // 15 seconds
   verbose: false,
   skipSources: [],
 };

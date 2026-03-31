@@ -1,6 +1,6 @@
 /**
- * Reminders 命令
- * 查看和管理提醒队列
+ * Reminders command
+ * View and manage the reminders queue.
  */
 
 import fs from 'node:fs/promises';
@@ -25,7 +25,7 @@ remindersCommand
       const configDir = getConfigDir();
       const remindersPath = path.join(configDir, REMINDERS_FILE);
 
-      // 处理忽略操作
+      // Handling ignore operations
       if (options.dismissAll) {
         await dismissAll(remindersPath);
         return;
@@ -41,7 +41,7 @@ remindersCommand
         return;
       }
 
-      // 默认：显示提醒列表
+      // Default: Show reminder list
       await displayReminders(remindersPath, options);
     } catch (error) {
       console.error(chalk.red('错误:'), error);
@@ -50,7 +50,7 @@ remindersCommand
   });
 
 /**
- * 显示提醒列表
+ * Show reminder list
  */
 async function displayReminders(
   remindersPath: string,
@@ -61,7 +61,7 @@ async function displayReminders(
 
   let reminders = store.reminders;
 
-  // 过滤条件
+  // filter conditions
   if (options.pending) {
     reminders = reminders.filter((r: any) => {
       if (r.dismissed) return false;
@@ -81,13 +81,13 @@ async function displayReminders(
     return;
   }
 
-  // JSON 输出
+  // JSON output
   if (options.json) {
     console.log(JSON.stringify({ reminders }, null, 2));
     return;
   }
 
-  // 人类可读输出
+  // human readable output
   console.log('');
   console.log(chalk.cyan(`你有 ${reminders.length} 条提醒:`));
   console.log('');
@@ -97,7 +97,7 @@ async function displayReminders(
     console.log('');
   }
 
-  // 提示如何处理
+  // Tips on how to deal with
   if (options.pending) {
     console.log(chalk.gray(`提示: 运行 corivo reminders --dismiss-all 可忽略所有提醒`));
     console.log('');
@@ -105,7 +105,7 @@ async function displayReminders(
 }
 
 /**
- * 忽略指定提醒
+ * Ignore specific reminders
  */
 async function dismissReminder(remindersPath: string, id: string): Promise<void> {
   const store = await loadStore(remindersPath);
@@ -129,7 +129,7 @@ async function dismissReminder(remindersPath: string, id: string): Promise<void>
 }
 
 /**
- * 忽略所有提醒
+ * Ignore all reminders
  */
 async function dismissAll(remindersPath: string): Promise<void> {
   const store = await loadStore(remindersPath);
@@ -153,7 +153,7 @@ async function dismissAll(remindersPath: string): Promise<void> {
 }
 
 /**
- * 清理过期提醒
+ * Clear expired reminders
  */
 async function cleanupReminders(remindersPath: string): Promise<void> {
   const store = await loadStore(remindersPath);
@@ -163,7 +163,7 @@ async function cleanupReminders(remindersPath: string): Promise<void> {
 
   const originalLength = store.reminders.length;
 
-  // 保留：未忽略 且（未过期 或 创建时间在保留期内）
+  // Retention: not ignored and (not expired or created within the retention period)
   store.reminders = store.reminders.filter((r: any) => {
     if (!r.dismissed && (r.expiresAt === 0 || r.expiresAt >= now)) {
       return true;
@@ -184,7 +184,7 @@ async function cleanupReminders(remindersPath: string): Promise<void> {
 }
 
 /**
- * 加载提醒存储
+ * Load reminder storage
  */
 async function loadStore(remindersPath: string): Promise<any> {
   try {
@@ -199,7 +199,7 @@ async function loadStore(remindersPath: string): Promise<any> {
 }
 
 /**
- * 保存提醒存储
+ * Save reminder storage
  */
 async function saveStore(remindersPath: string, store: any): Promise<void> {
   const dir = path.dirname(remindersPath);
@@ -208,22 +208,22 @@ async function saveStore(remindersPath: string, store: any): Promise<void> {
 }
 
 /**
- * 格式化单条提醒
+ * Format a single reminder
  */
 function formatReminder(reminder: any): string {
   const lines: string[] = [];
 
-  // 状态图标
+  // status icon
   const statusIcon = reminder.dismissed ? '✓' : '○';
 
-  // 优先级图标
+  // priority icon
   const priorityIcon: Record<string, string> = {
     high: '🔴',
     medium: '🟡',
     low: '🟢',
   };
 
-  // 类型图标
+  // type icon
   const typeIcon: Record<string, string> = {
     'follow-up': '📋',
     'attention': '⚠️',
@@ -237,12 +237,12 @@ function formatReminder(reminder: any): string {
 
   lines.push(`${statusIcon} ${pIcon} ${tIcon} ${reminder.title || '提醒'}`);
 
-  // 消息内容
+  // Message content
   if (reminder.message) {
     lines.push(chalk.gray(`   ${reminder.message}`));
   }
 
-  // ID（用于 --dismiss 操作）
+  // ID (for --dismiss operation)
   lines.push(chalk.gray(`   ID: ${reminder.id}`));
 
   return lines.join('\n');

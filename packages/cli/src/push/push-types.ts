@@ -1,9 +1,9 @@
 /**
- * 推送类型定义
+ * Push type definitions
  */
 
 /**
- * 推送触发上下文
+ * Context that triggered the push
  */
 export enum PushContext {
   SESSION_START = 'session-start',
@@ -14,33 +14,33 @@ export enum PushContext {
 }
 
 /**
- * 推送类型
+ * Push type
  */
 export enum PushType {
-  SUGGEST = 'suggest',       // 建议下一步
-  CONFLICT = 'conflict',     // 矛盾提醒
-  DECISION = 'decision',     // 决策经验
-  ATTENTION = 'attention',   // 需要关注
-  CONTEXT = 'context',       // 相关记忆
-  RELATED = 'related',       // 关联记忆
-  STATS = 'stats',           // 统计信息
-  SUMMARY = 'summary',       // 摘要
+  SUGGEST = 'suggest',       // Suggest a next step
+  CONFLICT = 'conflict',     // Conflict reminder
+  DECISION = 'decision',     // Decision experience
+  ATTENTION = 'attention',   // Needs attention
+  CONTEXT = 'context',       // Related memories
+  RELATED = 'related',       // Associated memories
+  STATS = 'stats',           // Statistics
+  SUMMARY = 'summary',       // Summary
 }
 
 /**
- * 推送优先级
+ * Push priority
  */
 export enum PushPriority {
-  SUGGEST = 0,    // P0 - 建议
-  CONFLICT = 1,   // P1 - 矛盾
-  DECISION = 2,   // P2 - 决策
-  ATTENTION = 3,  // P3 - 需关注
-  CONTEXT = 4,    // P4 - 上下文
-  STATS = 5,      // P5 - 统计
+  SUGGEST = 0,    // P0 - suggestion
+  CONFLICT = 1,   // P1 - conflict
+  DECISION = 2,   // P2 - decision
+  ATTENTION = 3,  // P3 - needs attention
+  CONTEXT = 4,    // P4 - context
+  STATS = 5,      // P5 - statistics
 }
 
 /**
- * 推送项
+ * A single push item
  */
 export interface PushItem {
   type: PushType;
@@ -54,23 +54,23 @@ export interface PushItem {
 }
 
 /**
- * 推送配置
+ * Push configuration
  */
 export interface PushConfig {
-  /** 最大推送数量 */
+  /** Maximum number of items to push */
   maxItems?: number;
-  /** 是否包含统计 */
+  /** Whether to include statistics */
   includeStats?: boolean;
-  /** 是否包含建议 */
+  /** Whether to include suggestions */
   includeSuggest?: boolean;
-  /** 是否包含矛盾 */
+  /** Whether to include conflict alerts */
   includeConflict?: boolean;
-  /** 输出格式 */
+  /** Output format */
   format?: 'text' | 'json';
 }
 
 /**
- * 推送结果
+ * Push result
  */
 export interface PushResult {
   items: PushItem[];

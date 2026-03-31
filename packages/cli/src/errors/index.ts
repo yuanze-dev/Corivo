@@ -1,16 +1,16 @@
 /**
- * 错误处理体系
+ * Error handling system
  *
- * 定义 Corivo 的错误类型层次结构，提供结构化错误信息
+ * Define Corivo's error type hierarchy to provide structured error information
  */
 
 /**
- * 基础错误类
+ * Basic error classes
  */
 export class CorivoError extends Error {
-  /** 错误码 */
+  /** error code */
   code: string;
-  /** 错误上下文信息 */
+  /** Error context information */
   context: Record<string, unknown>;
 
   constructor(code: string, message: string, context: Record<string, unknown> = {}) {
@@ -30,14 +30,14 @@ export class CorivoError extends Error {
     };
   }
 
-  /** 获取用户友好的错误消息 */
+  /** Get user-friendly error messages */
   getUserMessage(): string {
     return this.message;
   }
 }
 
 /**
- * 数据库错误
+ * Database error
  */
 export class DatabaseError extends CorivoError {
   constructor(message: string, context: Record<string, unknown> = {}) {
@@ -54,7 +54,7 @@ export class DatabaseError extends CorivoError {
 }
 
 /**
- * 加密错误
+ * Encryption error
  */
 export class CryptoError extends CorivoError {
   constructor(message: string, context: Record<string, unknown> = {}) {
@@ -68,7 +68,7 @@ export class CryptoError extends CorivoError {
 }
 
 /**
- * CLI 错误
+ * CLI error
  */
 export class CLIError extends CorivoError {
   constructor(message: string, context: Record<string, unknown> = {}) {
@@ -82,7 +82,7 @@ export class CLIError extends CorivoError {
 }
 
 /**
- * 验证错误
+ * Validation error
  */
 export class ValidationError extends CorivoError {
   constructor(message: string, context: Record<string, unknown> = {}) {
@@ -96,7 +96,7 @@ export class ValidationError extends CorivoError {
 }
 
 /**
- * 配置错误
+ * Configuration error
  */
 export class ConfigError extends CorivoError {
   constructor(message: string, context: Record<string, unknown> = {}) {
@@ -110,7 +110,7 @@ export class ConfigError extends CorivoError {
 }
 
 /**
- * 文件系统错误
+ * File system error
  */
 export class FileSystemError extends CorivoError {
   constructor(message: string, context: Record<string, unknown> = {}) {
@@ -124,7 +124,7 @@ export class FileSystemError extends CorivoError {
 }
 
 /**
- * 进程错误
+ * process error
  */
 export class ProcessError extends CorivoError {
   constructor(message: string, context: Record<string, unknown> = {}) {
@@ -138,7 +138,7 @@ export class ProcessError extends CorivoError {
 }
 
 /**
- * 身份错误
+ * mistaken identity
  */
 export class IdentityError extends CorivoError {
   constructor(message: string, context: Record<string, unknown> = {}) {
@@ -152,7 +152,7 @@ export class IdentityError extends CorivoError {
 }
 
 /**
- * 指纹错误
+ * Fingerprint error
  */
 export class FingerprintError extends CorivoError {
   constructor(message: string, context: Record<string, unknown> = {}) {
@@ -166,40 +166,40 @@ export class FingerprintError extends CorivoError {
 }
 
 /**
- * 错误码枚举
+ * Error code enumeration
  */
 export const ERROR_CODES = {
-  // 通用错误 (0xxx)
+  // Generic error (0xxx)
   UNKNOWN: 'UNKNOWN',
   NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
 
-  // 数据库错误 (1xxx)
+  // Database error (1xxx)
   DB_NOT_FOUND: 'DB_NOT_FOUND',
   DB_LOCKED: 'DB_LOCKED',
   DB_CORRUPT: 'DB_CORRUPT',
   DB_KEY_ERROR: 'DB_KEY_ERROR',
 
-  // 加密错误 (2xxx)
+  // Encryption error (2xxx)
   CRYPTO_KEY_DERIVE_FAILED: 'CRYPTO_KEY_DERIVE_FAILED',
   CRYPTO_DECRYPT_FAILED: 'CRYPTO_DECRYPT_FAILED',
   CRYPTO_INVALID_KEY: 'CRYPTO_INVALID_KEY',
 
-  // 验证错误 (3xxx)
+  // Validation error (3xxx)
   VALIDATION_INVALID_BLOCK: 'VALIDATION_INVALID_BLOCK',
   VALIDATION_INVALID_ANNOTATION: 'VALIDATION_INVALID_ANNOTATION',
   VALIDATION_INVALID_PATTERN: 'VALIDATION_INVALID_PATTERN',
 
-  // CLI 错误 (4xxx)
+  // CLI errors (4xxx)
   CLI_INVALID_COMMAND: 'CLI_INVALID_COMMAND',
   CLI_MISSING_ARGUMENT: 'CLI_MISSING_ARGUMENT',
   CLI_UNKNOWN_OPTION: 'CLI_UNKNOWN_OPTION',
 
-  // 配置错误 (5xxx)
+  // Configuration error (5xxx)
   CONFIG_NOT_INITIALIZED: 'CONFIG_NOT_INITIALIZED',
   CONFIG_MISSING_FILE: 'CONFIG_MISSING_FILE',
   CONFIG_INVALID_FORMAT: 'CONFIG_INVALID_FORMAT',
 
-  // 进程错误 (6xxx)
+  // Process error (6xxx)
   PROCESS_ALREADY_RUNNING: 'PROCESS_ALREADY_RUNNING',
   PROCESS_NOT_RUNNING: 'PROCESS_NOT_RUNNING',
   PROCESS_START_FAILED: 'PROCESS_START_FAILED',
@@ -208,14 +208,14 @@ export const ERROR_CODES = {
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
 
 /**
- * 判断是否为 CorivoError
+ * Determine whether it is CorivoError
  */
 export function isCorivoError(error: unknown): error is CorivoError {
   return error instanceof CorivoError;
 }
 
 /**
- * 包装未知错误为 CorivoError
+ * Wrapping unknown errors as CorivoError
  */
 export function wrapError(error: unknown, code: ErrorCode = ERROR_CODES.UNKNOWN): CorivoError {
   if (error instanceof CorivoError) {

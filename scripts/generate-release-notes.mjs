@@ -3,19 +3,19 @@
 /**
  * generate-release-notes.mjs
  *
- * 读取 CHANGELOG.md，用 AI 将技术日志转写为面向用户的 Release Notes，
- * 然后通过 GitHub API 创建 Release。
+ * Read CHANGELOG.md and use AI to convert technical logs into user-oriented Release Notes.
+ * Then create a Release via the GitHub API.
  *
- * 环境变量：
+ * Environment variables:
  *   OPENROUTER_API_KEY  — OpenRouter API Key
- *   GITHUB_TOKEN        — GitHub PAT（需要 contents:write 权限）
- *   GITHUB_REPOSITORY   — owner/repo（例如 yuanze-dev/Corivo）
+ *   GITHUB_TOKEN — GitHub PAT (requires contents:write permission)
+ *   GITHUB_REPOSITORY — owner/repo (e.g. yuanze-dev/Corivo)
  *
- * 用法：
- *   node scripts/generate-release-notes.mjs                  # 处理最新版本
- *   node scripts/generate-release-notes.mjs --version 0.12.0 # 处理指定版本
- *   node scripts/generate-release-notes.mjs --all            # 处理所有版本（backfill）
- *   node scripts/generate-release-notes.mjs --dry-run        # 只生成不发布
+ * usage:
+ *   node scripts/generate-release-notes.mjs # Process the latest version
+ *   node scripts/generate-release-notes.mjs --version 0.12.0 # Process the specified version
+ *   node scripts/generate-release-notes.mjs --all # Process all versions (backfill)
+ *   node scripts/generate-release-notes.mjs --dry-run # Only generate but not publish
  */
 
 import { readFileSync } from "fs";

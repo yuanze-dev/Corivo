@@ -1,5 +1,5 @@
 /**
- * CorivoSettings 配置类型测试
+ * CorivoSettings configuration type test
  */
 import { describe, it, expect } from 'vitest';
 import type { CorivoConfig, CorivoSettings } from '../../src/config.js';

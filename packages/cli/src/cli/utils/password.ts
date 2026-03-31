@@ -1,35 +1,35 @@
 /**
- * 密码输入工具
+ * Password input utility
  *
- * 提供隐藏的密码输入功能
+ * Provides hidden (masked) password input for interactive terminal sessions.
  */
 
 import * as readline from 'node:readline';
 
 /**
- * 读取隐藏的密码输入
+ * Read hidden password input
  *
- * 使用TTY原始模式隐藏输入字符
+ * Hide input characters using TTY raw mode
  *
- * @param prompt - 提示文本
- * @param options - 选项
- * @param options.allowEmpty - 是否允许空密码（用于非交互环境）
- * @returns 用户输入的密码
+ * @param prompt - prompt text
+ * @param options - options
+ * @param options.allowEmpty - whether to allow empty passwords (for non-interactive environments)
+ * @returns The password entered by the user
  */
 export function readPassword(prompt: string, options: { allowEmpty?: boolean } = {}): Promise<string> {
   return new Promise((resolve) => {
     const stdin = process.stdin;
     const stdout = process.stdout;
 
-    // 检查是否在TTY环境中
+    // Check if you are in a TTY environment
     if (!process.stdin.isTTY) {
-      // 非TTY环境（如测试、管道、Claude Code）
+      // Non-TTY environments (such as tests, pipelines, Claude Code)
       if (options.allowEmpty) {
-        // 允许空密码，返回默认值
+        // Allow empty passwords, return to default
         resolve('');
         return;
       }
-      // 否则尝试普通读取
+      // Otherwise try a normal read
       const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
@@ -42,7 +42,7 @@ export function readPassword(prompt: string, options: { allowEmpty?: boolean } =
       return;
     }
 
-    // TTY环境：使用原始模式隐藏输入
+    // TTY environment: hide input using raw mode
     stdout.write(prompt);
     stdin.setRawMode(true);
     stdin.resume();
@@ -68,7 +68,7 @@ export function readPassword(prompt: string, options: { allowEmpty?: boolean } =
         if (password.length > 0) {
           password = password.slice(0, -1);
         }
-      } else if (code >= 32) { // 可打印字符
+      } else if (code >= 32) { // Printable characters
         password += char;
       }
     };
@@ -78,10 +78,10 @@ export function readPassword(prompt: string, options: { allowEmpty?: boolean } =
 }
 
 /**
- * 读取 y/n 确认输入
+ * Read y/n to confirm input
  *
- * @param prompt - 提示文本（不含 [y/N]）
- * @param defaultNo - 默认值是否为 No（true = 按 Enter 视为 No）
+ * @param prompt - prompt text (without [y/N])
+ * @param defaultNo - whether the default value is No (true = pressing Enter treats No)
  */
 export function readConfirm(prompt: string, defaultNo = true): Promise<boolean> {
   return new Promise((resolve) => {

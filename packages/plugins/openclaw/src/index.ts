@@ -1,9 +1,9 @@
 /**
  * @corivo/openclaw
  *
- * OpenClaw realtime ingestor 插件。
- * 安装：npm install -g @corivo/openclaw
- * 启用：在 ~/.corivo/config.json 的 plugins 数组中添加 "@corivo/openclaw"
+ * OpenClaw realtime ingestor plugin.
+ * Installation: npm install -g @corivo/openclaw
+ * Enable: Add "@corivo/openclaw" to the plugins array in ~/.corivo/config.json
  */
 import { OpenClawIngestor } from './ingestor.js';
 import type { CorivoPlugin } from 'corivo';

@@ -1,7 +1,7 @@
 /**
- * CLI 命令 - sync
+ * CLI command - sync
  *
- * 与 Corivo solver 服务器同步记忆数据
+ * Synchronizes memory data with the Corivo solver server.
  */
 
 import { Command } from 'commander';
@@ -67,7 +67,7 @@ function buildDeviceName(): string {
   return `${name} (${os.hostname()})`;
 }
 
-// 简单 fetch wrapper（Node.js 18+ 内置 fetch）
+// Simple fetch wrapper (Node.js 18+ built-in fetch)
 export async function post(
   url: string,
   body: unknown,
@@ -141,7 +141,7 @@ export function applyPulledChangesets(
   logger.debug(`[sync:pull] 收到 ${changesets.length} 条 pull changesets preview=${summarizeChangesets(changesets)}`);
 
   for (const cs of changesets) {
-    // 当前简化同步协议只同步 blocks.content。
+    // The current simplified synchronization protocol only synchronizes blocks.content.
     if (cs.table_name !== 'blocks' || cs.col_name !== 'content' || !cs.pk || cs.value == null) {
       logger.debug(
         `[sync:pull] 已跳过 changeset block=${cs.pk || '(empty)'} table=${cs.table_name} col=${cs.col_name ?? 'null'} dbVersion=${cs.db_version ?? 'n/a'}`
@@ -172,7 +172,7 @@ export function applyPulledChangesets(
 }
 
 /**
- * 向 solver 服务器注册，返回 SolverConfig；失败返回 null
+ * Register with the solver server and return SolverConfig; if failed, return null
  */
 export async function registerWithSolver(
   serverUrl: string,
@@ -213,7 +213,7 @@ export function createSyncCommand(): Command {
   cmd.option('--pair', '生成配对码，供新设备加入');
 
   cmd.action(async (options, command: Command) => {
-    // --pair：生成配对码
+    // --pair: generate pairing code
     if (options.pair) {
       const config = await loadConfig();
       if (!config) {
@@ -253,7 +253,7 @@ export function createSyncCommand(): Command {
 
     let solverConfig = await loadSolverConfig();
 
-    // 如果没有 solver.json 或明确要求注册
+    // If there is no solver.json or registration is explicitly required
     if (!solverConfig || options.register) {
       const serverUrl: string = options.server;
       const siteId = randomBytes(16).toString('hex');
@@ -293,7 +293,7 @@ export function createSyncCommand(): Command {
         await saveSolverConfig(solverConfig);
       } catch (err: unknown) {
         console.error('保存 solver.json 失败:', err instanceof Error ? err.message : String(err));
-        // 继续执行，不终止进程
+        // Continue execution without terminating the process
       }
       console.log(`注册成功！site_id: ${siteId}`);
       console.log('solver.json 已保存到 ~/.corivo/solver.json');
@@ -302,7 +302,7 @@ export function createSyncCommand(): Command {
     const { server_url, shared_secret, site_id } = solverConfig;
     logger.debug(`[sync:cli] 开始同步 server=${server_url} site=${site_id} lastPull=${solverConfig.last_pull_version} lastPush=${solverConfig.last_push_version}`);
 
-    // 认证
+    // Certification
     console.log('正在认证...');
     let token: string;
     try {
@@ -313,7 +313,7 @@ export function createSyncCommand(): Command {
     }
     console.log('认证成功');
 
-    // 获取本地数据库
+    // Get local database
     const dbKey = await getDatabaseKey();
     if (!dbKey) {
       console.error('无法获取数据库密钥');
@@ -325,10 +325,10 @@ export function createSyncCommand(): Command {
       key: dbKey,
     });
 
-    // Push：获取本地变更
-    // 注意：cr-sqlite 扩展可能未加载，此时 crsql_changes 表不存在
-    // 我们做简化版 push：发送所有 blocks（全量），仅用于初始同步
-    // 完整的 cr-sqlite 集成需要单独启用
+    // Push: Get local changes
+    // NOTE: The cr-sqlite extension may not be loaded and the crsql_changes table does not exist at this time
+    // We do a simplified version of push: send all blocks (full amount), only for initial synchronization
+    // Full cr-sqlite integration needs to be enabled separately
     let pushStored = 0;
     try {
       const blocks = db.queryBlocks({ limit: 10000 });
@@ -339,7 +339,7 @@ export function createSyncCommand(): Command {
           pk: b.id,
           col_name: 'content',
           col_version: 1,
-          db_version: i + 1,   // 从 0 开始的序号，而非从 last_push_version 起算
+          db_version: i + 1,   // Sequence number starting from 0 instead of last_push_version
           value: b.content,
           site_id: site_id,
         }));
@@ -354,20 +354,20 @@ export function createSyncCommand(): Command {
         pushStored = pushResult.stored;
         logger.debug(`[sync:cli] push 完成 stored=${pushStored} changesets=${changesets.length}`);
 
-        solverConfig!.last_push_version = blocks.length;  // 记录已推送总量，不再累加
+        solverConfig!.last_push_version = blocks.length;  // Record the total amount pushed and no longer add it up
         try {
           await saveSolverConfig(solverConfig!);
           logger.debug(`[sync:cli] 已更新 last_push_version=${solverConfig!.last_push_version}`);
         } catch (err: any) {
           console.error('保存 solver.json 失败:', err.message);
-          // 继续执行，不终止进程
+          // Continue execution without terminating the process
         }
       }
     } catch (err: unknown) {
       console.error('Push 失败:', err instanceof Error ? err.message : String(err));
     }
 
-    // Pull：拉取远端变更
+    // Pull: Pull remote changes
     let pullCount = 0;
     try {
       const pullResult = await post(
@@ -384,7 +384,7 @@ export function createSyncCommand(): Command {
       pullCount = applyPulledChangesets(db, pullResult.changesets, logger);
       logger.debug(`[sync:cli] pull 已写库 applied=${pullCount}`);
 
-      // 无论是否有数据，都更新版本（避免重复拉取）
+      // Update the version regardless of whether there is data (to avoid repeated pulls)
       if (pullResult.current_version > solverConfig!.last_pull_version) {
         solverConfig!.last_pull_version = pullResult.current_version;
         try {
@@ -398,7 +398,7 @@ export function createSyncCommand(): Command {
       console.error('Pull 失败:', err instanceof Error ? err.message : String(err));
     }
 
-    // 拉取服务端设备列表，更新本地 identity.json
+    // Pull the server device list and update the local identity.json
     try {
       const devicesResult = await (async () => {
         const res = await fetch(`${server_url}/auth/devices`, {

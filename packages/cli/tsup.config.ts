@@ -6,7 +6,7 @@ export default defineConfig({
     'cli/index': 'src/cli/index.ts',
     'engine/heartbeat': 'src/engine/heartbeat.ts',
     'service/index': 'src/service/index.ts',
-    // Cold scan 模块
+    // Cold scan module
     'cold-scan/index': 'src/cold-scan/index.ts',
     'cold-scan/extractors/openclaw': 'src/cold-scan/extractors/openclaw.ts',
   },

@@ -1,7 +1,7 @@
 /**
- * Corivo - 你的硅基同事
+ * Corivo - your silicon-based colleague
  *
- * 它只为你活着
+ * it lives only for you
  */
 
 export * from './models';

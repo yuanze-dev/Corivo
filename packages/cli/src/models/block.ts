@@ -1,51 +1,51 @@
 /**
- * Block 数据模型
+ * Block data model
  *
- * Corivo 的最小存储单元 —— 一段语义自包含的自然语言文本
+ * The smallest storage unit in Corivo — a semantically self-contained natural language text fragment.
  */
 
 import type { Pattern } from './pattern';
 
 /**
- * Block 状态
+ * Block lifecycle status
  */
 export type BlockStatus = 'active' | 'cooling' | 'cold' | 'archived';
 
 /**
- * Block 接口定义
+ * Block interface definition
  */
 export interface Block {
-  /** 唯一标识符，格式: blk_<hex> */
+  /** Unique identifier, format: blk_<hex> */
   id: string;
-  /** 自然语言正文 */
+  /** Natural language body text */
   content: string;
-  /** 双维度标注：性质 · 领域 · 标签 */
+  /** Three-part annotation: nature · domain · tag */
   annotation: string;
-  /** 引用的其他 block ID 列表 */
+  /** IDs of other blocks referenced by this block */
   refs: string[];
-  /** 采集来源标识 */
+  /** Source identifier indicating where this block was collected from */
   source: string;
 
-  /** 生命力分值 0-100 */
+  /** Vitality score 0-100 */
   vitality: number;
-  /** 当前状态 */
+  /** Current lifecycle status */
   status: BlockStatus;
-  /** 累计被查询或引用的次数 */
+  /** Total number of times this block has been queried or referenced */
   access_count: number;
-  /** 最近一次被触达的时间戳 */
+  /** Timestamp of the most recent access */
   last_accessed: number | null;
 
-  /** 决策模式（仅决策类 block） */
+  /** Decision pattern (only present on decision-type blocks) */
   pattern?: Pattern;
 
-  /** 创建时间戳 */
+  /** Creation timestamp */
   created_at: number;
-  /** 最近更新时间戳 */
+  /** Last updated timestamp */
   updated_at: number;
 }
 
 /**
- * Block 创建参数（不需要 id 和时间戳）
+ * Input parameters for creating a Block (id and timestamps are auto-generated)
  */
 export type CreateBlockInput = {
   content: string;
@@ -60,101 +60,101 @@ export type CreateBlockInput = {
 };
 
 /**
- * Block 更新参数（部分字段可更新）
+ * Input parameters for updating a Block (all fields are optional)
  *
- * 注意: updated_at 仅用于测试，生产环境总是自动设置为当前时间
+ * Note: updated_at is only exposed for testing; in production it is always set automatically.
  */
 export type UpdateBlockInput = Partial<
   Pick<Block, 'content' | 'annotation' | 'refs' | 'vitality' | 'status' | 'access_count' | 'last_accessed' | 'pattern' | 'updated_at' | 'created_at'>
 >;
 
 /**
- * Block 查询过滤器
+ * Filter options for querying Blocks
  */
 export interface BlockFilter {
-  /** 按标注筛选（精确匹配） */
+  /** Filter by exact annotation match */
   annotation?: string;
-  /** 按标注前缀筛选，如 "决策" 匹配所有 "决策 · ..." 标注（annotation 精确匹配优先） */
+  /** Filter by annotation prefix, e.g. "decision" matches all "decision · ..." annotations (exact match takes priority) */
   annotationPrefix?: string;
-  /** 按状态筛选 */
+  /** Filter by lifecycle status */
   status?: BlockStatus;
-  /** 最低生命力 */
+  /** Minimum vitality threshold */
   minVitality?: number;
-  /** 返回数量限制 */
+  /** Maximum number of results to return */
   limit?: number;
-  /** 按来源筛选 */
+  /** Filter by collection source */
   source?: string;
-  /** 排序字段（默认 updated_at） */
+  /** Sort field (default: updated_at) */
   sortBy?: 'updated_at' | 'vitality';
-  /** 排序方向（默认 DESC） */
+  /** Sort direction (default: DESC) */
   sortOrder?: 'ASC' | 'DESC';
 }
 
 /**
- * Annotation 性质（第一维度）
+ * Annotation nature (first dimension)
  */
 export const NATURE_TYPES = {
-  FACT: '事实',       // 密码、配置、数据点、具体事件
-  KNOWLEDGE: '知识',  // 教程、总结、分析、方法论
-  DECISION: '决策',   // 选型结论、方案确定、规则约定
-  INSTRUCTION: '指令', // 用户偏好、行为规则、自动化触发
+  FACT: '事实',       // passwords, config values, data points, concrete events
+  KNOWLEDGE: '知识',  // tutorials, summaries, analyses, methodologies
+  DECISION: '决策',   // technology choices, confirmed plans, agreed conventions
+  INSTRUCTION: '指令', // user preferences, behavioral rules, automation triggers
 } as const;
 
 export type NatureType = (typeof NATURE_TYPES)[keyof typeof NATURE_TYPES];
 
 /**
- * Annotation 领域（第二维度）
+ * Annotation domain (second dimension)
  */
 export const DOMAIN_TYPES = {
-  SELF: 'self',         // 用户本人
-  PEOPLE: 'people',     // 具体的人
-  PROJECT: 'project',   // 有目标和终点的事
-  AREA: 'area',         // 需要长期维护的领域
-  ASSET: 'asset',       // 具体的物/账户/资源
-  KNOWLEDGE: 'knowledge', // 独立于场景的通用知识
-  TEAM: 'team',         // v0.10 新增：团队共享信息
+  SELF: 'self',         // the user themselves
+  PEOPLE: 'people',     // specific individuals
+  PROJECT: 'project',   // goal-driven work with a defined endpoint
+  AREA: 'area',         // ongoing responsibilities requiring long-term maintenance
+  ASSET: 'asset',       // physical items, accounts, or resources
+  KNOWLEDGE: 'knowledge', // general knowledge independent of a specific context
+  TEAM: 'team',         // added in v0.10: shared team information
 } as const;
 
 export type DomainType = (typeof DOMAIN_TYPES)[keyof typeof DOMAIN_TYPES];
 
 /**
- * 验证 annotation 格式
+ * Validate annotation format
  *
- * @param annotation - 待验证的标注字符串
- * @returns 是否有效
+ * @param annotation - The annotation string to validate
+ * @returns Whether the annotation is valid
  */
 export function validateAnnotation(annotation: string): boolean {
   const parts = annotation.split(' · ');
 
-  // 必须有三个部分
+  // Must contain exactly three parts
   if (parts.length !== 3) {
     return false;
   }
 
-  // 第一部分：如果是已知的性质则验证，否则允许（灵活性）
+  // First part: validated if it matches a known nature, otherwise allowed for extensibility
   const validNatures = new Set<string>(Object.values(NATURE_TYPES));
   const nature = parts[0];
-  // 允许任何非空的第一部分（扩展性）
+  // Allow any non-empty first part to support future extension
   if (nature.length === 0) {
     return false;
   }
 
-  // 第二部分：如果是已知的领域则验证，否则允许（灵活性）
+  // Second part: validated if it matches a known domain, otherwise allowed for extensibility
   const validDomains = new Set<string>(Object.values(DOMAIN_TYPES));
   const domain = parts[1];
-  // 允许任何非空的第二部分（扩展性）
+  // Allow any non-empty second part to support future extension
   if (domain.length === 0) {
     return false;
   }
 
-  // 第三部分可以是任意非空标签
+  // Third part can be any non-empty tag string
   return parts[2].length > 0;
 }
 
 /**
- * 生成 Block ID
+ * Generate a new Block ID
  *
- * @returns 新的 block ID
+ * @returns A new unique block ID
  */
 export function generateBlockId(): string {
   const timestamp = Date.now().toString(36);
@@ -163,54 +163,54 @@ export function generateBlockId(): string {
 }
 
 /**
- * 判断 block 是否处于完成状态（非 pending）
+ * Check whether a block has been annotated (i.e. is not in pending state)
  *
- * @param block - Block 对象
- * @returns 是否完成
+ * @param block - The Block object to check
+ * @returns True if the block has a resolved annotation
  */
 export function isBlockComplete(block: Block): boolean {
   return block.annotation !== 'pending';
 }
 
 /**
- * 计算两个时间戳之间的天数差
+ * Calculate the number of days between two timestamps
  *
- * @param earlier - 较早的时间戳
- * @param later - 较晚的时间戳
- * @returns 天数差
+ * @param earlier - The earlier timestamp (ms)
+ * @param later - The later timestamp (ms)
+ * @returns Number of days elapsed between the two timestamps
  */
 export function daysBetween(earlier: number, later: number): number {
   return (later - earlier) / 86400000;
 }
 
 /**
- * 根据 annotation 推断衰减率
+ * Infer the vitality decay rate from a block's annotation
  *
- * @param annotation - Block 标注
- * @returns 每天衰减的点数
+ * @param annotation - The block's annotation string
+ * @returns Vitality points to subtract per day
  */
 export function inferDecayRate(annotation: string): number {
   const lower = annotation.toLowerCase();
 
-  // 事实类衰减最慢
+  // Fact-type blocks decay the slowest — they represent stable, long-lived data
   if (lower.startsWith('事实') || lower.includes('asset') || lower.includes('密码')) {
     return 0.5;
   }
 
-  // 知识类衰减较快
+  // Knowledge-type blocks decay faster — they become stale as the field evolves
   if (lower.startsWith('知识')) {
     return 2;
   }
 
-  // 默认衰减率
+  // Default decay rate for all other annotation types
   return 1;
 }
 
 /**
- * 根据生命力计算状态
+ * Derive a BlockStatus from a vitality score
  *
- * @param vitality - 生命力值
- * @returns 对应的状态
+ * @param vitality - Vitality value (0–100)
+ * @returns The corresponding BlockStatus
  */
 export function vitalityToStatus(vitality: number): BlockStatus {
   if (vitality === 0) return 'archived';

@@ -1,39 +1,39 @@
 /**
- * 整合引擎
+ * integration engine
  *
- * 负责合并重复内容、提炼上层知识、补全关联链
- * 模拟人脑在睡眠时整理记忆的过程
+ * Responsible for merging duplicate content, refining upper-level knowledge, and completing related links
+ * Simulate the process of the human brain sorting out memories during sleep
  */
 
 import type { Block } from '../models/index.js';
 import { AssociationType, AssociationDirection } from '../models/association.js';
 
 /**
- * 整合结果
+ * Integrate results
  */
 export interface ConsolidationResult {
-  /** 执行的操作类型 */
+  /** Type of operation performed */
   action: 'merged' | 'linked';
-  /** 涉及的 block ID */
+  /** Involved block ID */
   blocks: string[];
-  /** 结果 block（如果有） */
+  /** Result block (if any) */
   result?: Block;
-  /** 理由说明 */
+  /** Justification */
   reason?: string;
 }
 
 /**
- * 整合配置
+ * Integrated configuration
  */
 interface ConsolidationConfig {
-  /** 相似度阈值（高于此值认为需要合并） */
+  /** Similarity threshold (above this value it is considered necessary to merge) */
   mergeThreshold: number;
-  /** 自动补链置信度阈值 */
+  /** Automatic chain link confidence threshold */
   linkThreshold: number;
 }
 
 /**
- * 整合引擎
+ * integration engine
  */
 export class ConsolidationEngine {
   private config: ConsolidationConfig;
@@ -47,10 +47,10 @@ export class ConsolidationEngine {
   }
 
   /**
-   * 去重：合并高度相似的 block
+   * Deduplication: merge highly similar blocks
    *
-   * @param candidates - 待检查的 block 列表
-   * @returns 合并结果列表
+   * @param candidates - list of blocks to be checked
+   * @returns merged result list
    */
   deduplicateBlocks(candidates: Block[]): ConsolidationResult[] {
     const results: ConsolidationResult[] = [];
@@ -61,15 +61,15 @@ export class ConsolidationEngine {
         continue;
       }
 
-      // 查找相似 block
+      // Find similar blocks
       const similar = this.findSimilarBlocks(block, candidates);
 
       if (similar.length > 0) {
-        // 合并到第一个 block
+        // merge into first block
         const merged = this.mergeBlocks(block, similar);
         results.push(merged);
 
-        // 标记为已处理
+        // Mark as processed
         processed.add(block.id);
         for (const s of similar) {
           processed.add(s.id);
@@ -81,11 +81,11 @@ export class ConsolidationEngine {
   }
 
   /**
-   * 补链：为相关但无 refs 的 block 添加关联
+   * Complementary chain: Add associations to blocks that are related but have no refs
    *
-   * @param blocks - block 列表
-   * @param associations - 现有关联列表
-   * @returns 需要更新的 block ID 映射
+   * @param blocks - list of blocks
+   * @param associations - list of existing associations
+   * @returns block ID mapping that needs to be updated
    */
   findMissingLinks(
     blocks: Block[],
@@ -93,11 +93,11 @@ export class ConsolidationEngine {
   ): Map<string, string[]> {
     const missingLinks = new Map<string, string[]>();
 
-    // 为每个 block 查找高置信度关联但未在 refs 中的 block
+    // For each block, find blocks that are associated with high confidence but are not in refs
     for (const block of blocks) {
       const currentRefs = new Set(block.refs);
 
-      // 找出高置信度关联但未在 refs 中的目标
+      // Find objects that are associated with high confidence but are not in refs
       const highConfLinks = associations
         .filter(
           (a) =>
@@ -116,7 +116,7 @@ export class ConsolidationEngine {
   }
 
   /**
-   * 查找相似 block
+   * Find similar blocks
    */
   private findSimilarBlocks(target: Block, candidates: Block[]): Block[] {
     const similar: Block[] = [];
@@ -126,7 +126,7 @@ export class ConsolidationEngine {
         continue;
       }
 
-      // 标注必须相同
+      // Labels must be the same
       if (candidate.annotation !== target.annotation) {
         continue;
       }
@@ -142,26 +142,26 @@ export class ConsolidationEngine {
   }
 
   /**
-   * 合并 block
+   * merge blocks
    *
-   * 保留内容最长、最新的那个作为主 block，其他的记录到 consolidated_from
+   * Keep the one with the longest and latest content as the main block, and record the others to consolidated_from
    */
   private mergeBlocks(primary: Block, duplicates: Block[]): ConsolidationResult {
-    // 找出内容最长的作为主 block
+    // Find the longest content as the main block
     const all = [primary, ...duplicates];
     all.sort((a, b) => b.content.length - a.content.length);
 
     const main = all[0];
     const others = all.slice(1);
 
-    // 合并 refs（去重）
+    // Merge refs (remove duplication)
     const allRefs = new Set<string>();
     allRefs.add(main.id);
     for (const b of all) {
       b.refs.forEach((r) => allRefs.add(r));
     }
 
-    // 计算新的生命力（取最高值）
+    // Calculate new vitality (take the highest value)
     const maxVitality = Math.max(...all.map((b) => b.vitality));
 
     const mergedBlock: Block = {
@@ -180,7 +180,7 @@ export class ConsolidationEngine {
   }
 
   /**
-   * 计算两个文本的相似度
+   * Calculate the similarity between two texts
    */
   private calculateSimilarity(text1: string, text2: string): number {
     const words1 = this.extractWords(text1);
@@ -193,7 +193,7 @@ export class ConsolidationEngine {
     const set1 = new Set(words1);
     const set2 = new Set(words2);
 
-    // Jaccard 相似度
+    // Jaccard similarity
     const intersection = new Set([...set1].filter((x) => set2.has(x)));
     const union = new Set([...set1, ...set2]);
 
@@ -201,7 +201,7 @@ export class ConsolidationEngine {
   }
 
   /**
-   * 提取文本中的所有词语
+   * Extract all words in text
    */
   private extractWords(text: string): string[] {
     const chineseChars = text

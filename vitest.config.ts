@@ -15,7 +15,7 @@ export default defineConfig({
         'packages/cli/__tests__/**',
         'packages/cli/src/cli/commands/**' // CLI commands mainly handle I/O
       ],
-      // MVP 覆盖率目标
+      // MVP coverage goals
       thresholds: {
         lines: 70,
         functions: 70,

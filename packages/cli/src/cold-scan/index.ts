@@ -1,12 +1,12 @@
 /**
- * Cold Scan 扫描框架
- * 首次安装时扫描用户本地环境，构建初始画像
+ * Cold Scan framework.
+ * Scans the user's local environment on first install to build an initial profile.
  */
 
 import { ScanSource, ScanConfig, DEFAULT_SCAN_CONFIG } from './types.js';
 import { shouldSkipPath } from './utils.js';
 
-// 导入所有提取器
+// Import all extractors
 import * as gitConfigExtractor from './extractors/git-config.js';
 import * as packageJsonExtractor from './extractors/package-json.js';
 import * as prettierConfigExtractor from './extractors/prettier-config.js';
@@ -18,38 +18,38 @@ import * as cursorExtractor from './extractors/cursor.js';
 import * as openclawExtractor from './extractors/openclaw.js';
 
 /**
- * 所有扫描源注册表
+ * Registry of all scan sources.
  */
 const SCAN_SOURCES: ScanSource[] = [
-  // === 高优先级：当前项目 ===
+  // === High priority: current project ===
   currentProjectExtractor.source,
 
-  // === 身份信息 ===
+  // === Identity information ===
   gitConfigExtractor.source,
 
-  // === 技术偏好 ===
+  // === Technical preferences ===
   prettierConfigExtractor.source,
   editorconfigExtractor.source,
 
-  // === 技术栈 ===
+  // === Tech stack ===
   packageJsonExtractor.source,
   dockerComposeExtractor.source,
 
-  // === AI 工具配置 ===
+  // === AI tool configuration ===
   claudeCodeExtractor.source,
   cursorExtractor.source,
   openclawExtractor.source,
-  // 更多提取器待添加...
+  // More extractors to be added...
 ];
 
 /**
- * 执行单个扫描源
+ * Runs a single scan source and returns its extracted blocks.
  */
 async function scanSource(
   source: ScanSource,
   config: ScanConfig
 ): Promise<{ blocks: Record<string, unknown>[]; success: boolean; error?: string }> {
-  // 检查是否跳过
+  // Skip this source if it is on the exclusion list
   if (config.skipSources.includes(source.name)) {
     if (config.verbose) {
       console.log(`  ⊝ 跳过: ${source.name}`);
@@ -58,7 +58,7 @@ async function scanSource(
   }
 
   try {
-    // 获取要扫描的文件路径
+    // Resolve the file path(s) to scan
     const paths =
       typeof source.path === 'function'
         ? await source.path()
@@ -67,7 +67,7 @@ async function scanSource(
     const allBlocks: Record<string, unknown>[] = [];
 
     for (const filePath of paths) {
-      // 安全检查
+      // Security check — skip sensitive paths
       if (shouldSkipPath(filePath)) {
         if (config.verbose) {
           console.log(`  ⊝ 跳过敏感文件: ${filePath}`);
@@ -75,18 +75,18 @@ async function scanSource(
         continue;
       }
 
-      // 读取文件内容
+      // Read the file contents
       const fs = await import('fs/promises');
       const content = await fs.readFile(filePath, 'utf-8').catch(() => null);
 
       if (!content) continue;
 
-      // 超时控制
+      // Enforce per-source timeout
       const timeoutPromise = new Promise<Record<string, unknown>[]>((_, reject) => {
         setTimeout(() => reject(new Error('timeout')), source.timeout);
       });
 
-      // 执行提取
+      // Run the extractor, racing against the timeout
       const blocks = await Promise.race([
         source.extractor(content, filePath) as Promise<Record<string, unknown>[]>,
         timeoutPromise,
@@ -108,7 +108,7 @@ async function scanSource(
 }
 
 /**
- * 执行 Cold Scan
+ * Runs a full cold scan across all registered sources.
  */
 export async function coldScan(config: Partial<ScanConfig> = {}): Promise<{
   blocks: Record<string, unknown>[];
@@ -121,7 +121,7 @@ export async function coldScan(config: Partial<ScanConfig> = {}): Promise<{
 
   console.log('[corivo] 正在扫描你的工作环境...');
 
-  // 按优先级排序
+  // Sort sources by descending priority so higher-priority sources run first
   const sortedSources = [...SCAN_SOURCES].sort((a, b) => b.priority - a.priority);
 
   const allBlocks: Record<string, unknown>[] = [];
@@ -136,7 +136,7 @@ export async function coldScan(config: Partial<ScanConfig> = {}): Promise<{
   let totalFound = 0;
 
   for (const source of sortedSources) {
-    // 检查总超时
+    // Abort remaining sources if the total timeout has been exceeded
     if (Date.now() - startTime > finalConfig.totalTimeout) {
       console.log(`[corivo] 扫描超时，已发现 ${totalFound} 条信息`);
       break;
@@ -166,8 +166,8 @@ export async function coldScan(config: Partial<ScanConfig> = {}): Promise<{
 
   console.log(`[corivo] 扫描完成，共发现 ${totalFound} 条信息`);
 
-  // 注意：数据库保存由调用方处理（如 init 命令）
-  // 这里只返回扫描结果
+  // Note: persisting blocks to the database is the caller's responsibility (e.g. the init command).
+  // This function only returns the raw scan results.
 
   return {
     blocks: allBlocks,
@@ -178,19 +178,19 @@ export async function coldScan(config: Partial<ScanConfig> = {}): Promise<{
 }
 
 /**
- * 获取所有已注册的扫描源
+ * Returns a copy of all registered scan sources.
  */
 export function getRegisteredSources(): ScanSource[] {
   return [...SCAN_SOURCES];
 }
 
 /**
- * 注册新的扫描源
+ * Registers a new scan source.
  */
 export function registerSource(source: ScanSource): void {
   SCAN_SOURCES.push(source);
 }
 
-// 导出类型和工具
+// Export types and utilities
 export * from './types.js';
 export * from './utils.js';

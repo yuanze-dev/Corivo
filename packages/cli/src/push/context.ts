@@ -1,7 +1,7 @@
 /**
- * 上下文推送模块
+ * Context push module
  *
- * 在查询时自动推送相关记忆
+ * Push relevant memories alongside query results
  */
 
 import type { CorivoDatabase } from '../storage/database.js';
@@ -9,32 +9,32 @@ import type { Block, Association } from '../models/index.js';
 import { AssociationType } from '../models/association.js';
 
 /**
- * 推送配置
+ * Push configuration
  */
 export interface PushConfig {
-  /** 最大显示长度 */
+  /** Maximum display length */
   maxPreviewLength?: number;
-  /** 是否显示标注 */
+  /** Whether to display labels */
   showAnnotation?: boolean;
-  /** 是否显示生命力 */
+  /** Whether to show vitality */
   showVitality?: boolean;
-  /** 是否显示时间 */
+  /** Whether to display time */
   showTime?: boolean;
 }
 
 /**
- * 上下文推送器
+ * Context pusher
  */
 export class ContextPusher {
   constructor(private db: CorivoDatabase) {}
 
   /**
-   * 查询时附加相关记忆
+   * Attach related memories when querying
    *
-   * @param query - 查询关键词
-   * @param limit - 返回数量限制
-   * @param config - 推送配置
-   * @returns 格式化的推送文本
+   * @param query - Search query
+   * @param limit - Maximum number of results to include
+   * @param config - Push configuration
+   * @returns Formatted push text
    */
   async pushContext(
     query: string,
@@ -48,16 +48,16 @@ export class ContextPusher {
       showTime = false,
     } = config;
 
-    // 使用 FTS5 搜索相关内容
+    // Search for relevant content using FTS5
     const related = this.db.searchBlocks(query, limit);
 
     if (related.length === 0) {
       return '';
     }
 
-    // 更新访问计数
-    // TODO: 优化为批量 UPDATE ... CASE 语句，避免 N+1 问题
-    // MVP 阶段记录量小，当前实现可接受
+    // Update access count
+    // TODO: Optimize into batch UPDATE...CASE statements to avoid N+1 problem
+    // The amount of records in the MVP stage is small and acceptable for the current implementation.
     for (const block of related) {
       this.db.updateBlock(block.id, {
         access_count: block.access_count + 1,
@@ -65,7 +65,7 @@ export class ContextPusher {
       });
     }
 
-    // 格式化输出
+    // Format the output payload
     const lines = related.map((block) => this.formatBlock(block, {
       maxPreviewLength,
       showAnnotation,
@@ -77,7 +77,7 @@ export class ContextPusher {
   }
 
   /**
-   * 格式化单个 block
+   * Format a single block
    */
   private formatBlock(
     block: Block,
@@ -85,13 +85,13 @@ export class ContextPusher {
   ): string {
     const { maxPreviewLength, showAnnotation, showVitality, showTime } = config;
 
-    // 预览内容
+    // Preview content
     const preview =
       block.content.length > maxPreviewLength
         ? block.content.slice(0, maxPreviewLength) + '...'
         : block.content;
 
-    // 元信息
+    // Build metadata chips
     const meta: string[] = [];
 
     if (showAnnotation && block.annotation && block.annotation !== 'pending') {
@@ -123,9 +123,9 @@ export class ContextPusher {
   }
 
   /**
-   * 统计信息推送
+   * Statistics push
    *
-   * 使用 SQL GROUP BY 在数据库层面聚合，避免读取全部数据到内存
+   * Use SQL GROUP BY to aggregate at the database level to avoid reading all data into memory
    */
   async pushStats(): Promise<string> {
     const stats = this.db.getStatusBreakdown();
@@ -134,7 +134,7 @@ export class ContextPusher {
   }
 
   /**
-   * 获取状态图标
+   * Get status icon
    */
   private getStatusIcon(vitality: number): string {
     if (vitality >= 80) return '🟢';
@@ -144,9 +144,9 @@ export class ContextPusher {
   }
 
   /**
-   * 推送需要关注的 block
+   * Push blocks that need attention
    *
-   * @returns 冷却或冷冻的 block 列表
+   * @returns cooled or frozen block list
    */
   async pushNeedsAttention(): Promise<string> {
     const blocks = this.db.queryBlocks({ limit: 100 });
@@ -169,16 +169,16 @@ export class ContextPusher {
   }
 
   /**
-   * 推送相关决策模式
+   * Push relevant decision-making patterns
    *
-   * @param query - 查询关键词
-   * @param limit - 返回数量限制
-   * @returns 决策模式推送文本
+   * @param query - Search query
+   * @param limit - Maximum number of results to include
+   * @returns Formatted decision-pattern push text
    */
   async pushPatterns(query: string, limit = 3): Promise<string> {
     const related = this.db.searchBlocks(query, limit);
 
-    // 筛选包含 pattern 的 block
+    // Keep only decision blocks that contain a structured pattern
     const withPatterns = related.filter((b) => b.pattern && b.annotation.includes('决策'));
 
     if (withPatterns.length === 0) {
@@ -198,23 +198,23 @@ export class ContextPusher {
   }
 
   /**
-   * 基于关联推送相关记忆
+   * Push related memories based on association
    *
-   * 不同于 pushContext 的全文搜索，这里基于已建立的关联关系
+   * Different from the full text search of pushContext, this is based on the established association relationship.
    *
-   * @param query - 查询关键词
-   * @param limit - 返回数量限制
-   * @returns 关联记忆推送文本
+   * @param query - Search query
+   * @param limit - Maximum number of results to include
+   * @returns Formatted related-memory push text
    */
   async pushRelated(query: string, limit = 5): Promise<string> {
-    // 先搜索得到初始 block
+    // First search to get the initial block
     const initial = this.db.searchBlocks(query, 3);
 
     if (initial.length === 0) {
       return '';
     }
 
-    // 获取这些 block 的关联
+    // Get the associations of these blocks
     const relatedIds = new Set<string>();
     const associations: Association[] = [];
 
@@ -231,7 +231,7 @@ export class ContextPusher {
       return '';
     }
 
-    // 获取关联 block
+    // Load the related blocks
     const relatedBlocks: Block[] = [];
     for (const id of relatedIds) {
       const block = this.db.getBlock(id);
@@ -240,7 +240,7 @@ export class ContextPusher {
       }
     }
 
-    // 按关联置信度排序并限制数量
+    // Sort by association confidence and limit quantity
     relatedBlocks.sort((a, b) => {
       const aAssoc = associations.find(
         (assoc) => assoc.from_id === a.id || assoc.to_id === a.id
@@ -257,7 +257,7 @@ export class ContextPusher {
       return '';
     }
 
-    // 格式化输出
+    // Format the output payload
     const lines = limited.map((block) => {
       const assoc = associations.find(
         (a) => a.from_id === block.id || a.to_id === block.id
@@ -273,21 +273,21 @@ export class ContextPusher {
   }
 
   /**
-   * 推送矛盾提醒
+   * Push conflict reminder
    *
-   * 检测当前内容与已有决策的冲突
+   * Detect conflicts between current content and existing decisions
    *
-   * @param content - 当前内容
-   * @returns 矛盾提醒文本
+   * @param content - current content
+   * @returns conflict reminder text
    */
   async pushConflicts(content: string): Promise<string> {
-    // 提取当前内容的关键信息
+    // Extract key information of current content
     const keywords = this.extractKeywords(content);
 
-    // 搜索可能冲突的决策
+    // Search for potentially conflicting decisions
     const conflicts: Array<{ block: Block; reason: string }> = [];
 
-    // 搜索包含决策关键词的 block
+    // Search for blocks containing decision keywords
     for (const keyword of keywords.slice(0, 5)) {
       const results = this.db.searchBlocks(keyword, 5);
 
@@ -296,12 +296,12 @@ export class ContextPusher {
           continue;
         }
 
-        // 检查是否已有矛盾关联
+        // Check if there are any conflicting relationships
         const blockAssocs = this.db.getBlockAssociations(block.id);
         const hasConflict = blockAssocs.some((a) => a.type === AssociationType.CONFLICTS);
 
         if (hasConflict) {
-          // 找到矛盾关联，获取对方
+          // Find the contradictory relationship and get the other party
           const conflictAssoc = blockAssocs.find((a) => a.type === AssociationType.CONFLICTS);
           const otherId = conflictAssoc?.from_id === block.id ? conflictAssoc.to_id : conflictAssoc?.from_id;
           const otherBlock = otherId ? this.db.getBlock(otherId) : null;
@@ -328,18 +328,18 @@ export class ContextPusher {
   }
 
   /**
-   * 推送相关决策（增强版）
+   * Push related decisions (enhanced version)
    *
-   * 结合关联关系的决策推送
+   * Decision push based on correlation
    *
-   * @param context - 上下文描述
-   * @returns 决策建议文本
+   * @param context - context description
+   * @returns Decision suggestion text
    */
   async pushDecisions(context: string): Promise<string> {
     const keywords = this.extractKeywords(context);
     const decisions: Array<{ block: Block; relevance: number }> = [];
 
-    // 搜索相关决策
+    // Search related decisions
     for (const keyword of keywords.slice(0, 5)) {
       const results = this.db.searchBlocks(keyword, 5);
 
@@ -348,12 +348,12 @@ export class ContextPusher {
           continue;
         }
 
-        // 检查是否已收集
+        // Check if collected
         if (decisions.some((d) => d.block.id === block.id)) {
           continue;
         }
 
-        // 计算相关性（基于关键词匹配）
+        // Calculate relevance (based on keyword matching)
         const relevance = this.calculateRelevance(context, block.content);
         if (relevance > 0.3) {
           decisions.push({ block, relevance });
@@ -365,7 +365,7 @@ export class ContextPusher {
       return '';
     }
 
-    // 按相关性排序
+    // Sort by relevance
     decisions.sort((a, b) => b.relevance - a.relevance);
 
     const topDecisions = decisions.slice(0, 3);
@@ -390,22 +390,22 @@ export class ContextPusher {
   }
 
   /**
-   * 推送摘要
+   * Push summary
    *
-   * 基于主题推送相关内容的摘要
+   * Push summary of relevant content based on topic
    *
-   * @param topic - 主题关键词
-   * @returns 摘要文本
+   * @param topic - topic keyword
+   * @returns summary text
    */
   async pushSummary(topic: string): Promise<string> {
-    // 搜索相关 block
+    // Search related blocks
     const related = this.db.searchBlocks(topic, 20);
 
     if (related.length < 3) {
-      return ''; // 内容太少，不生成摘要
+      return ''; // Too little content, no summary generated
     }
 
-    // 按标注分组
+    // Group by label
     const byAnnotation = new Map<string, Block[]>();
     for (const block of related) {
       const key = block.annotation;
@@ -415,7 +415,7 @@ export class ContextPusher {
       byAnnotation.get(key)!.push(block);
     }
 
-    // 生成摘要
+    // Generate summary
     const lines: string[] = [];
 
     for (const [annotation, blocks] of byAnnotation.entries()) {
@@ -438,10 +438,10 @@ export class ContextPusher {
   }
 
   /**
-   * 提取关键词
+   * Extract keywords
    */
   private extractKeywords(text: string): string[] {
-    // 简单的关键词提取
+    // Simple keyword extraction
     const words = text.toLowerCase().match(/[a-z]{2,}|[\u4e00-\u9fa5]/g) || [];
     const stopWords = new Set([
       '的', '了', '是', '在', '有', '和', '就', '不', '人', '都',
@@ -458,7 +458,7 @@ export class ContextPusher {
   }
 
   /**
-   * 计算相关性
+   * Calculate correlation
    */
   private calculateRelevance(text1: string, text2: string): number {
     const words1 = new Set(this.extractKeywords(text1));
@@ -475,7 +475,7 @@ export class ContextPusher {
   }
 
   /**
-   * 获取关联类型标签
+   * Get association type label
    */
   private getAssociationTypeLabel(type?: AssociationType): string {
     if (!type) return '相关';

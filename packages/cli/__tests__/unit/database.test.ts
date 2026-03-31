@@ -1,5 +1,5 @@
 /**
- * 数据库存储层单元测试
+ * Unit tests for the database storage layer
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -13,12 +13,12 @@ describe('CorivoDatabase', () => {
   let dbPath: string;
 
   beforeEach(async () => {
-    // 创建临时数据库（使用随机数避免冲突）
+    // Create a temporary database (use a random suffix to avoid conflicts)
     const randomId = Math.random().toString(36).slice(2, 10);
     dbPath = `/tmp/corivo-test-${randomId}.db`;
     const dbKey = KeyManager.generateDatabaseKey();
 
-    // 初始化数据库（不使用 FTS5 以避免腐烂问题）
+    // Initialize the database without FTS5 to avoid virtual table decay issues
     const sqliteDb = new Database(dbPath);
     sqliteDb.exec(`
       CREATE TABLE IF NOT EXISTS blocks (
@@ -42,21 +42,21 @@ describe('CorivoDatabase', () => {
     `);
     sqliteDb.close();
 
-    // 创建 CorivoDatabase 实例
+    // Create the CorivoDatabase singleton instance
     db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
   });
 
   afterEach(async () => {
-    // 关闭当前数据库实例
+    // Close the current database instance
     db.close();
 
-    // 清理单例缓存中当前路径的实例
+    // Remove this path's entry from the singleton cache
     const instances = (CorivoDatabase as any).instances;
     if (instances && instances.has(dbPath)) {
       instances.delete(dbPath);
     }
 
-    // 删除文件
+    // Delete the database file
     await fs.unlink(dbPath).catch(() => {});
   });
 
@@ -201,7 +201,7 @@ describe('CorivoDatabase', () => {
 
   describe('queryBlocks', () => {
     beforeEach(() => {
-      // 创建测试数据
+      // Seed test data
       db.createBlock({ content: 'Active block 1', status: 'active', vitality: 90 });
       db.createBlock({ content: 'Active block 2', status: 'active', vitality: 70 });
       db.createBlock({ content: 'Cooling block', status: 'cooling', vitality: 40 });

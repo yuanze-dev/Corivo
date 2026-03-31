@@ -1,17 +1,17 @@
 /**
  * Context Suggestion Engine
  *
- * 基于长期记忆预测用户下一步会输入什么
+ * Predict what the user is likely to type next from long-term memory
  *
- * 核心哲学（参考 Claude Code v2）：
- * "预测用户会打什么，不是你觉得他们该做什么"
+ * Core philosophy (inspired by Claude Code v2):
+ * "Predict what the user will type, not what you think they should do."
  */
 
 import type { CorivoDatabase } from '../storage/database.js';
 import type { Block } from '../models/block.js';
 
 /**
- * 上下文类型
+ * Suggestion context
  */
 export enum SuggestionContext {
   SESSION_START = 'session-start',
@@ -19,31 +19,31 @@ export enum SuggestionContext {
 }
 
 /**
- * 建议生成配置
+ * Suggestion generation settings
  */
 export interface SuggestionConfig {
-  /** 最大建议数量 */
+  /** Maximum number of suggestions */
   maxSuggestions?: number;
-  /** 优先考虑的天数范围（天） */
+  /** Preferred age window, in days */
   preferredAgeDays?: [number, number];
-  /** 最小生命力 */
+  /** Minimum vitality */
   minVitality?: number;
 }
 
 /**
- * 建议结果
+ * Suggestion result
  */
 export interface Suggestion {
-  /** 建议内容（不含 [corivo] 前缀） */
+  /** Suggestion text, without the `[corivo]` prefix */
   content: string;
-  /** 来源 Block ID */
+  /** Source Block ID */
   blockId: string;
-  /** 置信度 */
+  /** Confidence */
   confidence: 'high' | 'medium' | 'low';
 }
 
 /**
- * 建议引擎
+ * Suggestion engine
  */
 export class SuggestionEngine {
   private db: CorivoDatabase;
@@ -59,46 +59,46 @@ export class SuggestionEngine {
   }
 
   /**
-   * 生成建议
+   * Generate a suggestion
    *
-   * @param context 上下文类型
-   * @param lastMessage Claude 最后的回复（用于判断是否应该让出）
-   * @returns 建议内容（含 [corivo] 前缀）或空
+   * @param context Suggestion context
+   * @param lastMessage Claude's last reply, used to decide whether Corivo should yield
+   * @returns Suggestion text with the `[corivo]` prefix, or an empty string
    */
   generate(context: SuggestionContext, lastMessage?: string): string {
-    // 如果是 POST_REQUEST 且 Claude 有明显的下一步，让出
+    // Yield when POST_REQUEST already includes an obvious next step from Claude
     if (context === SuggestionContext.POST_REQUEST && lastMessage) {
       if (this.hasObviousNextStep(lastMessage)) {
-        return ''; // 让 Claude Code 处理
+        return ''; // Let Claude Code handle it
       }
     }
 
-    // 获取候选 Block
+    // Gather candidate blocks
     const candidates = this.getCandidateBlocks(context);
 
-    // 调试
+    // Debug logging
     // console.error('candidates:', candidates.length);
 
     if (candidates.length === 0) {
       return '';
     }
 
-    // 生成建议
+    // Build the final suggestion
     const suggestion = this.buildSuggestion(candidates[0]);
 
-    // 调试
+    // Debug logging
     // console.error('suggestion:', suggestion);
 
     return suggestion ? `[corivo] ${suggestion}` : '';
   }
 
   /**
-   * 判断 Claude 的回复是否有明显的下一步
+   * Determine whether Claude's reply already suggests an obvious next step
    */
   private hasObviousNextStep(message: string): boolean {
     const lower = message.toLowerCase();
 
-    // 明确的完成信号，Claude Code 会处理
+    // Clear completion signals are better handled by Claude Code itself
     const completionSignals = [
       'bug.*fix',
       '修复.*bug',
@@ -123,45 +123,45 @@ export class SuggestionEngine {
   }
 
   /**
-   * 获取候选 Block
+   * Get candidate blocks
    */
   private getCandidateBlocks(context: SuggestionContext = SuggestionContext.SESSION_START): Block[] {
     const now = Math.floor(Date.now() / 1000);
 
-    // 获取活跃 Block
+    // Start from currently active blocks
     const blocks = this.db.queryBlocks({
       limit: 50,
     });
 
-    // 过滤
+    // Filter down to the most relevant candidates
     return blocks.filter((block) => {
-      // 生命力检查
+      // Enforce the vitality threshold
       if (block.vitality < this.config.minVitality) {
         return false;
       }
 
-      // 状态检查（只要 active 和 cooling）
+      // Only consider active or cooling blocks
       if (block.status !== 'active' && block.status !== 'cooling') {
         return false;
       }
 
-      // 会话启动：优先最近 24 小时的重要决策
+      // On session start, prioritize important decisions from the last 24 hours
       if (context === SuggestionContext.SESSION_START) {
         const oneDayAgo = now - 86400;
-        // 如果是决策类且最近一天内，优先
+        // Always keep recent decision blocks from the past day
         if (block.annotation.includes('决策') && block.created_at > oneDayAgo) {
           return true;
         }
-        // 否则使用默认范围
+        // Otherwise fall through to the default age window
       }
 
-      // 默认时间范围检查（不要太新也不要太旧）
+      // Apply the normal age window so memories are neither too fresh nor too stale
       const [minAge, maxAge] = this.config.preferredAgeDays;
       const minTime = now - (maxAge * 86400);
       const maxTime = now - (minAge * 86400);
 
       if (block.created_at < minTime || block.created_at > maxTime) {
-        // 对于会话启动，放宽范围（1-14 天）
+        // Session start gets a wider window: 1 to 14 days old
         if (context === SuggestionContext.SESSION_START) {
           const sessionMinTime = now - (14 * 86400);
           const sessionMaxTime = now - 86400;
@@ -173,37 +173,37 @@ export class SuggestionEngine {
         }
       }
 
-      // 优先决策类
+      // Prefer decision blocks
       if (block.annotation.includes('决策')) {
         return true;
       }
 
-      // 其次是未完成的事实类
+      // Then consider unresolved fact blocks
       if (block.annotation.includes('事实') && block.refs.length === 0) {
         return true;
       }
 
       return false;
     }).sort((a, b) => {
-      // 按生命力排序
+      // Sort by vitality
       return b.vitality - a.vitality;
     }).slice(0, this.config.maxSuggestions);
   }
 
   /**
-   * 构建建议内容
+   * Build the suggestion text
    */
   private buildSuggestion(block: Block): string | null {
     const annotation = block.annotation;
     const content = block.content;
 
-    // 解析 annotation
+    // Parse the annotation triple
     const parts = annotation.split(' · ');
-    const nature = parts[0]; // 性质：决策/事实/知识
-    const domain = parts[1]; // 领域：self/people/project/asset/knowledge
-    const tag = parts[2];    // 标签
+    const nature = parts[0]; // Nature: decision/fact/knowledge
+    const domain = parts[1]; // Domain: self/people/project/asset/knowledge
+    const tag = parts[2];    // Tag
 
-    // 根据类型生成建议
+    // Generate the suggestion based on annotation type
     if (nature === '决策') {
       return this.buildDecisionSuggestion(block, domain, tag);
     }
@@ -212,45 +212,45 @@ export class SuggestionEngine {
       return this.buildPeopleSuggestion(content);
     }
 
-    // 默认：基于内容生成
+    // Default to deriving the suggestion from the content itself
     return this.buildGenericSuggestion(content, tag);
   }
 
   /**
-   * 决策类建议
+   * Decision-oriented suggestion
    */
   private buildDecisionSuggestion(block: Block, domain: string, tag: string): string {
-    // 如果有 Pattern（技术选型），提取 decision
+    // If there is Pattern (technical selection), extract the decision
     if (block.pattern && 'decision' in block.pattern) {
       const decision = (block.pattern as any).decision;
       return `继续 ${decision} 的实施`;
     }
 
-    // 基于 tag 生成
+    // Generate from the tag
     if (tag) {
       return `继续做 ${tag}`;
     }
 
-    // 基于 content 生成
+    // Generate from the content
     const content = block.content.slice(0, 20);
     return `继续 "${content}"`;
   }
 
   /**
-   * 人员相关建议
+   * Staff related suggestions
    */
   private buildPeopleSuggestion(content: string): string {
-    // 提取人名或任务
+    // Extract person name or task
     const match = content.match(/(.{0,15})/);
     const task = match ? match[1].trim() : '事项';
     return `跟进 ${task}`;
   }
 
   /**
-   * 通用建议
+   * General advice
    */
   private buildGenericSuggestion(content: string, tag: string): string {
-    // 限制内容长度
+    // Limit content length
     const short = content.slice(0, 15);
 
     if (tag && tag !== '通用' && tag !== '一般') {

@@ -1,5 +1,5 @@
 /**
- * CLI 命令单元测试
+ * Unit tests for CLI commands
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -18,19 +18,19 @@ describe('CLI Commands', () => {
   let masterKey: Buffer;
 
   beforeEach(async () => {
-    // 创建临时目录
+    // Create temporary directory
     tempDir = `${os.tmpdir()}/corivo-cli-test-${Date.now()}`;
     await fs.mkdir(tempDir, { recursive: true });
 
     configPath = path.join(tempDir, 'config.json');
     dbPath = path.join(tempDir, 'corivo.db');
 
-    // 生成密钥
+    // Generate key
     salt = KeyManager.generateSalt();
     dbKey = KeyManager.generateDatabaseKey();
     masterKey = KeyManager.deriveMasterKey('test-password', salt);
 
-    // 创建配置文件
+    // Create configuration file
     const encryptedKey = KeyManager.encryptDatabaseKey(dbKey, masterKey);
     const config = {
       salt: salt.toString('base64'),
@@ -40,17 +40,17 @@ describe('CLI Commands', () => {
   });
 
   afterEach(async () => {
-    // 清理临时目录
+    // Clean up temporary directory
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
   describe('initCommand validation', () => {
     it('should validate password strength', async () => {
-      // 弱密码应该被拒绝（太短或单一类型）
+      // Weak passwords should be rejected (too short or single type)
       const weakPasswords = ['', '123', 'abc', 'password', '12345678'];
 
       for (const pwd of weakPasswords) {
-        // 检查密码强度：至少8位且包含多种字符类型
+        // Check password strength: at least 8 characters and contain multiple character types
         const hasLower = /[a-z]/.test(pwd);
         const hasUpper = /[A-Z]/.test(pwd);
         const hasDigit = /\d/.test(pwd);
@@ -62,7 +62,7 @@ describe('CLI Commands', () => {
     });
 
     it('should accept strong passwords', async () => {
-      // 强密码应该通过
+      // Strong passwords should pass
       const strongPasswords = [
         'Test@12345',
         'mySecretPassword!2024',
@@ -124,10 +124,10 @@ describe('CLI Commands', () => {
     it('should check if already running', async () => {
       const pidPath = path.join(tempDir, 'heartbeat.pid');
 
-      // 模拟已存在的 PID 文件
+      // Simulate an existing PID file
       await fs.writeFile(pidPath, '99999');
 
-      // 检查文件存在
+      // Check file exists
       const exists = await fs.access(pidPath).then(() => true).catch(() => false);
       expect(exists).toBe(true);
     });
@@ -137,7 +137,7 @@ describe('CLI Commands', () => {
     it('should handle missing PID file', async () => {
       const pidPath = path.join(tempDir, 'heartbeat.pid');
 
-      // PID 文件不存在时应该优雅处理
+      // Should handle gracefully when PID file does not exist
       const exists = await fs.access(pidPath).then(() => true).catch(() => false);
       expect(exists).toBe(false);
     });

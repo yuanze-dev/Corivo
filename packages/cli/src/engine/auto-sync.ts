@@ -1,8 +1,8 @@
 /**
- * 自动同步引擎
+ * Auto-sync engine
  *
- * 在心跳守护进程中后台自动执行 push/pull，无需用户手动触发。
- * 前提：用户已通过 `corivo sync --register` 完成注册。
+ * Push/pull is automatically executed in the background in the heartbeat daemon without the need for manual triggering by the user.
+ * Prerequisite: The user has completed registration through `corivo sync --register`.
  */
 
 import { loadConfig, loadSolverConfig, saveSolverConfig } from '@/config';
@@ -10,7 +10,7 @@ import { applyPulledChangesets, authenticate, post } from '@/cli/commands/sync';
 import type { CorivoDatabase } from '@/storage/database';
 import { createLogger } from '@/utils/logging';
 
-const TOKEN_TTL = 4 * 60 * 1000; // 4 分钟（服务端 TTL 5 分钟）
+const TOKEN_TTL = 4 * 60 * 1000; // 4 minutes (server TTL 5 minutes)
 
 export class AutoSync {
   private token: string | null = null;
@@ -19,8 +19,8 @@ export class AutoSync {
   constructor(private db: CorivoDatabase) {}
 
   /**
-   * 执行一次同步（push + pull）
-   * @returns 同步结果计数，若未配置或出错则返回 null
+   * Perform a synchronization (push + pull)
+   * @returns synchronization result count, if not configured or an error occurs, null is returned
    */
   async run(): Promise<{ pushed: number; pulled: number } | null> {
     try {
@@ -36,10 +36,10 @@ export class AutoSync {
         `[sync:auto] 开始同步 server=${server_url} site=${site_id} lastPull=${solverConfig.last_pull_version} lastPush=${solverConfig.last_push_version}`
       );
 
-      // 确保 token 有效（缓存复用，过期重新获取）
+      // Make sure the token is valid (cache reuse, retrieval after expiration)
       const token = await this.ensureToken(server_url, config.identity_id, shared_secret, logger);
 
-      // Push：全量 blocks（简化版，与 CLI sync 一致）
+      // Push: full blocks (simplified version, consistent with CLI sync)
       let pushed = 0;
       const blocks = this.db.queryBlocks({ limit: 10000 });
       logger.debug(`[sync:auto] 准备 push blocks=${blocks.length}`);
@@ -69,7 +69,7 @@ export class AutoSync {
         logger.debug(`[sync:auto] 已更新 last_push_version=${solverConfig.last_push_version}`);
       }
 
-      // Pull：拉取服务端变更
+      // Pull: Pull server changes
       let pulled = 0;
       const pullResult = (await post(
         `${server_url}/sync/pull`,
@@ -98,7 +98,7 @@ export class AutoSync {
       return { pushed, pulled };
     } catch (error) {
       createLogger().error('[sync:auto] 同步失败:', error instanceof Error ? error.message : error);
-      // 401 认证失败：清除缓存 token，下次重新获取
+      // 401 Authentication failed: clear the cache token and obtain it again next time
       if (error instanceof Error && error.message.includes('401')) {
         this.token = null;
         this.tokenObtainedAt = 0;

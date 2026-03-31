@@ -1,6 +1,6 @@
 /**
- * Cold Scan 命令
- * 首次安装时扫描用户本地环境，构建初始画像
+ * Cold Scan command
+ * Scan the user's local environment during first installation to build an initial portrait
  */
 
 import fs from 'node:fs/promises';
@@ -36,9 +36,9 @@ coldScanCommand
         skipSources: options.skip || [],
       });
 
-      // 如果不是 dry-run，保存到数据库
+      // If not dry-run, save to database
       if (!options.dryRun) {
-        // 读取配置
+        // Read configuration
         const configDir = getConfigDir();
         const configPath = path.join(configDir, 'config.json');
 
@@ -58,13 +58,13 @@ coldScanCommand
           const dbPath = process.env.CORIVO_DB_PATH || getDefaultDatabasePath();
           const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
 
-          // 使用事务批量保存 blocks，确保数据持久化
+          // Use transactions to save blocks in batches to ensure data persistence
           let saved = 0;
           const saveTransaction = db['db'].transaction(() => {
             for (const block of result.blocks) {
               db.createBlock({
                 content: String((block as any).content || ''),
-                annotation: (block as any).annotation || 'pending',  // 保留原始 annotation
+                annotation: (block as any).annotation || 'pending',  // Keep original annotation
                 source: (block as any).source || (block as any).metadata?.scan_source || 'cold-scan',
                 vitality: 100,
               });
@@ -74,7 +74,7 @@ coldScanCommand
 
           saveTransaction();
 
-          // 执行 WAL checkpoint 确保数据写入主文件
+          // Execute WAL checkpoint to ensure data is written to the main file
           db['db'].pragma('wal_checkpoint(TRUNCATE)');
 
           if (saved > 0) {
@@ -93,7 +93,7 @@ coldScanCommand
       console.log(`记住的事: ${result.totalFound} 条`);
       console.log('');
 
-      // 显示摘要
+      // Show summary
       const successCount = result.results.filter((r) => r.success).length;
       const failCount = result.results.filter((r) => !r.success).length;
 
@@ -105,7 +105,7 @@ coldScanCommand
         console.log(chalk.yellow(`失败: ${failCount} 个来源`));
       }
 
-      // 下一步提示
+      // Next step tips
       if (!options.dryRun && result.totalFound > 0) {
         console.log('');
         console.log(chalk.gray('下一步: 运行 corivo first-run 整理这些信息'));

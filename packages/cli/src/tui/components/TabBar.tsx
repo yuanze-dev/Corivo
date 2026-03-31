@@ -25,7 +25,7 @@ interface TabBarProps {
   active: TabId;
 }
 
-// 仅依赖 active prop，用 React.memo 跳过无关渲染
+// Only rely on active prop and use React.memo to skip irrelevant rendering
 export const TabBar = React.memo(function TabBar({ active }: TabBarProps) {
   return (
     <Box marginBottom={1}>

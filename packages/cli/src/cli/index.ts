@@ -1,7 +1,7 @@
 /**
- * CLI 主入口
+ * CLI main entry point
  *
- * Corivo 命令行界面
+ * Corivo command-line interface — registers all subcommands and parses arguments.
  */
 
 import { Command } from 'commander';
@@ -10,15 +10,15 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-// 读取版本号
+// Read version number
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-// 在开发环境中从项目根目录读取，在生产环境中从 dist 目录读取
+// Read from the project root directory in development environment and from the dist directory in production environment
 const packagePath = join(__dirname, '../../package.json');
 const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
 const VERSION = packageJson.version;
 
-// 导入命令
+// import command
 import { initCommand } from './commands/init.js';
 import { saveCommand } from './commands/save.js';
 import { queryCommand } from './commands/query.js';
@@ -53,7 +53,7 @@ program
   .description('你的硅基同事 — 它只为你活着')
   .version(VERSION);
 
-// 注册命令
+// Register command
 program
   .command('init')
   .description('初始化 Corivo')
@@ -168,7 +168,7 @@ program.addCommand(daemonCommand);
 program.addCommand(updateCommand);
 program.addCommand(createSyncCommand());
 
-// 错误处理
+// Error handling
 program.configureOutput({
   writeErr: (str) => {
     if (str.includes('error:')) {
@@ -179,7 +179,7 @@ program.configureOutput({
   },
 });
 
-// 解析参数
+// Parse parameters
 program.parseAsync().catch((error) => {
   if (error instanceof Error) {
     console.error(chalk.red(`错误: ${error.message}`));

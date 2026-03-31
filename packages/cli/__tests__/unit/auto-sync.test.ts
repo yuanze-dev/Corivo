@@ -1,18 +1,18 @@
 /**
- * AutoSync 单元测试
+ * Unit tests for AutoSync
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AutoSync } from '../../src/engine/auto-sync.js';
 
-// Mock 配置模块
+// Mock configuration module
 vi.mock('../../src/config.js', () => ({
   loadConfig: vi.fn(),
   loadSolverConfig: vi.fn(),
   saveSolverConfig: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Mock sync 命令的工具函数
+// Utility functions for the Mock sync command
 vi.mock('../../src/cli/commands/sync.js', () => ({
   authenticate: vi.fn(),
   post: vi.fn(),
@@ -139,7 +139,7 @@ describe('AutoSync', () => {
       ];
       (mockDb.queryBlocks as ReturnType<typeof vi.fn>).mockReturnValue(blocks);
 
-      // push 响应
+      // push response
       mockPost
         .mockResolvedValueOnce({ stored: 2 })        // push
         .mockResolvedValueOnce({
@@ -228,9 +228,9 @@ describe('AutoSync', () => {
       await autoSync.run();
       expect(mockAuthenticate).toHaveBeenCalledTimes(1);
 
-      // 模拟 token 超时：直接修改内部时间戳
-      // @ts-expect-error 访问私有字段用于测试
-      autoSync.tokenObtainedAt = Date.now() - 5 * 60 * 1000; // 5 分钟前
+      // Simulate token timeout: directly modify the internal timestamp
+      // @ts-expect-error access private fields for testing
+      autoSync.tokenObtainedAt = Date.now() - 5 * 60 * 1000; // 5 minutes ago
 
       await autoSync.run();
       expect(mockAuthenticate).toHaveBeenCalledTimes(2);
@@ -251,21 +251,21 @@ describe('AutoSync', () => {
     });
 
     it('401 认证失败后清除 token 缓存', async () => {
-      // 先让 authenticate 返回一个 token
+      // First let authenticate return a token
       mockAuthenticate.mockResolvedValue('old-token');
       mockPost.mockResolvedValue({ changesets: [], current_version: 0 });
       await autoSync.run();
       expect(mockAuthenticate).toHaveBeenCalledTimes(1);
 
-      // 下一次 post 返回 401
+      // Next post returns 401
       mockPost.mockRejectedValue(new Error('HTTP 401: Unauthorized'));
 
       await autoSync.run();
 
-      // token 被清除，下次还会重新认证
+      // The token has been cleared and will be re-authenticated next time.
       mockPost.mockResolvedValue({ changesets: [], current_version: 0 });
       await autoSync.run();
-      // 第1次成功认证 + 第3次（token被清除后重新认证）= 2次
+      // The 1st successful authentication + the 3rd time (re-authentication after the token is cleared) = 2 times
       expect(mockAuthenticate).toHaveBeenCalledTimes(2);
     });
   });

@@ -18,7 +18,7 @@ export interface DbStats {
 export function useDatabase(db: CorivoDatabase | null): { stats: DbStats | null; loading: boolean } {
   const [stats, setStats] = useState<DbStats | null>(null);
   const [loading, setLoading] = useState(true);
-  // 上次数据的指纹，用于跳过无变化的更新
+  // Fingerprint of the last data, used to skip updates without changes
   const lastFingerprintRef = useRef('');
 
   useEffect(() => {
@@ -29,7 +29,7 @@ export function useDatabase(db: CorivoDatabase | null): { stats: DbStats | null;
         const tui = db.getTUIStats();
         const health = db.checkHealth();
 
-        // 计算指纹：排除 recentBlocks 完整内容，仅用 id+vitality 标识
+        // Calculate fingerprints: exclude recentBlocks complete content, only use id+vitality identification
         const recentKey = (tui.recentBlocks as any[])
           .map(b => `${b.id}:${b.vitality}`)
           .join(',');
@@ -40,7 +40,7 @@ export function useDatabase(db: CorivoDatabase | null): { stats: DbStats | null;
           ok: health.ok, recentKey,
         });
 
-        // 数据未变化则跳过 setState，避免不必要的重渲染
+        // If the data has not changed, setState will be skipped to avoid unnecessary re-rendering.
         if (fingerprint === lastFingerprintRef.current) return;
         lastFingerprintRef.current = fingerprint;
 

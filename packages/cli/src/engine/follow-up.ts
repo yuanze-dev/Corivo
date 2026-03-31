@@ -1,14 +1,14 @@
 /**
- * 进展提醒管理器
+ * Progress Reminder Manager
  *
- * 对待办决策进行温和的进展提醒："那个 xxx 后来怎么样了？"
+ * Provide gentle progress reminders for pending decisions: "What happened to that xxx?"
  */
 
 import type { CorivoDatabase } from '../storage/database.js';
 import type { Block } from '../models/index.js';
 
 /**
- * 提醒项
+ * reminder items
  */
 export interface ReminderItem {
   block: Block;
@@ -17,27 +17,27 @@ export interface ReminderItem {
 }
 
 /**
- * 进展提醒管理器
+ * Progress Reminder Manager
  */
 export class FollowUpManager {
-  private static readonly FOLLOW_UP_THRESHOLD_DAYS = 3; // 3 天后提醒
-  private static readonly REMINDER_COOLDOWN_DAYS = 7; // 同一内容 7 天内只提醒一次
+  private static readonly FOLLOW_UP_THRESHOLD_DAYS = 3; // Reminder after 3 days
+  private static readonly REMINDER_COOLDOWN_DAYS = 7; // Only remind once for the same content within 7 days
 
   constructor(private db: CorivoDatabase) {}
 
   /**
-   * 获取需要跟进的内容
+   * Get content you need to follow up on
    *
-   * @returns 需要提醒的项列表
+   * @returns List of items that need to be reminded
    */
   getPendingItems(): ReminderItem[] {
-    // 获取待办决策
+    // Get pending decisions
     const pendingDecisions = this.db.queryBlocks({
       annotation: 'pending',
       limit: 100,
     });
 
-    // 获取决策类但未标注完成的
+    // Get the decision class but not marked it
     const decisions = this.db.queryBlocks({
       limit: 100,
     }).filter((b) =>
@@ -53,7 +53,7 @@ export class FollowUpManager {
     for (const block of combined) {
       const daysSince = (now - block.created_at * 1000) / (24 * 60 * 60 * 1000);
 
-      // 超过 3 天且未归档
+      // Older than 3 days and not archived
       if (daysSince >= FollowUpManager.FOLLOW_UP_THRESHOLD_DAYS) {
         reminders.push({
           block,
@@ -67,14 +67,14 @@ export class FollowUpManager {
   }
 
   /**
-   * 获取本周需要提醒的内容（用于心跳定期检查）
+   * Get what needs to be reminded this week (for regular heartbeat check)
    *
-   * @returns 提醒消息列表
+   * @returns reminder message list
    */
   getWeeklyReminders(): string[] {
     const pending = this.getPendingItems();
 
-    // 只提醒最多 3 个，避免烦人
+    // Only remind up to 3 people to avoid being annoying
     const limited = pending.slice(0, 3);
 
     if (limited.length === 0) {
@@ -85,14 +85,14 @@ export class FollowUpManager {
   }
 
   /**
-   * 生成提醒语
+   * Generate reminder
    */
   private generateReminder(block: Block, daysSince: number): string {
     const preview = block.content.length > 30
       ? block.content.slice(0, 30) + '...'
       : block.content;
 
-    // 根据时间调整语气
+    // Adjust tone according to time
     if (daysSince <= 7) {
       return `那个 "${preview}" 有进展吗？`;
     } else if (daysSince <= 14) {
@@ -103,10 +103,10 @@ export class FollowUpManager {
   }
 
   /**
-   * 检查某个 block 是否需要提醒
+   * Check whether a certain block needs to be reminded
    *
    * @param blockId - Block ID
-   * @returns 是否需要提醒
+   * @returns Do you need a reminder?
    */
   needsReminder(blockId: string): boolean {
     const block = this.db.getBlock(blockId);

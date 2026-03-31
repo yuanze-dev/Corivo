@@ -1,5 +1,5 @@
 /**
- * 规则引擎测试
+ * Rule engine tests
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';

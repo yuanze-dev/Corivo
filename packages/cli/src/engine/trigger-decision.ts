@@ -1,7 +1,7 @@
 /**
- * 触发决策引擎
+ * trigger decision engine
  *
- * 让 Corivo 自己判断什么时候需要告诉用户什么
+ * Let Corivo decide when it needs to tell the user what
  */
 
 import type { CorivoDatabase } from '../storage/database.js';
@@ -9,26 +9,26 @@ import type { Block } from '../models/block.js';
 import { AssociationType } from '../models/association.js';
 
 /**
- * 触发决策输入
+ * Trigger decision input
  */
 export interface TriggerInput {
-  /** 当前时间戳 */
+  /** current timestamp */
   now: number;
-  /** 最近保存的 block */
+  /** Recently saved blocks */
   recentBlock?: Block;
-  /** 当前对话上下文（如果有） */
+  /** Current conversation context (if any) */
   conversationContext?: string;
-  /** 上次检查时间 */
+  /** Last check time */
   lastCheckTime?: number;
 }
 
 /**
- * 推送项
+ * Push items
  */
 export interface PushItem {
   id: string;
   type: 'conflict' | 'forgotten' | 'relevant' | 'attention' | 'summary';
-  priority: number; // 0-4, 越小越重要
+  priority: number; // 0-4, the smaller the value, the more important it is.
   title: string;
   message: string;
   metadata?: Record<string, unknown>;
@@ -38,28 +38,28 @@ export interface PushItem {
 }
 
 /**
- * 触发决策引擎
+ * trigger decision engine
  */
 export class TriggerDecision {
   private db: CorivoDatabase;
-  private readonly DECISION_DAYS = 3; // 决策 N 天后提醒
-  private readonly FORGOTTEN_THRESHOLD = 7; // N 天未访问算遗忘
-  private readonly CONFLICT_COOLDOWN = 86400 * 7; // 同一矛盾 7 天不重复
+  private readonly DECISION_DAYS = 3; // Reminder after N days of decision making
+  private readonly FORGOTTEN_THRESHOLD = 7; // Not visited for N days is considered forgotten.
+  private readonly CONFLICT_COOLDOWN = 86400 * 7; // The same conflict will not be repeated for 7 days
 
   constructor(db: CorivoDatabase) {
     this.db = db;
   }
 
   /**
-   * 决策是否需要推送
+   * Decide whether to push
    *
-   * @param input 触发输入
-   * @returns 推送项列表（最多 2 条）
+   * @param input trigger input
+   * @returns Push item list (up to 2 items)
    */
   decide(input: TriggerInput): PushItem[] {
     const items: PushItem[] = [];
 
-    // 1. 冲突检测（最高优先级）
+    // 1. Conflict detection (highest priority)
     if (input.recentBlock) {
       const conflict = this.checkConflict(input.recentBlock);
       if (conflict) {
@@ -67,58 +67,58 @@ export class TriggerDecision {
       }
     }
 
-    // 2. 遗忘的决策（重要但不紧急）
+    // 2. Forgotten decisions (important but not urgent)
     if (!input.recentBlock || !input.recentBlock.annotation.includes('决策')) {
-      // 如果刚保存的不是决策，检查是否有遗忘的决策
+      // If what you just saved is not a decision, check if there are any forgotten decisions.
       const forgotten = this.checkForgotten(input.now);
       if (forgotten) {
         items.push(forgotten);
       }
     }
 
-    // 3. 需要关注的记忆（冷却期）
+    // 3. Memories that require attention (cooling period)
     const attention = this.checkAttention();
     if (attention.length > 0 && items.length < 2) {
       items.push(...attention.slice(0, 2 - items.length));
     }
 
-    // 克制：最多返回 2 条
+    // Restraint: return up to 2 items
     return items.slice(0, 2);
   }
 
   /**
-   * 检查冲突
+   * Check for conflicts
    */
   private checkConflict(block: Block): PushItem | null {
-    // 只检查决策类
+    // Check only decision classes
     if (!block.annotation.includes('决策')) {
       return null;
     }
 
-    // 提取关键词
+    // Extract keywords
     const keywords = this.extractKeywords(block.content);
 
-    // 搜索可能冲突的决策
+    // Search for potentially conflicting decisions
     for (const keyword of keywords.slice(0, 5)) {
       const results = this.db.searchBlocks(keyword, 5);
 
       for (const existing of results) {
-        // 跳过自己
+        // skip yourself
         if (existing.id === block.id) {
           continue;
         }
 
-        // 只检查决策类
+        // Check only decision classes
         if (!existing.annotation.includes('决策')) {
           continue;
         }
 
-        // 检查是否已有关联
+        // Check if there is already an association
         const assocs = this.db.getBlockAssociations(block.id);
         const hasConflict = assocs.some(a => a.type === AssociationType.CONFLICTS);
 
         if (hasConflict) {
-          // 找到矛盾关联
+          // Find contradictory relationships
           const conflictAssoc = assocs.find(a => a.type === AssociationType.CONFLICTS);
           const otherId = conflictAssoc?.from_id === block.id
             ? conflictAssoc.to_id
@@ -138,7 +138,7 @@ export class TriggerDecision {
                   conflictWith: otherBlock.id,
                 },
                 created_at: Math.floor(Date.now() / 1000),
-                expires_at: Math.floor(Date.now() / 1000) + 86400, // 1 天后过期
+                expires_at: Math.floor(Date.now() / 1000) + 86400, // Expires in 1 day
                 dismissed: false,
               };
             }
@@ -151,30 +151,30 @@ export class TriggerDecision {
   }
 
   /**
-   * 检查遗忘的决策
+   * Check for forgotten decisions
    */
   private checkForgotten(now: number): PushItem | null {
     const nowSec = Math.floor(now / 1000);
     const threshold = nowSec - (this.DECISION_DAYS * 86400);
 
-    // 获取决策类 block
+    // Get decision class block
     const blocks = this.db.queryBlocks({ limit: 50 });
 
-    // 找到 3-N 天前创建、未完成的决策
+    // Find unfinished decisions created 3-N days ago
     const candidates = blocks.filter(block => {
       if (!block.annotation.includes('决策')) {
         return false;
       }
 
-      // 时间范围：3-7 天前
+      // Time range: 3-7 days ago
       if (block.created_at < threshold - (4 * 86400)) {
-        return false; // 太旧了
+        return false; // too old
       }
       if (block.created_at > threshold) {
-        return false; // 太新了
+        return false; // too new
       }
 
-      // 检查是否"遗忘"（最近没有访问）
+      // Check if "forgotten" (no recent access)
       const lastAccessed = block.last_accessed || (block.updated_at * 1000);
       const daysSinceAccess = (now - lastAccessed) / 86400000;
 
@@ -185,7 +185,7 @@ export class TriggerDecision {
       return null;
     }
 
-    // 选择生命力最高但被遗忘的
+    // Choose the most vital but forgotten
     const best = candidates.sort((a, b) => b.vitality - a.vitality)[0];
 
     return {
@@ -199,29 +199,29 @@ export class TriggerDecision {
         daysSinceAccess: Math.floor((now - (best.last_accessed || best.updated_at * 1000)) / 86400000),
       },
       created_at: nowSec,
-      expires_at: nowSec + 86400 * 3, // 3 天后过期
+      expires_at: nowSec + 86400 * 3, // Expires in 3 days
       dismissed: false,
     };
   }
 
   /**
-   * 检查需要关注的记忆
+   * Check for memories that require attention
    */
   private checkAttention(): PushItem[] {
     const blocks = this.db.queryBlocks({ limit: 100 });
 
-    // 找到冷却/冷冻的重要记忆
+    // Find important memories for cooling/freezing
     const needsAttention = blocks.filter(block => {
       if (block.status !== 'cooling' && block.status !== 'cold') {
         return false;
       }
 
-      // 优先决策类
+      // priority decision making
       if (block.annotation.includes('决策')) {
         return true;
       }
 
-      // 其次是高生命力的事实
+      // Next is the fact of high vitality
       if (block.annotation.includes('事实') && block.vitality > 30) {
         return true;
       }
@@ -251,7 +251,7 @@ export class TriggerDecision {
   }
 
   /**
-   * 提取决策关键词
+   * Extract decision-making keywords
    */
   private extractKeywords(content: string): string[] {
     const words = content.toLowerCase().match(/[a-z]{2,}|[\u4e00-\u9fa5]{2,}/g) || [];
@@ -259,14 +259,14 @@ export class TriggerDecision {
   }
 
   /**
-   * 提取决策内容
+   * Extract decision content
    */
   private extractDecision(block: Block): string {
     if (block.pattern && 'decision' in block.pattern) {
       return (block.pattern as { decision: string }).decision;
     }
 
-    // 从 annotation 中提取 tag
+    // Extract tag from annotation
     const parts = block.annotation.split(' · ');
     if (parts.length >= 3) {
       return parts[2]; // tag

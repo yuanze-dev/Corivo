@@ -1,8 +1,8 @@
 /**
- * 平台指纹生成
+ * Platform fingerprint generation
  *
- * 从各平台提取唯一标识，生成不可逆的用户指纹
- * 用于跨设备识别同一用户
+ * Extract unique identifiers from each platform to generate irreversible user fingerprints
+ * Used to identify the same user across devices
  */
 
 import crypto from 'node:crypto';
@@ -11,52 +11,52 @@ import path from 'node:path';
 import { FingerprintError } from '../errors/index.js';
 
 /**
- * 平台类型（可扩展）
+ * Supported platform type
  *
- * 设计理念：同一用户在不同设备上会使用相同的工具集合
- * 通过收集多个工具的指纹，交叉验证是同一个人
+ * Design principle: the same user tends to use a similar toolchain across devices.
+ * Cross-check those tool fingerprints to recognize the same person.
  */
 export type PlatformType =
-  // AI 编程工具
+  // AI programming tools
   | 'claude_code'
   | 'cursor'
   | 'codex'
   | 'opencode'
   | 'windsurf'
   | 'copilot'
-  // 开发工具
+  // development tools
   | 'vscode'
   | 'jetbrains'
   | 'neovim'
-  // 版本控制
+  // version control
   | 'github'
   | 'gitlab'
   | 'git'
-  // 包管理
+  // Package management
   | 'npm'
   | 'yarn'
   | 'pnpm'
   | 'bun'
-  // 容器/虚拟化
+  // Containers/Virtualization
   | 'docker'
   | 'podman'
-  // 通讯/协作
+  // Communication/Collaboration
   | 'feishu'
   | 'slack'
   | 'wechat'
   | 'dingtalk'
   | 'notion'
-  // 云服务
+  // cloud services
   | 'aws'
   | 'aliyun'
   | 'gcp'
-  // 其他
+  // Others
   | 'device'
   | 'email'
   | 'custom';
 
 /**
- * Claude Code 配置
+ * Claude Code configuration
  */
 interface ClaudeCodeConfig {
   env?: {
@@ -65,14 +65,14 @@ interface ClaudeCodeConfig {
 }
 
 /**
- * 飞书配置
+ * Feishu configuration
  */
 interface FeishuConfig {
   [key: string]: unknown;
 }
 
 /**
- * 指纹结果
+ * Fingerprint results
  */
 export interface Fingerprint {
   platform: PlatformType;
@@ -82,17 +82,17 @@ export interface Fingerprint {
 }
 
 /**
- * 指纹收集器
+ * Fingerprint collector
  */
 export class FingerprintCollector {
 
   /**
-   * 收集所有可用的平台指纹
+   * Collect all available platform fingerprints
    *
-   * 对用户完全透明，静默收集所有可用指纹
+   * Runs passively without interrupting the user while collecting every available fingerprint
    *
-   * 设计理念：同一用户在不同设备上会使用相同的工具集合
-   * 通过收集多个工具的指纹，交叉验证是同一个人
+   * Design principle: the same user tends to use a similar toolchain across devices.
+   * Cross-check those tool fingerprints to recognize the same person.
    */
   static async collectAll(options?: {
     claudeSettingsPath?: string;
@@ -100,18 +100,18 @@ export class FingerprintCollector {
   }): Promise<Fingerprint[]> {
     const fingerprints: Fingerprint[] = [];
 
-    // 辅助函数：安全添加指纹
+    // Helper: add a fingerprint without letting one failure abort the full collection pass
     const addIfPresent = async (promise: Promise<Fingerprint | null>) => {
       try {
         const fp = await promise;
         if (fp) fingerprints.push(fp);
       } catch {
-        // 静默失败
+        // Silently fails
       }
     };
 
-    // ========== 高置信度平台指纹 ==========
-    // 这些平台的用户 ID 是稳定且唯一的
+    // ========== High-confidence platform fingerprints ==========
+    // These platforms usually expose stable, user-specific identifiers
 
     await addIfPresent(this.getClaudeCodeFingerprint(options?.claudeSettingsPath));
     await addIfPresent(this.getCursorFingerprint());
@@ -120,7 +120,7 @@ export class FingerprintCollector {
     await addIfPresent(this.getGitHubFingerprint());
     await addIfPresent(this.getSSHFingerprint());
 
-    // ========== 中置信度平台指纹 ==========
+    // ========== Medium-confidence platform fingerprints ==========
 
     await addIfPresent(this.getVSCodeFingerprint());
     await addIfPresent(this.getJetBrainsFingerprint());
@@ -128,33 +128,33 @@ export class FingerprintCollector {
     await addIfPresent(this.getCodexFingerprint());
     await addIfPresent(this.getOpenCodeFingerprint());
 
-    // ========== 低置信度指纹（辅助验证） ==========
+    // ========== Low-confidence fingerprints (used as supporting evidence) ==========
 
     await addIfPresent(this.getNpmFingerprint());
     await addIfPresent(this.getDockerFingerprint());
 
-    // 设备指纹（总是存在，作为最后备用）
+    // Device fingerprint is always available and acts as the fallback signal
     try {
       fingerprints.push(await this.getDeviceFingerprint());
     } catch {
-      // 静默失败
+        // Ignore individual collection failures
     }
 
     return fingerprints;
   }
 
   /**
-   * 从 Claude Code 提取指纹
+   * Extract fingerprints from Claude Code
    *
-   * 读取 ANTHROPIC_AUTH_TOKEN，计算 SHA256 的前 16 位
+   * Read ANTHROPIC_AUTH_TOKEN and calculate the first 16 bits of SHA256
    *
-   * @param settingsPath - Claude Code settings.json 路径
-   * @returns 指纹或 null
+   * @param settingsPath - Claude Code settings.json path
+   * @returns fingerprint or null
    */
   static async getClaudeCodeFingerprint(
     settingsPath?: string
   ): Promise<Fingerprint | null> {
-    // 默认路径
+    // Default path
     const defaultPath = path.join(
       process.env.HOME || process.env.USERPROFILE || '',
       '.claude',
@@ -171,7 +171,7 @@ export class FingerprintCollector {
         return null;
       }
 
-      // 计算 SHA256 哈希，取前 16 位作为指纹
+      // Use the first 16 hex characters of the SHA256 hash as the fingerprint
       const hash = crypto.createHash('sha256').update(token).digest('hex');
       const fingerprint = hash.substring(0, 16);
 
@@ -187,15 +187,15 @@ export class FingerprintCollector {
   }
 
   /**
-   * 从飞书 MCP 提取指纹
+   * Extract fingerprints from Feishu MCP
    *
-   * @param configPath - 飞书 MCP 配置路径
-   * @returns 指纹或 null
+   * @param configPath - Feishu MCP configuration path
+   * @returns fingerprint or null
    */
   static async getFeishuFingerprint(
     configPath?: string
   ): Promise<Fingerprint | null> {
-    // 尝试从 MCP 配置读取
+    // Try to read from MCP configuration
     const defaultPath = path.join(
       process.env.HOME || process.env.USERPROFILE || '',
       '.claude',
@@ -206,7 +206,7 @@ export class FingerprintCollector {
       const content = await fs.readFile(configPath || defaultPath, 'utf-8');
       const config = JSON.parse(content);
 
-      // 查找 feishu-mcp 配置
+      // Find feishu-mcp configuration
       const feishuConfig = config.servers?.['feishu-mcp'] as
         | { env?: { FEISHU_USER_ID?: string; FEISHU_OPEN_ID?: string } }
         | undefined;
@@ -217,7 +217,7 @@ export class FingerprintCollector {
         return null;
       }
 
-      // 直接使用 open_id 作为指纹（飞书保证唯一性）
+      // Directly use open_id as fingerprint (Feishu guarantees uniqueness)
       return {
         platform: 'feishu',
         value: userId,
@@ -230,9 +230,9 @@ export class FingerprintCollector {
   }
 
   /**
-   * 从 Cursor 提取指纹
+   * Extract fingerprints from Cursor
    *
-   * Cursor 配置通常在 ~/.cursor/config.json
+   * Cursor configuration is usually in ~/.cursor/config.json
    */
   static async getCursorFingerprint(): Promise<Fingerprint | null> {
     const configPaths = [
@@ -245,7 +245,7 @@ export class FingerprintCollector {
         const content = await fs.readFile(configPath, 'utf-8');
         const config = JSON.parse(content);
 
-        // 尝试多种可能的用户 ID 字段
+        // Try multiple possible user ID fields
         const userId =
           config.user_id ||
           config.userId ||
@@ -263,7 +263,7 @@ export class FingerprintCollector {
           };
         }
       } catch {
-        // 继续尝试下一个路径
+        // Keep trying the next path
       }
     }
 
@@ -271,7 +271,7 @@ export class FingerprintCollector {
   }
 
   /**
-   * 从 Codex 提取指纹
+   * Extract fingerprints from Codex
    */
   static async getCodexFingerprint(): Promise<Fingerprint | null> {
     const configPaths = [
@@ -298,7 +298,7 @@ export class FingerprintCollector {
           };
         }
       } catch {
-        // 继续尝试
+        // keep trying
       }
     }
 
@@ -306,7 +306,7 @@ export class FingerprintCollector {
   }
 
   /**
-   * 从 OpenCode 提取指纹
+   * Extract fingerprints from OpenCode
    */
   static async getOpenCodeFingerprint(): Promise<Fingerprint | null> {
     const configPaths = [
@@ -331,7 +331,7 @@ export class FingerprintCollector {
           };
         }
       } catch {
-        // 继续尝试
+        // keep trying
       }
     }
 
@@ -339,12 +339,12 @@ export class FingerprintCollector {
   }
 
   /**
-   * 从 Slack 提取指纹
+   * Fingerprinting from Slack
    *
-   * Slack 配置可能在多个位置
+   * Slack configuration may be in multiple locations
    */
   static async getSlackFingerprint(): Promise<Fingerprint | null> {
-    // Slack 通常在 ~/Library/Application Support/Slack (macOS)
+    // Slack is usually found in ~/Library/Application Support/Slack (macOS)
     const slackPaths = [
       path.join(process.env.HOME || '', 'Library', 'Application Support', 'Slack'),
       path.join(process.env.HOME || '', '.config', 'Slack'),
@@ -352,11 +352,11 @@ export class FingerprintCollector {
 
     for (const slackPath of slackPaths) {
       try {
-        // 读取 team info 或 local storage
+        // Read team info or local storage
         const teamFile = path.join(slackPath, 'local-storage', 'leveldb');
         const stats = await fs.readFile(teamFile, 'utf-8');
 
-        // 尝试提取 team ID 或 user ID
+        // Try to extract team ID or user ID
         const teamMatch = stats.match(/team_id["\s:]+([a-zA-Z0-9]+)/);
         const userMatch = stats.match(/user_id["\s:]+([a-zA-Z0-9]+)/);
 
@@ -370,7 +370,7 @@ export class FingerprintCollector {
           };
         }
       } catch {
-        // 继续尝试
+        // keep trying
       }
     }
 
@@ -378,17 +378,17 @@ export class FingerprintCollector {
   }
 
   /**
-   * 从 GitHub 提取指纹
+   * Extract fingerprints from GitHub
    *
-   * 读取 GitHub CLI 或 Git 配置
+   * Read the GitHub CLI or Git configuration
    */
   static async getGitHubFingerprint(): Promise<Fingerprint | null> {
-    // 尝试 GitHub CLI 配置
+    // Try the GitHub CLI configuration
     try {
       const ghConfigPath = path.join(process.env.HOME || '', '.config', 'gh', 'hosts.yml');
       const content = await fs.readFile(ghConfigPath, 'utf-8');
 
-      // 提取用户名（不提取 token）
+      // Extract username (do not extract token)
       const userMatch = content.match(/user:\s*(\S+)/);
       if (userMatch) {
         const hash = crypto.createHash('sha256').update(userMatch[1]).digest('hex');
@@ -400,10 +400,10 @@ export class FingerprintCollector {
         };
       }
     } catch {
-      // 继续尝试 Git 配置
+      // Continue trying Git configuration
     }
 
-    // 尝试 Git 配置
+    // Try Git configuration
     try {
       const { execSync } = await import('node:child_process');
       const gitEmail = execSync('git config --global user.email 2>/dev/null || echo')
@@ -419,16 +419,16 @@ export class FingerprintCollector {
         };
       }
     } catch {
-      // 忽略
+      // ignore
     }
 
     return null;
   }
 
   /**
-   * 从 VS Code 提取指纹
+   * Extract fingerprints from VS Code
    *
-   * 读取 VS Code 用户设置或机器 ID
+   * Read VS Code user settings or machine ID
    */
   static async getVSCodeFingerprint(): Promise<Fingerprint | null> {
     const vscodePaths = [
@@ -441,7 +441,7 @@ export class FingerprintCollector {
         const content = await fs.readFile(vsPath, 'utf-8');
         const data = JSON.parse(content);
 
-        // 提取机器 ID（不包含用户数据）
+        // Extract machine ID (without user data)
         const machineId = data.machineId || data.telemetryMachineId;
         if (machineId) {
           const hash = crypto.createHash('sha256').update(machineId).digest('hex');
@@ -453,7 +453,7 @@ export class FingerprintCollector {
           };
         }
       } catch {
-        // 继续尝试
+        // keep trying
       }
     }
 
@@ -461,9 +461,9 @@ export class FingerprintCollector {
   }
 
   /**
-   * 从 npm 提取指纹
+   * Extract fingerprints from npm
    *
-   * 读取 npm 配置获取唯一标识
+   * Read npm configuration to get unique identifier
    */
   static async getNpmFingerprint(): Promise<Fingerprint | null> {
     try {
@@ -471,12 +471,12 @@ export class FingerprintCollector {
       const npmUser = execSync('npm config get userconfig 2>/dev/null || echo')
         .toString().trim();
 
-      // 读取 npm 配置文件
+      // Read npm configuration file
       const npmrcPath = path.join(process.env.HOME || '', '.npmrc');
       try {
         const content = await fs.readFile(npmrcPath, 'utf-8');
 
-        // 提取唯一标识（如 npm username 或 registry url）
+        // Extract a unique identifier (such as npm username or registry url)
         const lines = content.split('\n').filter(l => l.includes('//registry.npmjs.org/') || l.includes('_auth'));
 
         if (lines.length > 0) {
@@ -489,10 +489,10 @@ export class FingerprintCollector {
           };
         }
       } catch {
-        // 继续尝试从缓存目录获取
+        // Continue trying to get from the cache directory
       }
 
-      // 从 npm 缓存目录获取特征
+      // Get features from npm cache directory
       const npmCache = execSync('npm config get cache 2>/dev/null || echo').toString().trim();
       if (npmCache && npmCache !== '' && npmCache !== 'null' && npmCache !== 'undefined') {
         const hash = crypto.createHash('sha256').update(npmCache).digest('hex');
@@ -504,20 +504,20 @@ export class FingerprintCollector {
         };
       }
     } catch {
-      // 忽略
+      // ignore
     }
 
     return null;
   }
 
   /**
-   * 从 Docker 提取指纹
+   * Extract fingerprints from Docker
    */
   static async getDockerFingerprint(): Promise<Fingerprint | null> {
     try {
       const { execSync } = await import('node:child_process');
 
-      // 获取 Docker 用户 ID
+      // Get Docker user ID
       const userId = execSync('docker info 2>/dev/null | grep -i "ID:" | head -1 || echo')
         .toString().trim();
 
@@ -531,16 +531,16 @@ export class FingerprintCollector {
         };
       }
     } catch {
-      // 忽略
+      // ignore
     }
 
     return null;
   }
 
   /**
-   * 从 SSH 密钥提取指纹
+   * Extract fingerprints from SSH keys
    *
-   * SSH 密钥是跨设备的强身份标识
+   * SSH keys are strong identities across devices
    */
   static async getSSHFingerprint(): Promise<Fingerprint | null> {
     const sshDir = path.join(process.env.HOME || '', '.ssh');
@@ -551,23 +551,23 @@ export class FingerprintCollector {
         const keyPath = path.join(sshDir, keyFile);
         const content = await fs.readFile(keyPath, 'utf-8');
 
-        // SSH 公钥格式: "ssh-rsa AAAA... comment"
+        // SSH public key format: "ssh-rsa AAAA... comment"
         const keyMatch = content.match(/^(\S+)\s+(\S+)/);
         if (keyMatch) {
           const keyType = keyMatch[1];
           const publicKey = keyMatch[2];
 
-          // 只使用前 32 个字符作为指纹（不是完整密钥，保护隐私）
+          // Only use the first 32 characters as the fingerprint (not the full key to protect privacy)
           const hash = crypto.createHash('sha256').update(`${keyType}:${publicKey.substring(0, 32)}`).digest('hex');
           return {
             platform: 'custom',
             value: hash.substring(0, 16),
             method: 'sha256(ssh_public_key_prefix)[:16]',
-            confidence: 'high', // SSH 密钥是强身份标识
+            confidence: 'high', // SSH keys are strong identities
           };
         }
       } catch {
-        // 继续尝试
+        // keep trying
       }
     }
 
@@ -575,7 +575,7 @@ export class FingerprintCollector {
   }
 
   /**
-   * 从 AWS CLI 提取指纹
+   * Extract fingerprints from the AWS CLI
    */
   static async getAWSFingerprint(): Promise<Fingerprint | null> {
     const awsConfigPath = path.join(process.env.HOME || '', '.aws', 'config');
@@ -583,7 +583,7 @@ export class FingerprintCollector {
     try {
       const content = await fs.readFile(awsConfigPath, 'utf-8');
 
-      // 提取 profile 名称（不包含凭证）
+      // Extract profile name (without credentials)
       const profileMatches = content.match(/\[profile\s([^\]]+)\]/g);
       if (profileMatches && profileMatches.length > 0) {
         const profiles = profileMatches.map(p => p.replace(/\[profile\s|\]/g, '')).sort();
@@ -596,16 +596,16 @@ export class FingerprintCollector {
         };
       }
     } catch {
-      // 忽略
+      // ignore
     }
 
     return null;
   }
 
   /**
-   * 从 JetBrains IDE 提取指纹
+   * Extract fingerprints from JetBrains IDE
    *
-   * 支持 IntelliJ, PyCharm, WebStorm 等
+   * Support IntelliJ, PyCharm, WebStorm, etc.
    */
   static async getJetBrainsFingerprint(): Promise<Fingerprint | null> {
     const jbPaths = [
@@ -620,7 +620,7 @@ export class FingerprintCollector {
 
         if (optionsDir) {
           const optionsPath = path.join(jbPath, optionsDir.name);
-          // 读取所有产品的标识
+          // Read the IDs of all products
           const hash = crypto.createHash('sha256').update(optionsPath).digest('hex');
           return {
             platform: 'jetbrains',
@@ -630,7 +630,7 @@ export class FingerprintCollector {
           };
         }
       } catch {
-        // 继续尝试
+        // keep trying
       }
     }
 
@@ -638,30 +638,30 @@ export class FingerprintCollector {
   }
 
   /**
-   * 生成设备指纹
+   * Generate device fingerprint
    *
-   * 基于系统信息生成，作为备用指纹
+   * Generated based on system information as a backup fingerprint
    *
-   * @returns 设备指纹
+   * @returns device fingerprint
    */
   static async getDeviceFingerprint(): Promise<Fingerprint> {
-    // 收集系统信息
+    // Gather system information
     const infos: string[] = [];
 
-    // 操作系统
+    // operating system
     infos.push(process.platform);
     infos.push(process.arch);
 
-    // 用户目录
+    // User directory
     infos.push(process.env.HOME || process.env.USERPROFILE || '');
 
-    // 主机名
+    // hostname
     infos.push(process.env.HOSTNAME || process.env.COMPUTERNAME || 'unknown');
 
-    // 机器 ID（Linux）或序列号（macOS）
+    // Machine ID (Linux) or serial number (macOS)
     try {
       if (process.platform === 'darwin') {
-        // macOS: 读取硬件 UUID
+        // macOS: Reading hardware UUID
         const { execSync } = await import('node:child_process');
         const uuid = execSync('ioreg -rd1 -c IOPlatformExpertDevice | grep UUID')
           .toString()
@@ -670,25 +670,25 @@ export class FingerprintCollector {
           infos.push(uuid);
         }
       } else if (process.platform === 'linux') {
-        // Linux: 读取 machine-id
+        // Linux: read machine-id
         try {
           const machineId = await fs.readFile('/etc/machine-id', 'utf-8');
           infos.push(machineId.trim());
         } catch {
-          // 某些发行版使用 /var/lib/dbus/machine-id
+          // Some distributions use /var/lib/dbus/machine-id
           try {
             const dbusId = await fs.readFile('/var/lib/dbus/machine-id', 'utf-8');
             infos.push(dbusId.trim());
           } catch {
-            // 忽略
+            // ignore
           }
         }
       }
     } catch {
-      // 忽略错误
+      // ignore errors
     }
 
-    // 计算哈希
+    // Calculate hash
     const hash = crypto.createHash('sha256').update(infos.join('|')).digest('hex');
     const fingerprint = hash.substring(0, 16);
 
@@ -696,15 +696,15 @@ export class FingerprintCollector {
       platform: 'device',
       value: fingerprint,
       method: 'sha256(system_info)[:16]',
-      confidence: 'low', // 设备指纹置信度低，因为同设备可能换用户
+      confidence: 'low', // Device fingerprint confidence is low because users of the same device may change
     };
   }
 
   /**
-   * 从字符串生成自定义指纹
+   * Generate custom fingerprint from string
    *
-   * @param value - 原始值
-   * @returns 指纹
+   * @param value - original value
+   * @returns fingerprint
    */
   static generateCustomFingerprint(value: string): Fingerprint {
     const hash = crypto.createHash('sha256').update(value).digest('hex');
@@ -738,28 +738,28 @@ function parseTomlLike(content: string): Record<string, string> {
 }
 
 /**
- * 指纹匹配器
+ * fingerprint matcher
  *
- * 用于判断两组指纹是否属于同一用户
+ * Used to determine whether two sets of fingerprints belong to the same user
  */
 export class FingerprintMatcher {
 
   /**
-   * 检查两组指纹是否有匹配
+   * Check whether the two sets of fingerprints match
    *
-   * @param fingerprints1 - 第一组指纹
-   * @param fingerprints2 - 第二组指纹
-   * @returns 是否匹配
+   * @param fingerprints1 - the first set of fingerprints
+   * @param fingerprints2 - second set of fingerprints
+   * Does @returns match
    */
   static match(
     fingerprints1: Fingerprint[],
     fingerprints2: Fingerprint[]
   ): boolean {
-    // 提取高置信度指纹
+    // Extract high-confidence fingerprints
     const highConfidence1 = this.getHighConfidenceFingerprints(fingerprints1);
     const highConfidence2 = this.getHighConfidenceFingerprints(fingerprints2);
 
-    // 检查是否有任何高置信度指纹匹配
+    // Check if there are any high confidence fingerprint matches
     for (const fp1 of highConfidence1) {
       for (const fp2 of highConfidence2) {
         if (fp1.platform === fp2.platform && fp1.value === fp2.value) {
@@ -768,14 +768,14 @@ export class FingerprintMatcher {
       }
     }
 
-    // 如果没有高置信度匹配，检查中置信度
+    // If there is no high confidence match, check for medium confidence
     const mediumConfidence1 = this.getMediumConfidenceFingerprints(fingerprints1);
     const mediumConfidence2 = this.getMediumConfidenceFingerprints(fingerprints2);
 
     for (const fp1 of mediumConfidence1) {
       for (const fp2 of mediumConfidence2) {
         if (fp1.platform === fp2.platform && fp1.value === fp2.value) {
-          return true; // 中置信度匹配，可能是同一用户
+          return true; // Medium confidence match, probably the same user
         }
       }
     }
@@ -784,11 +784,11 @@ export class FingerprintMatcher {
   }
 
   /**
-   * 计算匹配置信度
+   * Calculate match confidence
    *
-   * @param fingerprints1 - 第一组指纹
-   * @param fingerprints2 - 第二组指纹
-   * @returns 置信度 (0-1)
+   * @param fingerprints1 - the first set of fingerprints
+   * @param fingerprints2 - second set of fingerprints
+   * @returns Confidence (0-1)
    */
   static matchConfidence(
     fingerprints1: Fingerprint[],
@@ -797,7 +797,7 @@ export class FingerprintMatcher {
     let score = 0;
     let maxScore = 0;
 
-    // 高置信度匹配权重
+    // High confidence match weighting
     const high1 = this.getHighConfidenceFingerprints(fingerprints1);
     const high2 = this.getHighConfidenceFingerprints(fingerprints2);
 
@@ -812,7 +812,7 @@ export class FingerprintMatcher {
       }
     }
 
-    // 中置信度匹配权重
+    // medium confidence match weight
     const medium1 = this.getMediumConfidenceFingerprints(fingerprints1);
     const medium2 = this.getMediumConfidenceFingerprints(fingerprints2);
 
@@ -831,7 +831,7 @@ export class FingerprintMatcher {
   }
 
   /**
-   * 获取高置信度指纹
+   * Obtain high-confidence fingerprints
    */
   private static getHighConfidenceFingerprints(
     fingerprints: Fingerprint[]
@@ -840,7 +840,7 @@ export class FingerprintMatcher {
   }
 
   /**
-   * 获取中置信度指纹
+   * Get medium confidence fingerprints
    */
   private static getMediumConfidenceFingerprints(
     fingerprints: Fingerprint[]
@@ -850,7 +850,7 @@ export class FingerprintMatcher {
 }
 
 /**
- * 指纹序列化
+ * Fingerprint serialization
  */
 export function serializeFingerprints(fingerprints: Fingerprint[]): string {
   return JSON.stringify(
@@ -864,7 +864,7 @@ export function serializeFingerprints(fingerprints: Fingerprint[]): string {
 }
 
 /**
- * 指纹反序列化
+ * Fingerprint deserialization
  */
 export function deserializeFingerprints(data: string): Fingerprint[] {
   try {

@@ -1,5 +1,5 @@
 /**
- * macOS launchd 守护进程管理
+ * macOS launchd daemon management
  */
 
 import fs from 'node:fs/promises'
@@ -13,10 +13,10 @@ const LAUNCH_AGENTS_DIR = path.join(os.homedir(), 'Library', 'LaunchAgents')
 const PLIST_PATH = path.join(LAUNCH_AGENTS_DIR, PLIST_NAME)
 
 /**
- * 生成 launchd plist 文件内容
+ * Generate launchd plist file content
  */
 function generatePlist(config: ServiceConfig): string {
-  // 解析命令：如果是 "node /path/to/cli.js" 格式，拆分为数组
+  // Parsing command: If it is "node /path/to/cli.js" format, split into an array
   let programArgs: string[]
   if (config.corivoBin.includes('node ') || config.corivoBin.includes('nodejs ')) {
     const parts = config.corivoBin.trim().split(/\s+/)
@@ -77,17 +77,17 @@ export class MacOSServiceManager implements ServiceManager {
 
   async install(config: ServiceConfig): Promise<ServiceResult> {
     try {
-      // 确保 LaunchAgents 目录存在
+      // Make sure the LaunchAgents directory exists
       await fs.mkdir(LAUNCH_AGENTS_DIR, { recursive: true })
 
-      // 写入 plist 文件
+      // Write to plist file
       const plistContent = generatePlist(config)
       await fs.writeFile(PLIST_PATH, plistContent, { mode: 0o644 })
 
-      // 加载服务
+      // Loading services
       execSync(`launchctl load "${PLIST_PATH}"`, { encoding: 'utf-8' })
 
-      // 启动服务
+      // Start service
       execSync(`launchctl start com.corivo.daemon`, { encoding: 'utf-8' })
 
       return { success: true }
@@ -101,23 +101,23 @@ export class MacOSServiceManager implements ServiceManager {
 
   async uninstall(): Promise<ServiceResult> {
     try {
-      // 尝试停止服务
+      // Try to stop the service
       try {
         execSync(`launchctl stop com.corivo.daemon`, { encoding: 'utf-8' })
       } catch {
-        // 服务可能没有运行，忽略
+        // The service may not be running, ignore
       }
 
-      // 尝试卸载服务
+      // Try to uninstall the service
       try {
         execSync(`launchctl unload "${PLIST_PATH}"`, { encoding: 'utf-8' })
       } catch {
-        // 服务可能没有加载，忽略
+        // The service may not be loaded, ignore
       }
 
-      // 删除 plist 文件
+      // delete plist file
       await fs.unlink(PLIST_PATH).catch(() => {
-        // 文件可能不存在，忽略
+        // File may not exist, ignore
       })
 
       return { success: true }
@@ -131,23 +131,23 @@ export class MacOSServiceManager implements ServiceManager {
 
   async getStatus(): Promise<ServiceStatus> {
     try {
-      // 检查 plist 文件是否存在
+      // Check if plist file exists
       const loaded = await fs.access(PLIST_PATH).then(() => true).catch(() => false)
 
       if (!loaded) {
         return { running: false, loaded: false }
       }
 
-      // 尝试获取 PID
+      // Try to get PID
       const output = execSync(`launchctl list | grep com.corivo.daemon`, {
         encoding: 'utf-8',
       })
 
-      // 输出格式: "PID\texit_code\tcom.corivo.daemon"
+      // Output format: "PID\texit_code\tcom.corivo.daemon"
       const match = output.match(/^(\d+)\s+\d+\s+com\.corivo\.daemon/)
       const pid = match ? parseInt(match[1], 10) : undefined
 
-      // 如果 PID 是 "-" 或没有，说明服务没有运行
+      // If the PID is "-" or none, the service is not running
       const running = pid !== undefined && pid > 0
 
       return { running, loaded: true, pid }

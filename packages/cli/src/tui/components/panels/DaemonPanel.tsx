@@ -8,7 +8,7 @@ interface DaemonPanelProps {
   panelHeight: number;
 }
 
-// 引擎循环任务列表
+// Engine cycle task list
 const ENGINE_CYCLES = [
   { task: 'processPendingBlocks', interval: '5s' },
   { task: 'processVitalityDecay', interval: '5s' },
@@ -26,7 +26,7 @@ function formatUptime(seconds: number | null): string {
   return h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
-// ─── 平铺行类型（虚拟滚动用） ─────────────────────────────────────
+// ───Tile row type (for virtual scrolling) ────────────────────────────────────
 
 type FlatRow = { key: string; node: React.ReactNode };
 
@@ -87,7 +87,7 @@ function buildRows(daemon: DaemonStatus): FlatRow[] {
   return rows;
 }
 
-// ─── 分组 bordered 样式（高度充足时） ────────────────────────────
+// ─── Grouped bordered style (when the height is sufficient) ─────────────────────────────
 
 function FullView({ daemon }: { daemon: DaemonStatus }) {
   const statusColor = daemon.running ? 'green' : 'gray';
@@ -138,13 +138,13 @@ function FullView({ daemon }: { daemon: DaemonStatus }) {
   );
 }
 
-// ─── 主组件 ─────────────────────────────────────────────────────
+// ─── Main component ──────────────────────────────────────────────────
 
 export const DaemonPanel = React.memo(function DaemonPanel({ daemon, scrollOffset, panelHeight }: DaemonPanelProps) {
   const availableRows = Math.max(5, panelHeight);
   const rows = buildRows(daemon);
   const scrollModeRef = React.useRef<boolean | null>(null);
-  // 分组模式额外开销：3个section × (边框+标题+间距) ≈ +9 行
+  // Group mode overhead: 3 sections × (border + title + spacing) ≈ +9 lines
   const threshold = rows.length + 9;
 
   if (scrollModeRef.current === null) {
@@ -159,7 +159,7 @@ export const DaemonPanel = React.memo(function DaemonPanel({ daemon, scrollOffse
     return <FullView daemon={daemon} />;
   }
 
-  // 高度不足：虚拟滚动
+  // Not enough height: virtual scrolling
   const innerH = Math.max(2, availableRows - 3);
   const maxScroll = Math.max(0, rows.length - innerH);
   const offset = Math.min(scrollOffset, maxScroll);

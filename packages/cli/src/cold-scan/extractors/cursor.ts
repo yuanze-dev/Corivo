@@ -1,6 +1,6 @@
 /**
- * Cursor 配置提取器
- * 提取 Cursor 的 AI 规则
+ * Cursor configuration extractor
+ * Extract Cursor’s AI rules
  */
 
 import { readFileSafe, createBlock } from '../utils.js';
@@ -9,19 +9,19 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 /**
- * 提取 .cursorrules 文件
+ * Extract the .cursorrules file
  */
 async function extractCursorRules(content: string, filePath: string) {
   const blocks: ReturnType<typeof createBlock>[] = [];
 
   if (!content) return blocks;
 
-  // 清理内容，移除敏感信息
+  // Clean content and remove sensitive information
   const lines = content.split('\n');
   const cleanLines: string[] = [];
 
   for (const line of lines) {
-    // 跳过可能的敏感内容
+    // Skip potentially sensitive content
     if (
       line.includes('API_KEY') ||
       line.includes('SECRET') ||
@@ -35,7 +35,7 @@ async function extractCursorRules(content: string, filePath: string) {
 
   const cleanContent = cleanLines.join('\n').trim();
 
-  // 如果内容较短，保存完整内容
+  // If the content is short, save the complete content
   if (cleanContent.length > 0 && cleanContent.length < 1000) {
     blocks.push(
       createBlock({
@@ -47,7 +47,7 @@ async function extractCursorRules(content: string, filePath: string) {
       })
     );
   } else if (cleanContent.length > 0) {
-    // 内容较长，只保存摘要
+    // The content is long, only the summary is saved
     blocks.push(
       createBlock({
         content: '已配置 Cursor AI 规则',
@@ -63,14 +63,14 @@ async function extractCursorRules(content: string, filePath: string) {
 }
 
 /**
- * 提取 Cursor .cursor/rules 目录下的规则文件
+ * Extract the rule files in the Cursor .cursor/rules directory
  */
 async function extractCursorRuleFiles(content: string, filePath: string) {
   const blocks: ReturnType<typeof createBlock>[] = [];
 
   if (!content) return blocks;
 
-  // 单个规则文件，通常是 .mdc 格式
+  // A single rules file, usually in .mdc format
   const cleanContent = content
     .split('\n')
     .filter(line => !line.includes('API_KEY') && !line.includes('SECRET'))
@@ -98,7 +98,7 @@ export const source: ScanSource = {
     const results: string[] = [];
     const cwd = process.cwd();
 
-    // 检查 .cursorrules
+    // Check .cursorrules
     const cursorrulesPath = path.join(cwd, '.cursorrules');
     try {
       await fs.access(cursorrulesPath);
@@ -107,7 +107,7 @@ export const source: ScanSource = {
       // ignore
     }
 
-    // 检查 .cursor/rules 目录
+    // Check the .cursor/rules directory
     const rulesDir = path.join(cwd, '.cursor', 'rules');
     try {
       const files = await fs.readdir(rulesDir);

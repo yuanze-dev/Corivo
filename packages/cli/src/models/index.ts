@@ -1,5 +1,5 @@
 /**
- * Models 模块导出
+ * Models module export
  */
 
 export * from './association.js';

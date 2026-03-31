@@ -1,13 +1,13 @@
 /**
- * 身份识别模块
+ * Identity module
  *
- * 提供基于平台指纹的用户身份识别和跨设备关联功能
+ * Provides platform-fingerprint-based user identification and cross-device association.
  *
- * 子模块：
- * - fingerprint: 指纹采集和匹配
- * - identity: 身份管理
- * - collector: 动态指纹采集器
- * - auth: 身份验证（最高级别）
+ * Sub-modules:
+ * - fingerprint: fingerprint collection and matching
+ * - identity: identity lifecycle management
+ * - collector: dynamic fingerprint collector
+ * - auth: identity authentication (highest trust level)
  */
 
 export * from './fingerprint.js';

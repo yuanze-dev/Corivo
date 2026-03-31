@@ -1,8 +1,8 @@
 /**
- * 关联引擎
+ * Association Engine
  *
- * 发现 block 之间的关系，建立知识网络
- * 基于规则的关联发现，零 LLM 依赖
+ * Discovers relationships between blocks and builds a knowledge graph.
+ * Rule-based association discovery with zero LLM dependency.
  */
 
 import type { Block } from '../models/index.js';
@@ -16,21 +16,21 @@ import {
 } from '../models/association.js';
 
 /**
- * 关联配置
+ * Association engine configuration
  */
 interface AssociationConfig {
-  /** 相似度阈值（高于此值认为是相似内容） */
+  /** Similarity threshold above which two blocks are considered similar content */
   similarityThreshold: number;
-  /** 关键词匹配权重 */
+  /** Weight applied to keyword overlap when scoring associations */
   keywordWeight: number;
-  /** 标注匹配权重 */
+  /** Weight applied to annotation match when scoring associations */
   annotationWeight: number;
-  /** 时间关联窗口（毫秒，同一时间段内的内容可能相关） */
+  /** Time window in milliseconds within which content may be considered related */
   timeWindowMs: number;
 }
 
 /**
- * 关联引擎
+ * Association engine
  */
 export class AssociationEngine {
   private config: AssociationConfig;
@@ -40,37 +40,37 @@ export class AssociationEngine {
       similarityThreshold: 0.7,
       keywordWeight: 0.6,
       annotationWeight: 0.4,
-      timeWindowMs: 3600000, // 1 小时
+      timeWindowMs: 3600000, // 1 hour
       ...config,
     };
   }
 
   /**
-   * 基于规则发现关联
+   * Discover associations between blocks using rule-based heuristics.
    *
-   * @param blocks - 待分析的 block 列表
-   * @returns 发现的关联列表
+   * @param blocks - List of blocks to analyze
+   * @returns List of discovered associations
    */
   discoverByRules(blocks: Block[]): Association[] {
     const associations: Association[] = [];
     const n = blocks.length;
 
-    // 两两比较，发现关联
+    // Pairwise comparison to find associations
     for (let i = 0; i < n; i++) {
       for (let j = i + 1; j < n; j++) {
         const a = blocks[i];
         const b = blocks[j];
 
-        // 跳过已归档的
+        // Skip archived blocks
         if (a.status === 'archived' || b.status === 'archived') {
           continue;
         }
 
-        // 检测各种关联类型
+        // Check association types in priority order
         const conflicts = this.detectConflicts(a, b);
         if (conflicts) {
           associations.push(conflicts);
-          continue; // 矛盾优先，跳过其他检测
+          continue; // Conflict takes priority; skip remaining checks
         }
 
         const supersedes = this.detectSupersedes(a, b);
@@ -100,19 +100,19 @@ export class AssociationEngine {
   }
 
   /**
-   * 检测矛盾关联
+   * Detect conflicting associations between decision-type blocks.
    *
-   * 主要检测决策类 block 的冲突：
-   * - 相同领域（domain）但决策不同
-   * - 相同主题但结论相反
+   * Conflicts are identified when:
+   * - Both blocks are decisions in the same domain
+   * - They carry different choices for the same decision type
    */
   private detectConflicts(a: Block, b: Block): Association | null {
-    // 只检测决策类
+    // Only compare decision-type blocks
     if (!a.annotation.includes('决策') || !b.annotation.includes('决策')) {
       return null;
     }
 
-    // 检查领域是否相同
+    // Domains must match
     const aDomain = this.extractDomain(a.annotation);
     const bDomain = this.extractDomain(b.annotation);
 
@@ -120,12 +120,12 @@ export class AssociationEngine {
       return null;
     }
 
-    // 检查是否有模式
+    // Both must have a pattern
     if (!a.pattern || !b.pattern) {
       return null;
     }
 
-    // 相同决策类型但不同选择
+    // Same decision category but different choices
     if (a.pattern.type === b.pattern.type && a.pattern.decision !== b.pattern.decision) {
       return {
         id: generateAssociationId(),
@@ -134,7 +134,7 @@ export class AssociationEngine {
         type: AssociationType.CONFLICTS,
         direction: AssociationDirection.BI_DIRECTIONAL,
         confidence: 0.8,
-        reason: `同一领域的不同决策：${a.pattern.decision} vs ${b.pattern.decision}`,
+        reason: `Conflicting decisions in the same domain: ${a.pattern.decision} vs ${b.pattern.decision}`,
         created_at: Date.now(),
       };
     }
@@ -143,23 +143,23 @@ export class AssociationEngine {
   }
 
   /**
-   * 检测替代/更新关联
+   * Detect superseding (replacement) associations.
    *
-   * 检测条件：
-   * - 相同标注
-   * - 后创建的内容提到/修正前创建的内容
-   * - 或者后创建的内容是前创建的更完整版本
+   * Conditions:
+   * - Both blocks share the same annotation
+   * - The newer block references or revises the older one
+   * - The newer block is a more complete version of the older one
    */
   private detectSupersedes(a: Block, b: Block): Association | null {
-    // 标注必须完全相同
+    // Annotations must be identical
     if (a.annotation !== b.annotation) {
       return null;
     }
 
-    // 确定时间顺序
+    // Establish chronological order
     const [older, newer] = a.created_at < b.created_at ? [a, b] : [b, a];
 
-    // 检查内容是否提到"修正"、"更新"、"改为"等关键词
+    // Check for update/revision language in the newer block
     const updateKeywords = [
       '修正',
       '更新',
@@ -178,7 +178,7 @@ export class AssociationEngine {
       return null;
     }
 
-    // 检查 newer 是否提到 older 的关键内容
+    // Check whether the newer block mentions key terms from the older one
     const olderKeywords = this.extractKeywords(older.content).slice(0, 3);
     const mentionsOlder = olderKeywords.some((kw) => newer.content.includes(kw));
 
@@ -190,7 +190,7 @@ export class AssociationEngine {
         type: AssociationType.SUPERSEDES,
         direction: AssociationDirection.ONE_WAY,
         confidence: 0.75,
-        reason: '新版本替代旧版本',
+        reason: 'Newer version supersedes older version',
         created_at: Date.now(),
       };
     }
@@ -199,15 +199,15 @@ export class AssociationEngine {
   }
 
   /**
-   * 检测细化/补充关联
+   * Detect refinement (elaboration) associations.
    *
-   * 检测条件：
-   * - 标注相同领域
-   * - 一个内容更短/更抽象，一个内容更长/更具体
-   * - 时间接近
+   * Conditions:
+   * - Both blocks share the same domain
+   * - One is significantly shorter/more abstract, the other longer/more specific
+   * - They were created within the configured time window
    */
   private detectRefines(a: Block, b: Block): Association | null {
-    // 领域必须相同
+    // Domains must match
     const aDomain = this.extractDomain(a.annotation);
     const bDomain = this.extractDomain(b.annotation);
 
@@ -215,22 +215,22 @@ export class AssociationEngine {
       return null;
     }
 
-    // 确定哪个更详细
+    // Identify which block is more detailed
     const [shorter, longer] =
       a.content.length < b.content.length ? [a, b] : [b, a];
 
-    // 长度差异至少 2 倍
+    // The longer must be at least 2x the length of the shorter
     if (longer.content.length < shorter.content.length * 2) {
       return null;
     }
 
-    // 检查时间是否接近
+    // Both must have been created within the time window
     const timeDiff = Math.abs(longer.created_at - shorter.created_at);
     if (timeDiff > this.config.timeWindowMs) {
       return null;
     }
 
-    // 检查 longer 是否包含 shorter 的关键词
+    // The longer block must mention keywords from the shorter block
     const shorterKeywords = this.extractKeywords(shorter.content);
     const mentionsKeywords = shorterKeywords.filter((kw) =>
       longer.content.toLowerCase().includes(kw.toLowerCase())
@@ -244,7 +244,7 @@ export class AssociationEngine {
         type: AssociationType.REFINES,
         direction: AssociationDirection.ONE_WAY,
         confidence: 0.7,
-        reason: '更详细的版本',
+        reason: 'More detailed elaboration',
         created_at: Date.now(),
       };
     }
@@ -253,14 +253,14 @@ export class AssociationEngine {
   }
 
   /**
-   * 检测相似关联
+   * Detect similarity associations.
    *
-   * 检测条件：
-   * - 标注相同
-   * - 内容相似度高于阈值
+   * Conditions:
+   * - Both blocks have identical annotations
+   * - Content similarity exceeds the configured threshold
    */
   private detectSimilar(a: Block, b: Block): Association | null {
-    // 标注必须相同
+    // Annotations must be identical
     if (a.annotation !== b.annotation) {
       return null;
     }
@@ -279,7 +279,7 @@ export class AssociationEngine {
         type: AssociationType.SIMILAR,
         direction,
         confidence: similarity,
-        reason: `内容相似度 ${(similarity * 100).toFixed(0)}%`,
+        reason: `Content similarity ${(similarity * 100).toFixed(0)}%`,
         created_at: Date.now(),
       };
     }
@@ -288,14 +288,14 @@ export class AssociationEngine {
   }
 
   /**
-   * 检测相关关联
+   * Detect general relatedness associations.
    *
-   * 检测条件：
-   * - 领域相同
-   * - 共享关键词
+   * Conditions:
+   * - Both blocks are in the same domain
+   * - They share a sufficient number of keywords (Jaccard ≥ 0.3)
    */
   private detectRelated(a: Block, b: Block): Association | null {
-    // 领域必须相同
+    // Domains must match
     const aDomain = this.extractDomain(a.annotation);
     const bDomain = this.extractDomain(b.annotation);
 
@@ -303,7 +303,7 @@ export class AssociationEngine {
       return null;
     }
 
-    // 提取关键词并计算重合度
+    // Extract keywords and measure overlap
     const aKeywords = this.extractKeywords(a.content);
     const bKeywords = this.extractKeywords(b.content);
 
@@ -311,12 +311,12 @@ export class AssociationEngine {
       bKeywords.some((bk) => kw.toLowerCase() === bk.toLowerCase())
     );
 
-    // 至少 2 个共同关键词
+    // Require at least 2 shared keywords
     if (commonKeywords.length < 2) {
       return null;
     }
 
-    // 计算相关度
+    // Compute Jaccard similarity on keyword sets
     const unionSize = new Set([...aKeywords, ...bKeywords]).size;
     const jaccard = commonKeywords.length / unionSize;
 
@@ -331,8 +331,8 @@ export class AssociationEngine {
         to_id: b.id,
         type: AssociationType.RELATED,
         direction,
-        confidence: Math.min(jaccard + 0.3, 0.9), // 提升到合理范围
-        reason: `共享关键词: ${commonKeywords.slice(0, 3).join(', ')}`,
+        confidence: Math.min(jaccard + 0.3, 0.9), // Boost into a meaningful confidence range
+        reason: `Shared keywords: ${commonKeywords.slice(0, 3).join(', ')}`,
         context_tags: commonKeywords,
         created_at: Date.now(),
       };
@@ -342,9 +342,9 @@ export class AssociationEngine {
   }
 
   /**
-   * 计算两个文本的相似度
+   * Calculate textual similarity between two strings.
    *
-   * 使用简化的 Jaccard 相似度
+   * Uses simplified Jaccard similarity over word sets.
    */
   private calculateSimilarity(text1: string, text2: string): number {
     const words1 = this.extractWords(text1);
@@ -357,7 +357,7 @@ export class AssociationEngine {
     const set1 = new Set(words1);
     const set2 = new Set(words2);
 
-    // 计算 Jaccard 相似度
+    // Jaccard similarity: |intersection| / |union|
     const intersection = new Set([...set1].filter((x) => set2.has(x)));
     const union = new Set([...set1, ...set2]);
 
@@ -365,14 +365,14 @@ export class AssociationEngine {
   }
 
   /**
-   * 提取文本中的关键词
+   * Extract meaningful keywords from text.
    *
-   * 简单实现：提取中文词汇和英文单词
+   * Handles both Chinese characters and English words; filters common stop words.
    */
   private extractKeywords(text: string): string[] {
     const words = this.extractWords(text);
 
-    // 过滤停用词
+    // Filter stop words for both Chinese and English
     const stopWords = new Set([
       '的', '了', '是', '在', '有', '和', '就', '不', '人', '都',
       '一', '一个', '上', '也', '很', '到', '说', '要', '去', '你',
@@ -384,29 +384,28 @@ export class AssociationEngine {
 
     return [...new Set(words)]
       .filter((w) => w.length > 1 && !stopWords.has(w.toLowerCase()))
-      .slice(0, 10); // 最多返回 10 个
+      .slice(0, 10); // Cap at 10 keywords
   }
 
   /**
-   * 提取文本中的所有词语
+   * Extract all words (tokens) from text, supporting both Chinese and English.
    */
   private extractWords(text: string): string[] {
-    // 中文：按字符分割，过滤标点
+    // Chinese: split by character, filter punctuation
     const chineseChars = text
       .match(/[\u4e00-\u9fa5]/g)
       ?.filter((c) => !/[，。！？、；：""''（）【】《》]/.test(c)) || [];
 
-    // 英文：提取单词
+    // English: extract lowercase words
     const englishWords = text.toLowerCase().match(/[a-z]{2,}/g) || [];
 
-    // 组合
     return [...chineseChars, ...englishWords];
   }
 
   /**
-   * 从 annotation 中提取领域
+   * Extract the domain segment from an annotation string.
    *
-   * annotation 格式: "性质 · 领域 · 标签"
+   * Annotation format: "nature · domain · tag"
    */
   private extractDomain(annotation: string): string {
     const parts = annotation.split(' · ');

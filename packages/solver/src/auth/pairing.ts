@@ -5,8 +5,8 @@ interface PairingEntry {
   expiresAt: number;
 }
 
-const PAIRING_TTL_MS = 24 * 60 * 60 * 1000; // 24 小时
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 去掉易混淆字符 0/O/I/1
+const PAIRING_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Excludes visually ambiguous characters: 0/O/I/1
 
 const pairingStore = new Map<string, PairingEntry>();
 
@@ -19,7 +19,7 @@ setInterval(() => {
 
 export function generatePairingCode(identityId: string): { code: string; expiresAt: number } {
   let code: string;
-  // 确保不与现有码冲突
+  // Retry until the generated code does not collide with an existing entry
   do {
     const bytes = randomBytes(6);
     code = Array.from(bytes).map(b => CODE_CHARS[b % CODE_CHARS.length]).join('');

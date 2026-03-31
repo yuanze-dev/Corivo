@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-// tsup 打包后 __dirname 指向 dist/cli/，用 ../../package.json 读取版本号
+// After tsup is packaged, __dirname points to dist/cli/, and ../../package.json is used to read the version number.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packagePath = join(__dirname, '../../package.json');
@@ -12,10 +12,10 @@ let VERSION = '0.11.0';
 try {
   VERSION = JSON.parse(readFileSync(packagePath, 'utf-8')).version;
 } catch {
-  // 打包环境路径不同时使用默认版本号
+  // The default version number is used when the packaging environment path is different.
 }
 
-// 纯静态组件，用 React.memo 避免父组件渲染时的无效重渲染
+// Purely static components, use React.memo to avoid invalid re-rendering when rendering parent components
 export const Header = React.memo(function Header() {
   return (
     <Box borderStyle="single" borderColor="gray" marginBottom={0}>

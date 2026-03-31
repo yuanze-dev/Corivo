@@ -1,7 +1,7 @@
 /**
- * CLI 命令 - doctor
+ * CLI command-doctor
  *
- * 健康检查
+ * health check
  */
 
 import fs from 'node:fs/promises';
@@ -28,7 +28,7 @@ export async function doctorCommand(): Promise<void> {
 
   console.log('✅ 配置文件正常');
 
-  // 检查数据库
+  // Check database
   const dbPath = getDefaultDatabasePath();
   let dbExists = false;
 
@@ -40,7 +40,7 @@ export async function doctorCommand(): Promise<void> {
   if (dbExists) {
     console.log('✅ 数据库文件存在');
 
-    // 尝试打开数据库
+    // Try to open the database
     try {
       const password = await readPassword('请输入主密码以验证数据库: ');
       const salt = Buffer.from(config.salt, 'base64');
@@ -71,7 +71,7 @@ export async function doctorCommand(): Promise<void> {
     console.log('   将在第一次使用时自动创建');
   }
 
-  // 检查守护进程
+  // Check daemon
   const pidPath = path.join(configDir, 'heartbeat.pid');
   try {
     const pidStr = await fs.readFile(pidPath, 'utf-8');

@@ -1,7 +1,7 @@
 /**
- * CLI 命令 - setup-password
+ * CLI command - setup-password
  *
- * 设置主密码，用于数据库加密和跨设备身份验证
+ * Set a master password for database encryption and cross-device authentication
  */
 
 import fs from 'node:fs/promises';
@@ -20,7 +20,7 @@ export async function setupPasswordCommand(options: SetupPasswordOptions = {}): 
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');
 
-  // 读取现有配置
+  // Read existing configuration
   let config: any;
   try {
     const content = await fs.readFile(configPath, 'utf-8');
@@ -29,7 +29,7 @@ export async function setupPasswordCommand(options: SetupPasswordOptions = {}): 
     throw new ConfigError('Corivo 未初始化。请先运行: corivo init');
   }
 
-  // 检查是否已设置密码
+  // Check if a password has been set
   const hasPassword = config.encrypted_db_key !== undefined;
 
   if (hasPassword && !options.force) {
@@ -52,7 +52,7 @@ export async function setupPasswordCommand(options: SetupPasswordOptions = {}): 
   console.log(chalk.gray('  • 请使用容易记住但不易被猜到的密码'));
   console.log(chalk.gray('  • 忘记密码无法找回，请妥善保管\\n'));
 
-  // 如果已有密码，需要先验证
+  // If you already have a password, you need to verify it first
   if (hasPassword && options.force) {
     const oldPassword = await readPassword('请输入当前密码: ');
     const salt = Buffer.from(config.salt, 'base64');
@@ -65,7 +65,7 @@ export async function setupPasswordCommand(options: SetupPasswordOptions = {}): 
     }
   }
 
-  // 输入新密码
+  // Enter new password
   const newPassword = await readPassword('请输入新密码: ');
   if (!KeyManager.validatePasswordStrength(newPassword)) {
     throw new ValidationError('密码强度不足：至少 8 个字符，包含字母和数字');
@@ -76,19 +76,19 @@ export async function setupPasswordCommand(options: SetupPasswordOptions = {}): 
     throw new ValidationError('两次输入的密码不一致');
   }
 
-  // 生成新的加密密钥
+  // Generate new encryption key
   const salt = KeyManager.generateSalt();
   const masterKey = KeyManager.deriveMasterKey(newPassword, salt);
 
-  // 生成新的数据库密钥
+  // Generate new database key
   const dbKey = KeyManager.generateDatabaseKey();
   const encryptedDbKey = KeyManager.encryptDatabaseKey(dbKey, masterKey);
 
-  // 更新配置
+  // Update configuration
   config.salt = salt.toString('base64');
   config.encrypted_db_key = encryptedDbKey;
 
-  // 移除明文密钥
+  // Remove plaintext key
   if (config.db_key) {
     delete config.db_key;
   }

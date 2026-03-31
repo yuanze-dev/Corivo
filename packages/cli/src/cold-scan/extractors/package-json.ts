@@ -1,6 +1,6 @@
 /**
- * package.json 提取器
- * 扫描最近项目，提取技术栈信息
+ * package.json extractor
+ * Scan recent projects and extract technology stack information
  */
 
 import { readJsonSafe, getRecentGitProjects, createBlock } from '../utils.js';
@@ -14,14 +14,14 @@ async function extractPackageJson(content: string, filePath: string) {
   try {
     const pkg = JSON.parse(content);
 
-    // 提取主要依赖
+    // Extract main dependencies
     const allDeps = {
       ...((pkg.dependencies as Record<string, string>) || {}),
       ...((pkg.devDependencies as Record<string, string>) || {}),
     };
 
     if (Object.keys(allDeps).length > 0) {
-      // 分类常见依赖
+      // Classify common dependencies
       const frameworks: string[] = [];
       const languages: string[] = [];
       const tools: string[] = [];
@@ -41,7 +41,7 @@ async function extractPackageJson(content: string, filePath: string) {
         }
       }
 
-      // 推断主要语言
+      // Infer primary language
       if (languages.includes('TypeScript')) {
         blocks.push(
           createBlock({
@@ -64,7 +64,7 @@ async function extractPackageJson(content: string, filePath: string) {
         );
       }
 
-      // 前端框架
+      // front-end framework
       if (frameworks.length > 0) {
         blocks.push(
           createBlock({
@@ -77,7 +77,7 @@ async function extractPackageJson(content: string, filePath: string) {
         );
       }
 
-      // 构建工具
+      // Build tools
       if (tools.length > 0) {
         blocks.push(
           createBlock({
@@ -90,7 +90,7 @@ async function extractPackageJson(content: string, filePath: string) {
         );
       }
 
-      // 测试框架
+      // testing framework
       const testDeps = Object.keys(allDeps).filter(
         d =>
           /^(vitest|jest|mocha|jasmine|cypress|playwright|@testing-library)/i.test(
@@ -110,7 +110,7 @@ async function extractPackageJson(content: string, filePath: string) {
       }
     }
 
-    // 提取项目名称
+    // Extract project name
     if (pkg.name) {
       blocks.push(
         createBlock({
@@ -123,7 +123,7 @@ async function extractPackageJson(content: string, filePath: string) {
       );
     }
 
-    // 提取脚本习惯
+    // Extract script habits
     if (pkg.scripts && Object.keys(pkg.scripts).length > 0) {
       const scriptTypes = Object.keys(pkg.scripts).filter(s =>
         /^(dev|build|test|lint|format|start)/.test(s)
@@ -142,7 +142,7 @@ async function extractPackageJson(content: string, filePath: string) {
       }
     }
   } catch {
-    // JSON 解析失败，跳过
+    // JSON parsing failed, skipped
   }
 
   return blocks;
@@ -151,7 +151,7 @@ async function extractPackageJson(content: string, filePath: string) {
 export const source: ScanSource = {
   name: 'package-json',
   path: async () => {
-    // 获取最近的 Git 项目，查找其中的 package.json
+    // Get the latest Git project and find package.json in it
     const projects = await getRecentGitProjects(10);
     const results: string[] = [];
 
@@ -166,7 +166,7 @@ export const source: ScanSource = {
         continue;
       }
 
-      if (results.length >= 5) break; // 最多扫描 5 个项目
+      if (results.length >= 5) break; // Scan up to 5 items
     }
 
     return results;

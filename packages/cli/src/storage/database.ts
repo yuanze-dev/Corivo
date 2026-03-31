@@ -1,33 +1,33 @@
 /**
- * 数据库存储层
+ * Database storage layer
  *
- * 使用 SQLCipher 提供加密的本地存储，支持 WAL 模式和连接池
+ * Provides encrypted local storage using SQLCipher, supports WAL mode and connection pooling
  *
- * ## 加密支持
+ * ## Encryption support
  *
- * 要启用 SQLCipher 加密，需要在构建 better-sqlite3 时链接 SQLCipher 库：
+ * To enable SQLCipher encryption, you need to link the SQLCipher library when building better-sqlite3:
  *
  * ```bash
- * # 卸载普通版本
+ * # Uninstall the normal version
  * npm uninstall better-sqlite3
  *
- * # 安装构建依赖
+ * #Install build dependencies
  * npm install --save-dev node-gyp
  *
- * # 安装 SQLCipher (macOS)
+ * # Install SQLCipher (macOS)
  * brew install sqlcipher
  *
- * # 设置环境变量并重新安装
+ * # Set environment variables and reinstall
  * export SQLITE3_LIB_DIR=$(brew --prefix sqlcipher)/lib
  * export SQLITE3_INCLUDE_DIR=$(brew --prefix sqlcipher)/include
  * npm install better-sqlite3 --build-from-source
  * ```
  *
- * 如果未使用 SQLCipher 构建，pragma key 语句会被静默忽略，
- * 数据库将以明文存储（用户应依赖文件系统加密如 FileVault）。
+ * If not built with SQLCipher, pragma key statements are silently ignored.
+ * The database will be stored in clear text (users should rely on file system encryption such as FileVault).
  */
 
-// ESM 兼容：使用 createRequire 加载 CommonJS 模块
+// ESM Compatible: Use createRequire to load CommonJS modules
 import { createRequire } from 'node:module';
 import type { Database as SQLiteDatabase } from 'better-sqlite3';
 const require = createRequire(import.meta.url);
@@ -49,61 +49,61 @@ import { generateAssociationId, AssociationType } from '../models/association.js
 import { KeyManager } from '../crypto/keys.js';
 
 /**
- * 数据库配置
+ * Database configuration
  */
 interface DatabaseConfig {
-  /** 数据库文件路径 */
+  /** Database file path */
   path: string;
-  /** 数据库密钥 */
+  /** database key */
   key: Buffer;
-  /** 是否启用加密（默认 false） */
+  /** Whether to enable encryption (default false) */
   enableEncryption?: boolean;
 }
 
 /**
- * SQLCipher 数据库封装
+ * SQLCipher database encapsulation
  *
- * ## 单例生命周期
+ * ## Singleton life cycle
  *
  * ```
  * ┌──────────────────────────────────────────────────────────────┐
- * │                      CorivoDatabase 单例                      │
+ * │ CorivoDatabase singleton │
  * ├──────────────────────────────────────────────────────────────┤
  * │                                                              │
  * │  getInstance(path, key)                                       │
  * │       │                                                      │
  * │       ▼                                                      │
  * │  ┌─────────────────┐                                        │
- * │  │ 检查 WAL 锁      │ ◄── 防止未释放的锁导致启动失败           │
+ * │ │ Check WAL lock │ ◄── Prevent unreleased locks from causing startup failure │
  * │  │ (stale lock)    │                                        │
  * │  └────────┬────────┘                                        │
  * │           │                                                  │
  * │           ▼                                                  │
  * │  ┌─────────────────┐                                        │
- * │  │ 创建实例        │   如果路径已存在，返回缓存的实例         │
- * │  │ (缓存于 Map)    │                                        │
+ * │ │ Create instance │ If path already exists, return cached instance │
+ * │ │ (cached in Map) │ │
  * │  └────────┬────────┘                                        │
  * │           │                                                  │
  * │           ▼                                                  │
- * │  ┌─────────────────┐    实例生命周期 = 进程生命周期           │
- * │  │ initialize()    │    close() 仅在进程退出时调用           │
- * │  │ - WAL 模式      │                                        │
- * │  │ - Schema 创建   │                                        │
+ * │ ┌─────────────────┐ Instance life cycle = process life cycle │
+ * │ │ initialize() │ close() is only called when the process exits │
+ * │ │ - WAL mode │ │
+ * │ │ - Schema creation │ │
  * │  └─────────────────┘                                        │
  * │                                                              │
  * │  closeAll()                                                   │
  * │       │                                                      │
- * │       └── 关闭所有缓存连接，清空 Map                         │
+ * │ └── Close all cache connections and clear the Map │
  * │                                                              │
  * └──────────────────────────────────────────────────────────────┘
  * ```
  *
- * ## WAL 锁处理
+ * ## WAL lock handling
  *
- * - WAL 模式下，-wal 和 -shm 文件由 SQLite 自动管理
- * - 进程异常退出（SIGKILL）可能导致锁未释放
- * - 启动时检测并清理陈旧的锁文件
- * - 正常关闭时 SQLite 会自动清理 WAL 文件
+ * - In WAL mode, -wal and -shm files are automatically managed by SQLite
+ * - The process exits abnormally (SIGKILL) may cause the lock to not be released
+ * - Detect and clean stale lock files on startup
+ * - SQLite will automatically clean up the WAL file during normal shutdown
  */
 export class CorivoDatabase {
   private db: SQLiteDatabase;
@@ -112,22 +112,22 @@ export class CorivoDatabase {
   private useSQLCipher: boolean = false;
 
   private constructor(private config: DatabaseConfig) {
-    // 保存加密配置
+    // Save encryption configuration
     this.enableEncryption = config.enableEncryption ?? false;
-    // 启动前检测并清理陈旧的 WAL 锁
+    // Detect and clean up stale WAL locks before startup
     this.detectAndCleanupStaleLock();
     this.db = new Database(config.path);
     this.initialize();
   }
 
   /**
-   * 获取数据库实例（单例模式，连接池）
+   * Get the database instance (singleton mode, connection pool)
    *
-   * 同一路径的数据库只会创建一个实例，后续调用返回缓存的实例。
-   * 实例生命周期与进程生命周期一致，调用者无需手动关闭。
+   * Only one instance will be created for the database with the same path, and subsequent calls will return the cached instance.
+   * The instance life cycle is consistent with the process life cycle, and the caller does not need to shut down manually.
    *
-   * @param config - 数据库配置
-   * @returns 数据库实例（缓存或新建）
+   * @param config - database configuration
+   * @returns database instance (cached or new)
    */
   static getInstance(config: DatabaseConfig): CorivoDatabase {
     const key = config.path;
@@ -138,7 +138,7 @@ export class CorivoDatabase {
   }
 
   /**
-   * 关闭所有数据库连接
+   * Close all database connections
    */
   static closeAll(): void {
     for (const db of this.instances.values()) {
@@ -148,88 +148,88 @@ export class CorivoDatabase {
   }
 
   /**
-   * 检测并清理陈旧的 WAL 锁文件
+   * Detect and clean stale WAL lock files
    *
-   * 当进程异常退出（如 SIGKILL）时，WAL 文件可能未被清理。
-   * 此方法在启动时检测是否有其他进程持有锁，如果没有则清理陈旧文件。
+   * When a process exits abnormally (such as SIGKILL), the WAL file may not be cleaned up.
+   * This method detects at startup whether another process holds the lock and cleans up stale files if not.
    *
-   * ## 检测逻辑
-   * 1. 检查 -wal 和 -shm 文件是否存在
-   * 2. 尝试以排他模式打开数据库（SQLite 的锁定机制）
-   * 3. 如果成功，说明没有其他进程持有锁，可以安全清理
-   * 4. 如果失败，抛出错误让用户处理
+   * ## Detection logic
+   * 1. Check whether the -wal and -shm files exist
+   * 2. Try to open the database in exclusive mode (SQLite’s locking mechanism)
+   * 3. If successful, it means that no other process holds the lock and it can be safely cleaned up.
+   * 4. If it fails, throw an error and let the user handle it.
    *
-   * @throws {DatabaseError} 如果数据库被其他进程锁定
+   * @throws {DatabaseError} if the database is locked by another process
    */
   private detectAndCleanupStaleLock(): void {
-    // WAL 文件由 SQLite 自动管理，无需手动干预。
-    // 即使进程崩溃，SQLite 在下次打开时会自动恢复 WAL。
-    // 手动删除 WAL 会导致未 checkpoint 的数据丢失。
+    // WAL files are automatically managed by SQLite without manual intervention.
+    // Even if the process crashes, SQLite automatically restores the WAL the next time it is opened.
+    // Manual deletion of WAL will result in loss of uncheckpointed data.
   }
 
   /**
-   * 初始化数据库
+   * Initialize database
    */
   private initialize(): void {
-    // 如果启用加密，尝试使用 SQLCipher
+    // If encryption is enabled, try using SQLCipher
     if (this.enableEncryption) {
       this.useSQLCipher = this.trySetupSQLCipher();
     }
 
-    // 启用 WAL 模式（支持并发读写）
+    // Enable WAL mode (supports concurrent reading and writing)
     this.db.pragma('journal_mode = WAL');
 
-    // 其他配置
-    this.db.pragma('foreign_keys = OFF'); // 不使用外键
-    this.db.pragma('synchronous = NORMAL'); // 平衡性能和安全
-    this.db.pragma('cache_size = -64000'); // 64MB 缓存
+    // Other configurations
+    this.db.pragma('foreign_keys = OFF'); // Do not use foreign keys
+    this.db.pragma('synchronous = NORMAL'); // Balance performance and security
+    this.db.pragma('cache_size = -64000'); // 64MB cache
     this.db.pragma('temp_store = MEMORY');
 
     this.createSchema();
   }
 
   /**
-   * 尝试设置 SQLCipher 加密
+   * Try setting up SQLCipher encryption
    *
-   * @returns 是否成功设置 SQLCipher
+   * @returns Whether SQLCipher was successfully set up
    */
   private trySetupSQLCipher(): boolean {
     try {
       const hexKey = this.config.key.toString('hex');
 
-      // 设置加密密钥
+      // Set encryption key
       this.db.pragma(`key = "x'${hexKey}'"`);
 
-      // 尝试查询 cipher_version 验证 SQLCipher 可用
+      // Try querying cipher_version to verify that SQLCipher is available
       const result = this.db.pragma('cipher_version');
       this.useSQLCipher = result !== undefined;
 
       if (this.useSQLCipher) {
-        // SQLCipher 可用，配置加密参数
-        // 使用 PBKDF2 加强密钥派生
-        this.db.pragma('kdf_iter = 256000'); // PBKDF2 迭代次数
+        // SQLCipher is available, configure encryption parameters
+        // Strengthening key derivation using PBKDF2
+        this.db.pragma('kdf_iter = 256000'); // PBKDF2 iteration number
         this.db.pragma('cipher_page_size = 4096');
       }
 
       return this.useSQLCipher;
     } catch {
-      // SQLCipher 不可用，回退到应用层加密
+      // SQLCipher is unavailable, falling back to application layer encryption
       return false;
     }
   }
 
   /**
-   * 创建数据库表结构
+   * Create database table structure
    */
   private createSchema(): void {
-    // Blocks 表（如果已存在则跳过）
-    // 使用 sqlite_master 检查表是否已存在
+    // Blocks table (skip if already exists)
+    // Use sqlite_master to check if the table already exists
     const tableExists = this.db.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='blocks'"
     ).get() as { name: string } | undefined;
 
     if (!tableExists) {
-      // 新数据库：创建完整结构
+      // New database: Create complete structure
       this.db.exec(`
         CREATE TABLE blocks (
           id TEXT PRIMARY KEY,
@@ -247,17 +247,17 @@ export class CorivoDatabase {
       `);
     }
 
-    // FTS5 全文搜索表
-    // 使用独立的 FTS5 表（而非 external content）避免虚拟表腐烂问题
-    // 数据通过触发器自动同步
+    // FTS5 full text search table
+    // Use standalone FTS5 tables (rather than external content) to avoid virtual table rot issues
+    // Data is automatically synchronized via triggers
     //
-    // 迁移逻辑：检测并修复旧版本的外部内容表
+    // Migration logic: detect and repair old versions of external content tables
     const ftsTable = this.db.prepare(
       "SELECT sql FROM sqlite_master WHERE type='table' AND name='blocks_fts'"
     ).get() as { sql: string } | undefined;
 
     if (ftsTable && ftsTable.sql.includes("content='blocks'")) {
-      // 旧版本：外部内容表模式，需要重建
+      // Old version: external table of contents schema, needs to be rebuilt
       this.db.exec(`DROP TABLE IF EXISTS blocks_fts`);
       this.db.exec(`DROP TRIGGER IF EXISTS blocks_ai`);
       this.db.exec(`DROP TRIGGER IF EXISTS blocks_au`);
@@ -277,7 +277,7 @@ export class CorivoDatabase {
         )
       `);
 
-      // 触发器：INSERT 同步
+      // Trigger: INSERT synchronization
       this.db.exec(`
         CREATE TRIGGER blocks_ai AFTER INSERT ON blocks BEGIN
           INSERT INTO blocks_fts(id, content, annotation)
@@ -285,7 +285,7 @@ export class CorivoDatabase {
         END
       `);
 
-      // 触发器：UPDATE 同步（删除后重新插入，避免 FTS5 腐烂）
+      // Trigger: UPDATE synchronization (reinsert after deletion to avoid FTS5 rot)
       this.db.exec(`
         CREATE TRIGGER blocks_au AFTER UPDATE ON blocks BEGIN
           DELETE FROM blocks_fts WHERE id = old.id;
@@ -294,21 +294,21 @@ export class CorivoDatabase {
         END
       `);
 
-      // 触发器：DELETE 同步
+      // Trigger: DELETE sync
       this.db.exec(`
         CREATE TRIGGER blocks_ad AFTER DELETE ON blocks BEGIN
           DELETE FROM blocks_fts WHERE id = old.id;
         END
       `);
 
-      // 重建索引：从现有 blocks 表同步数据
+      // Reindex: synchronize data from existing blocks table
       this.db.exec(`
         INSERT INTO blocks_fts(id, content, annotation)
         SELECT id, content, annotation FROM blocks
       `);
     }
 
-    // 索引
+    // Index
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_blocks_annotation ON blocks(annotation);
       CREATE INDEX IF NOT EXISTS idx_blocks_status ON blocks(status);
@@ -317,7 +317,7 @@ export class CorivoDatabase {
       CREATE INDEX IF NOT EXISTS idx_blocks_created_at ON blocks(created_at);
     `);
 
-    // Associations 表（关联表）
+    // Associations table (association table)
     const assocTable = this.db.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='associations'"
     ).get() as { name: string } | undefined;
@@ -337,7 +337,7 @@ export class CorivoDatabase {
           UNIQUE(from_id, to_id, type))
       `);
 
-      // 关联表索引
+      // Related table index
       this.db.exec(`
         CREATE INDEX IF NOT EXISTS idx_associations_from ON associations(from_id);
         CREATE INDEX IF NOT EXISTS idx_associations_to ON associations(to_id);
@@ -346,7 +346,7 @@ export class CorivoDatabase {
       `);
     }
 
-    // Query logs 表（查询历史）
+    // Query logs table (query history)
     const queryLogsTable = this.db.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='query_logs'"
     ).get() as { name: string } | undefined;
@@ -365,9 +365,9 @@ export class CorivoDatabase {
       `);
     }
 
-    // 迁移 M001：清理低质量摘要 block（由 heartbeat:consolidation 自动生成）
-    // createSummary 已移除，历史摘要 block 信息价值低，直接删除
-    // 用 PRAGMA user_version 记录已执行的迁移版本号（≥1 表示已执行 M001）
+    // Migration M001: Clean up low-quality summary blocks (automatically generated by heartbeat:consolidation)
+    // createSummary has been removed. The historical summary block information has low value and should be deleted directly.
+    // Use PRAGMA user_version to record the executed migration version number (≥1 means M001 has been executed)
     const userVersion = (this.db.pragma('user_version', { simple: true }) as number) ?? 0;
     if (userVersion < 1) {
       this.db.exec(`
@@ -380,28 +380,28 @@ export class CorivoDatabase {
   }
 
   /**
-   * 创建 Block
+   * Create Block
    *
-   * @param input - Block 创建参数
-   * @returns 创建的 Block
+   * @param input - Block creation parameter
+   * Block created by @returns
    */
   createBlock(input: CreateBlockInput): Block {
-    // 验证内容
+    // Verify content
     if (!input.content || input.content.trim().length === 0) {
       throw new DatabaseError('Block 内容不能为空');
     }
 
-    // 验证内容长度（限制 1MB）
+    // Verify content length (limit 1MB)
     if (input.content.length > 1024 * 1024) {
       throw new DatabaseError('Block 内容超出最大长度限制 (1MB)');
     }
 
-    // 验证 refs 格式
+    // Verify refs format
     if (input.refs !== undefined) {
       if (!Array.isArray(input.refs)) {
         throw new DatabaseError('refs 必须是数组');
       }
-      // 验证每个 ref 都是字符串
+      // Verify that each ref is a string
       for (const ref of input.refs) {
         if (typeof ref !== 'string') {
           throw new DatabaseError('refs 中的每个元素必须是字符串');
@@ -409,10 +409,10 @@ export class CorivoDatabase {
       }
     }
 
-    // 验证 pattern 格式（如果提供）
+    // Validate pattern format (if provided)
     if (input.pattern !== undefined) {
       const pattern = input.pattern;
-      // 检查必需字段
+      // Check required fields
       if (typeof pattern !== 'object' || pattern === null) {
         throw new DatabaseError('pattern 必须是对象');
       }
@@ -436,7 +436,7 @@ export class CorivoDatabase {
     const id = generateBlockId();
     const now = Math.floor(Date.now() / 1000);
 
-    // 如果启用加密但 SQLCipher 不可用，使用应用层加密
+    // If encryption is enabled but SQLCipher is not available, use application layer encryption
     const contentToStore = (this.enableEncryption && !this.useSQLCipher)
       ? KeyManager.encryptContent(input.content, this.config.key)
       : input.content;
@@ -467,7 +467,7 @@ export class CorivoDatabase {
       throw new DatabaseError('创建 Block 失败', { cause: error, blockId: id });
     }
 
-    // 返回完整的 Block 对象（包含默认值）
+    // Returns the complete Block object (including default values)
     return {
       id,
       content: input.content,
@@ -485,9 +485,9 @@ export class CorivoDatabase {
   }
 
   /**
-   * 以指定 ID 创建或更新 Block。
+   * Creates or updates a Block with the specified ID.
    *
-   * 用于导入远端同步数据，避免 createBlock() 总是生成新 ID。
+   * Used to import remote synchronization data to prevent createBlock() from always generating new IDs.
    */
   upsertBlock(input: CreateBlockInput & { id: string }): Block {
     if (!input.id || input.id.trim().length === 0) {
@@ -562,10 +562,10 @@ export class CorivoDatabase {
   }
 
   /**
-   * 获取 Block
+   * Get Block
    *
    * @param id - Block ID
-   * @returns Block 或 null
+   * @returns Block or null
    */
   getBlock(id: string): Block | null {
     const stmt = this.db.prepare('SELECT * FROM blocks WHERE id = ?');
@@ -576,11 +576,11 @@ export class CorivoDatabase {
   }
 
   /**
-   * 更新 Block
+   * Update Block
    *
    * @param id - Block ID
-   * @param updates - 更新字段
-   * @returns 是否更新成功
+   * @param updates - update fields
+   * @returns Whether the update is successful
    */
   updateBlock(id: string, updates: UpdateBlockInput): boolean {
     const fields: string[] = [];
@@ -588,7 +588,7 @@ export class CorivoDatabase {
 
     if (updates.content !== undefined) {
       fields.push('content = ?');
-      // 如果启用加密但 SQLCipher 不可用，加密内容
+      // If encryption is enabled but SQLCipher is not available, encrypt content
       const contentToStore = (this.enableEncryption && !this.useSQLCipher)
         ? KeyManager.encryptContent(updates.content, this.config.key)
         : updates.content;
@@ -626,7 +626,7 @@ export class CorivoDatabase {
       fields.push('updated_at = ?');
       values.push(updates.updated_at);
     } else {
-      // 默认自动更新时间戳（生产环境行为）
+      // Automatically update timestamp by default (production environment behavior)
       fields.push('updated_at = ?');
       values.push(Math.floor(Date.now() / 1000));
     }
@@ -647,12 +647,12 @@ export class CorivoDatabase {
   }
 
   /**
-   * 批量更新 Block（vitality 和 status）
+   * Batch update Blocks (vitality and status)
    *
-   * 使用事务批量更新，比逐条更新快 10-100 倍
+   * Use transaction batch update, which is 10-100 times faster than item-by-item update
    *
-   * @param updates - 要更新的 Block 列表，每项包含 id、vitality 和 status
-   * @returns 更新成功的数量
+   * @param updates - List of Blocks to update, each containing id, vitality and status
+   * @returns The number of successful updates
    */
   batchUpdateVitality(updates: Array<{ id: string; vitality: number; status: string }>): number {
     if (updates.length === 0) return 0;
@@ -660,7 +660,7 @@ export class CorivoDatabase {
     const now = Math.floor(Date.now() / 1000);
     let updatedCount = 0;
 
-    // 使用事务加速批量更新
+    // Speed up batch updates using transactions
     const transaction = this.db.transaction(() => {
       const stmt = this.db.prepare(`
         UPDATE blocks
@@ -673,7 +673,7 @@ export class CorivoDatabase {
           const result = stmt.run(update.vitality, update.status, now, update.id);
           updatedCount += result.changes;
         } catch (error) {
-          // 单个更新失败不影响其他更新
+          // Failure of a single update does not affect other updates
           console.error(`批量更新失败 ${update.id}:`, error);
         }
       }
@@ -688,10 +688,10 @@ export class CorivoDatabase {
   }
 
   /**
-   * 删除 Block
+   * Delete Block
    *
    * @param id - Block ID
-   * @returns 是否删除成功
+   * @returns Whether the deletion was successful
    */
   deleteBlock(id: string): boolean {
     const stmt = this.db.prepare('DELETE FROM blocks WHERE id = ?');
@@ -704,13 +704,13 @@ export class CorivoDatabase {
     }
   }
 
-  // ========== 关联操作 ==========
+  // ========== Related operations ==========
 
   /**
-   * 创建关联
+   * Create association
    *
-   * @param input - 关联创建参数
-   * @returns 创建的关联
+   * @param input - association creation parameter
+   * Association created by @returns
    */
   createAssociation(input: CreateAssociationInput): Association {
     const id = generateAssociationId();
@@ -752,10 +752,10 @@ export class CorivoDatabase {
   }
 
   /**
-   * 批量创建关联
+   * Create associations in batches
    *
-   * @param associations - 关联列表
-   * @returns 创建成功的数量
+   * @param associations - list of associations
+   * @returns The number of successful creations
    */
   batchCreateAssociations(associations: CreateAssociationInput[]): number {
     if (associations.length === 0) return 0;
@@ -787,7 +787,7 @@ export class CorivoDatabase {
           );
           createdCount++;
         } catch (error) {
-          // 单个创建失败不影响其他
+          // Failure of a single creation does not affect other
           console.error(`批量创建关联失败 ${input.from_id} -> ${input.to_id}:`, error);
         }
       }
@@ -802,10 +802,10 @@ export class CorivoDatabase {
   }
 
   /**
-   * 查询关联
+   * Query association
    *
-   * @param filter - 查询过滤器
-   * @returns 关联列表
+   * @param filter - Query filter
+   * @returns association list
    */
   queryAssociations(filter: AssociationFilter = {}): Association[] {
     const conditions: string[] = [];
@@ -845,11 +845,11 @@ export class CorivoDatabase {
   }
 
   /**
-   * 获取 block 的所有关联（双向）
+   * Get all associations of block (bidirectional)
    *
    * @param blockId - Block ID
-   * @param minConfidence - 最低置信度
-   * @returns 关联列表
+   * @param minConfidence - minimum confidence level
+   * @returns association list
    */
   getBlockAssociations(blockId: string, minConfidence = 0.5): Association[] {
     const stmt = this.db.prepare(`
@@ -868,10 +868,10 @@ export class CorivoDatabase {
   }
 
   /**
-   * 删除关联
+   * Delete association
    *
-   * @param id - 关联 ID
-   * @returns 是否删除成功
+   * @param id - association ID
+   * @returns Whether the deletion was successful
    */
   deleteAssociation(id: string): boolean {
     const stmt = this.db.prepare('DELETE FROM associations WHERE id = ?');
@@ -885,10 +885,10 @@ export class CorivoDatabase {
   }
 
   /**
-   * 删除 block 的所有关联
+   * Delete all associations of block
    *
    * @param blockId - Block ID
-   * @returns 删除的关联数量
+   * @returns Number of deleted associations
    */
   deleteBlockAssociations(blockId: string): number {
     const stmt = this.db.prepare('DELETE FROM associations WHERE from_id = ? OR to_id = ?');
@@ -902,16 +902,16 @@ export class CorivoDatabase {
   }
 
   /**
-   * 获取关联统计
+   * Get associated statistics
    *
-   * @returns 统计数据
+   * @returns statistics
    */
   getAssociationStats(): AssociationStats {
-    // 总数
+    // total
     const totalStmt = this.db.prepare('SELECT COUNT(*) as count FROM associations');
     const { count: total } = totalStmt.get() as { count: number };
 
-    // 按类型分组
+    // Group by type
     const typeStmt = this.db.prepare(`
       SELECT type, COUNT(*) as count FROM associations GROUP BY type
     `);
@@ -931,11 +931,11 @@ export class CorivoDatabase {
       }
     }
 
-    // 平均置信度
+    // average confidence
     const avgStmt = this.db.prepare('SELECT AVG(confidence) as avg FROM associations');
     const { avg } = avgStmt.get() as { avg: number | null };
 
-    // 最活跃的 block
+    // most active block
     const activeStmt = this.db.prepare(`
       SELECT block_id, COUNT(*) as count FROM (
         SELECT from_id as block_id FROM associations
@@ -957,10 +957,10 @@ export class CorivoDatabase {
   }
 
   /**
-   * 查询 Blocks
+   * Query Blocks
    *
-   * @param filter - 查询过滤器
-   * @returns Block 数组
+   * @param filter - Query filter
+   * @returns Block array
    */
   queryBlocks(filter: BlockFilter = {}): Block[] {
     const conditions: string[] = [];
@@ -970,7 +970,7 @@ export class CorivoDatabase {
       conditions.push('annotation = ?');
       values.push(filter.annotation);
     } else if (filter.annotationPrefix) {
-      // 转义 LIKE 通配符，防止误匹配
+      // Escape LIKE wildcards to prevent mismatches
       const escaped = filter.annotationPrefix.replace(/%/g, '\\%').replace(/_/g, '\\_');
       conditions.push("annotation LIKE ? ESCAPE '\\'");
       values.push(`${escaped}%`);
@@ -989,11 +989,11 @@ export class CorivoDatabase {
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    // 验证 limit 范围，防止极端值
+    // Verify limit range to prevent extreme values
     const limit = filter.limit ? Math.max(1, Math.min(filter.limit, 10000)) : null;
     const limitClause = limit ? `LIMIT ${limit}` : '';
 
-    // 排序：sortBy 和 sortOrder 均来自白名单，不存在 SQL 注入风险
+    // Sorting: sortBy and sortOrder are both from the whitelist, and there is no risk of SQL injection
     const sortColumn = filter.sortBy === 'vitality' ? 'vitality' : 'updated_at';
     const sortDirection = filter.sortOrder === 'ASC' ? 'ASC' : 'DESC';
 
@@ -1010,22 +1010,22 @@ export class CorivoDatabase {
   }
 
   /**
-   * 全文搜索 Blocks（使用 FTS5）
+   * Search blocks with FTS5 full-text search
    *
-   * 使用 FTS5 的 MATCH 运算符进行全文搜索，返回按相关性排序的结果。
+   * Full-text search using FTS5's MATCH operator, returning results sorted by relevance.
    *
-   * @param query - 搜索关键词
-   * @param limit - 返回数量限制
-   * @returns 相关 Block 数组
+   * @param query - Search query
+   * @param limit - Maximum number of results to return
+   * @returns Matching blocks
    */
   searchBlocks(query: string, limit = 10): Block[] {
-    // 空查询返回所有结果
+    // Empty queries fall back to the standard block listing
     if (!query || query.trim() === '') {
       return this.queryBlocks({ limit });
     }
 
-    // 应用层加密时，内容以密文存储，SQL 层搜索无法匹配明文。
-    // 改为全量读取后在内存中解密匹配。
+    // With application-layer encryption, SQL only sees ciphertext.
+    // Fall back to decrypting rows in memory and matching there.
     if (this.enableEncryption && !this.useSQLCipher) {
       const allRows = this.db.prepare('SELECT * FROM blocks ORDER BY updated_at DESC').all() as any[];
       const matched: Block[] = [];
@@ -1039,7 +1039,7 @@ export class CorivoDatabase {
       return matched;
     }
 
-    // 先尝试 FTS5 全文搜索
+    // Prefer FTS5 full-text search when it is available
     const ftsStmt = this.db.prepare(`
       SELECT b.* FROM blocks b
       INNER JOIN blocks_fts fts ON b.id = fts.id
@@ -1049,20 +1049,20 @@ export class CorivoDatabase {
     `);
 
     try {
-      // 转义查询字符串中的特殊字符
+      // Escape special characters in query string
       const escapedQuery = query.replace(/["']/g, '');
       const rows = ftsStmt.all(escapedQuery, limit) as any[];
 
-      // FTS5 返回结果，直接返回
+      // FTS5 returns the result directly.
       if (rows.length > 0) {
         return rows.map(row => this.rowToBlock(row));
       }
     } catch (error) {
-      // FTS5 查询失败，忽略错误，继续使用备用搜索
+      // FTS5 query fails, ignore error, continue using alternate search
     }
 
-    // FTS5 无结果或失败时，使用 LIKE 备用搜索
-    // 这对中文搜索特别有用，因为 FTS5 对中文分词支持不佳
+    // Use LIKE backup search when FTS5 has no results or fails
+    // This is especially useful for Chinese searches, as FTS5 has poor support for Chinese word segmentation
     const likeStmt = this.db.prepare(`
       SELECT * FROM blocks
       WHERE content LIKE ? OR annotation LIKE ?
@@ -1076,20 +1076,20 @@ export class CorivoDatabase {
   }
 
   /**
-   * 获取统计信息
+   * Get statistics
    *
-   * @returns 统计数据
+   * @returns statistics
    */
   getStats(): {
     total: number;
     byStatus: Record<string, number>;
     byAnnotation: Record<string, number>;
   } {
-    // 总数
+    // total
     const totalStmt = this.db.prepare('SELECT COUNT(*) as count FROM blocks');
     const { count: total } = totalStmt.get() as { count: number };
 
-    // 按状态分组
+    // Group by status
     const statusStmt = this.db.prepare(`
       SELECT status, COUNT(*) as count FROM blocks GROUP BY status
     `);
@@ -1099,7 +1099,7 @@ export class CorivoDatabase {
       byStatus[row.status] = row.count;
     }
 
-    // 按标注分组（只取前 5）
+    // Group by label (only take top 5)
     const annotationStmt = this.db.prepare(`
       SELECT annotation, COUNT(*) as count FROM blocks GROUP BY annotation ORDER BY count DESC LIMIT 5
     `);
@@ -1113,11 +1113,11 @@ export class CorivoDatabase {
   }
 
   /**
-   * 获取状态分布（用于上下文推送）
+   * Get state distribution (for context push)
    *
-   * 使用 SQL GROUP BY 在数据库层面聚合，避免读取全部数据到内存
+   * Use SQL GROUP BY to aggregate at the database level to avoid reading all data into memory
    *
-   * @returns 各状态的 block 数量
+   * @returns The number of blocks in each state
    */
   getStatusBreakdown(): {
     total: number;
@@ -1126,7 +1126,7 @@ export class CorivoDatabase {
     cold: number;
     archived: number;
   } {
-    // 单条 SQL 完成全部聚合
+    // A single SQL statement completes all aggregation
     const stmt = this.db.prepare(`
       SELECT
         COUNT(*) as total,
@@ -1145,7 +1145,7 @@ export class CorivoDatabase {
       archived: number;
     };
 
-    // SQLite 返回的 SUM 可能是 null（当没有记录时）
+    // The SUM returned by SQLite may be null (when there are no records)
     return {
       total: row.total || 0,
       active: row.active || 0,
@@ -1156,9 +1156,9 @@ export class CorivoDatabase {
   }
 
   /**
-   * 健康检查
+   * health check
    *
-   * @returns 健康检查结果
+   * @returns health check results
    */
   checkHealth(): {
     ok: boolean;
@@ -1168,14 +1168,14 @@ export class CorivoDatabase {
     blockCount?: number;
   } {
     try {
-      // 完整性检查
+      // integrity check
       const integrityResult = this.db.pragma('integrity_check');
-      // integrity_check 返回 [{ integrity_check: 'ok' }] 或类似结构
+      // integrity_check returns [{ integrity_check: 'ok' }] or similar structure
       const ok = Array.isArray(integrityResult)
         ? integrityResult.length > 0 && integrityResult[0].integrity_check === 'ok'
         : String(integrityResult) === 'ok';
 
-      // 文件大小 - pragma 返回值可能是数组或直接值
+      // File size - pragma return value may be an array or a direct value
       const pageSizeResult = this.db.pragma('page_size') as any;
       const pageCountResult = this.db.pragma('page_count') as any;
 
@@ -1184,7 +1184,7 @@ export class CorivoDatabase {
 
       const size = (pageSize || 0) * (pageCount || 0);
 
-      // 获取 block 数量
+      // Get the number of blocks
       const count = this.db.prepare('SELECT COUNT(*) as count FROM blocks').get() as { count: number };
 
       return {
@@ -1203,7 +1203,7 @@ export class CorivoDatabase {
   }
 
   /**
-   * 获取 TUI 状态面板所需的全量数据
+   * Get all the data you need for the TUI status panel
    */
   getTUIStats(): {
     total: number;
@@ -1280,20 +1280,20 @@ export class CorivoDatabase {
   }
 
   /**
-   * 关闭数据库连接
+   * Close database connection
    *
-   * SQLite 会在关闭时自动清理 WAL 文件。
-   * 如果进程被 SIGKILL 杀死，WAL 文件可能残留，下次启动时会自动检测并清理。
+   * SQLite automatically cleans up WAL files on shutdown.
+   * If the process is killed by SIGKILL, the WAL file may remain and will be automatically detected and cleaned up the next time it is started.
    */
   close(): void {
     this.db.close();
   }
 
   /**
-   * 将数据库行转换为 Block 对象
+   * Convert database rows to Block objects
    */
   private rowToBlock(row: any): Block {
-    // 如果启用加密但 SQLCipher 不可用，解密内容
+    // If encryption is enabled but SQLCipher is not available, decrypt content
     const content = (this.enableEncryption && !this.useSQLCipher)
       ? KeyManager.decryptContent(row.content, this.config.key)
       : row.content;
@@ -1315,7 +1315,7 @@ export class CorivoDatabase {
   }
 
   /**
-   * 将数据库行转换为 Association 对象
+   * Convert database rows to Association objects
    */
   private rowToAssociation(row: any): Association {
     return {
@@ -1332,7 +1332,7 @@ export class CorivoDatabase {
   }
 
   /**
-   * 获取加密信息（用于状态显示）
+   * Get encrypted information (for status display)
    */
   getEncryptionInfo(): { enabled: boolean; method: 'sqlcipher' | 'application' | 'none' } {
     if (!this.enableEncryption) {
@@ -1346,11 +1346,11 @@ export class CorivoDatabase {
 }
 
 /**
- * 数据库工具函数
+ * Database tool functions
  */
 
 /**
- * 获取默认数据库路径
+ * Get the default database path
  */
 export function getDefaultDatabasePath(): string {
   const home = process.env.HOME || process.env.USERPROFILE || '.';
@@ -1358,7 +1358,7 @@ export function getDefaultDatabasePath(): string {
 }
 
 /**
- * 获取 PID 文件路径
+ * Get PID file path
  */
 export function getPidFilePath(): string {
   const home = process.env.HOME || process.env.USERPROFILE || '.';
@@ -1366,7 +1366,7 @@ export function getPidFilePath(): string {
 }
 
 /**
- * 获取配置目录路径
+ * Get configuration directory path
  */
 export function getConfigDir(): string {
   const home = process.env.HOME || process.env.USERPROFILE || '.';

@@ -1,65 +1,65 @@
 /**
- * Association 数据模型
+ * Association data model
  *
- * Block 之间的关系 - 知识网络的基础
+ * Relationships between blocks, which form the basis of the knowledge graph
  */
 
 /**
- * 关联类型
+ * Association type
  */
 export enum AssociationType {
-  /** 内容相似（可能重复或描述同一件事） */
+  /** Similar content (may repeat or describe the same thing) */
   SIMILAR = 'similar',
-  /** 主题相关（同一领域的不同方面） */
+  /** Thematically related (different aspects of the same field) */
   RELATED = 'related',
-  /** 内容矛盾（决策冲突、说法不一致） */
+  /** Conflict in content (conflict in decision-making, inconsistent statements) */
   CONFLICTS = 'conflicts',
-  /** 细化/补充（更详细的版本） */
+  /** Refinements/Supplements (more detailed version) */
   REFINES = 'refines',
-  /** 替代/更新（新版本替代旧版本） */
+  /** Replacement/update (new version replaces old version) */
   SUPERSEDES = 'supersedes',
-  /** 因果关系（A 导致 B） */
+  /** Causal relationship (A causes B) */
   CAUSES = 'causes',
-  /** 依赖关系（A 依赖 B） */
+  /** Dependency (A depends on B) */
   DEPENDS_ON = 'depends_on',
 }
 
 /**
- * 关联方向
+ * Association direction
  */
 export enum AssociationDirection {
-  /** 单向：from → to */
+  /** One-way: from → to */
   ONE_WAY = 'one_way',
-  /** 双向：from ↔ to */
+  /** Bidirectional: from ↔ to */
   BI_DIRECTIONAL = 'bi_directional',
 }
 
 /**
- * 关联接口定义
+ * Association model
  */
 export interface Association {
-  /** 唯一标识符，格式: asso_<hex> */
+  /** Unique identifier, format: asso_<hex> */
   id: string;
-  /** 源 block ID */
+  /** Source block ID */
   from_id: string;
-  /** 目标 block ID */
+  /** Target block ID */
   to_id: string;
-  /** 关联类型 */
+  /** Association type */
   type: AssociationType;
-  /** 关联方向 */
+  /** Association direction */
   direction: AssociationDirection;
-  /** 置信度 0-1 */
+  /** Confidence 0-1 */
   confidence: number;
-  /** 关联说明（可选，如 LLM 生成的解释） */
+  /** Association description (optional, such as an LLM-generated explanation) */
   reason?: string;
-  /** 创建时间戳 */
+  /** Creation timestamp */
   created_at: number;
-  /** 关联的上下文标签（用于推理） */
+  /** Associated contextual labels (for inference) */
   context_tags?: string[];
 }
 
 /**
- * 关联创建参数
+ * Association creation parameters
  */
 export type CreateAssociationInput = {
   from_id: string;
@@ -72,37 +72,37 @@ export type CreateAssociationInput = {
 };
 
 /**
- * 关联查询过滤器
+ * Association query filters
  */
 export interface AssociationFilter {
-  /** 按 from_id 筛选 */
+  /** Filter by from_id */
   from_id?: string;
-  /** 按 to_id 筛选 */
+  /** Filter by to_id */
   to_id?: string;
-  /** 按类型筛选 */
+  /** Filter by type */
   type?: AssociationType;
-  /** 最低置信度 */
+  /** Minimum confidence */
   minConfidence?: number;
-  /** 返回数量限制 */
+  /** Maximum number of results to return */
   limit?: number;
 }
 
 /**
- * 关联统计
+ * Association statistics
  */
 export interface AssociationStats {
-  /** 总关联数 */
+  /** Total number of associations */
   total: number;
-  /** 按类型分组统计 */
+  /** Statistics grouped by type */
   byType: Record<AssociationType, number>;
-  /** 平均置信度 */
+  /** Average confidence */
   avgConfidence: number;
-  /** 最活跃的 block（关联最多） */
+  /** Most connected blocks */
   mostConnected: Array<{ block_id: string; count: number }>;
 }
 
 /**
- * 生成关联 ID
+ * Generate association ID
  */
 export function generateAssociationId(): string {
   const timestamp = Date.now().toString(36);
@@ -111,14 +111,14 @@ export function generateAssociationId(): string {
 }
 
 /**
- * 判断关联类型是否需要双向处理
+ * Determine whether the association type requires bidirectional processing
  */
 export function isBiDirectionalType(type: AssociationType): boolean {
   return type === AssociationType.RELATED || type === AssociationType.SIMILAR;
 }
 
 /**
- * 获取关联类型的中文描述
+ * Get the Chinese description of the associated type
  */
 export function getAssociationTypeLabel(type: AssociationType): string {
   const labels: Record<AssociationType, string> = {

@@ -206,7 +206,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send({ ok: true });
   });
 
-  // POST /auth/pair — 生成配对码（需认证）
+  // POST /auth/pair — generate a pairing code (requires authentication)
   app.post('/auth/pair', {
     preHandler: authPreHandler,
   }, async (req, reply) => {
@@ -215,7 +215,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({ pairing_code: code, expires_at: expiresAt });
   });
 
-  // POST /auth/redeem-pair — 兑换配对码，注册新设备（无需认证）
+  // POST /auth/redeem-pair — redeem a pairing code to register a new device (no authentication required)
   app.post<{ Body: RedeemPairBody }>('/auth/redeem-pair', {
     schema: {
       body: {
@@ -269,7 +269,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send({ identity_id: identityId, shared_secret: account.sharedSecret });
   });
 
-  // GET /auth/devices — 列出当前 identity 的所有设备（需认证）
+  // GET /auth/devices — list all devices belonging to the current identity (requires authentication)
   app.get('/auth/devices', {
     preHandler: authPreHandler,
   }, async (req, reply) => {

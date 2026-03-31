@@ -1,7 +1,7 @@
 /**
- * CLI 命令 - list
+ * CLI command - list
  *
- * 浏览 Corivo 记忆列表，支持过滤和排序，无需搜索关键词
+ * Browses the Corivo memory list with optional filtering and sorting, no search keyword required.
  */
 
 import fs from 'node:fs/promises';
@@ -16,7 +16,7 @@ import type { BlockFilter, BlockStatus } from '../../models/block.js';
 const VALID_STATUSES: BlockStatus[] = ['active', 'cooling', 'cold', 'archived'];
 const VALID_SORTS = ['time', 'vitality'];
 
-/** 英文 annotation 类型别名 → 中文前缀 */
+/** English annotation type alias → Chinese prefix */
 const ANNOTATION_ALIASES: Record<string, string> = {
   decision:    '决策',
   fact:        '事实',
@@ -44,7 +44,7 @@ listCommand
     verbose?: boolean;
     json?: boolean;
   }) => {
-    // 参数校验
+    // Parameter verification
     const limit = parseInt(options.limit, 10);
     if (isNaN(limit) || limit < 1) {
       console.error(chalk.red('错误: --limit 必须是正整数'));
@@ -61,7 +61,7 @@ listCommand
       process.exit(1);
     }
 
-    // 初始化数据库（使用新式模式）
+    // Initialize the database (using modern schema)
     const configDir = getConfigDir();
     const configPath = path.join(configDir, 'config.json');
 
@@ -85,7 +85,7 @@ listCommand
       enableEncryption: config.encrypted_db_key !== undefined,
     });
 
-    // 构建过滤器
+    // Build filter
     const filter: BlockFilter = {
       limit,
       sortBy: options.sort === 'vitality' ? 'vitality' : 'updated_at',
@@ -101,13 +101,13 @@ listCommand
 
     const blocks = db.queryBlocks(filter);
 
-    // JSON 输出模式
+    // JSON output mode
     if (options.json) {
       console.log(JSON.stringify(blocks, null, 2));
       return;
     }
 
-    // 人类可读输出
+    // human readable output
     if (blocks.length === 0) {
       console.log(chalk.yellow('\n未找到符合条件的记忆'));
       return;
@@ -125,7 +125,7 @@ listCommand
       const vitalityNum = chalk.white(String(block.vitality).padStart(3));
       const statusStr = statusColor(block.status.padEnd(8));
 
-      // 内容剩余宽度 = 总宽 - id(12) - 空格(2) - annotation(22) - 空格(2) - bar(10) - 空格(1) - vitality(3) - 空格(1) - status(8) - 边距(4)
+      // Content remaining width = total width - id(12) - space(2) - annotation(22) - space(2) - bar(10) - space(1) - vitality(3) - space(1) - status(8) - margin(4)
       const contentWidth = Math.max(10, termWidth - 12 - 2 - 22 - 2 - 10 - 1 - 3 - 1 - 8 - 4);
       const contentStr = chalk.white(truncate(block.content, contentWidth).padEnd(contentWidth));
 
@@ -147,7 +147,7 @@ listCommand
   });
 
 /**
- * 渲染生命力进度条（10格）
+ * Rendering vitality progress bar (10 grids)
  */
 function renderVitalityBar(vitality: number): string {
   const filled = Math.round(vitality / 10);
@@ -156,7 +156,7 @@ function renderVitalityBar(vitality: number): string {
 }
 
 /**
- * 截断字符串并添加省略号
+ * Truncate string and add ellipses
  */
 function truncate(str: string, maxLen: number): string {
   if (str.length <= maxLen) return str;
@@ -164,7 +164,7 @@ function truncate(str: string, maxLen: number): string {
 }
 
 /**
- * 获取状态对应的颜色函数
+ * Get the color function corresponding to the state
  */
 function getStatusColor(status: string): (text: string) => string {
   switch (status) {

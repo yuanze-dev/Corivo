@@ -1,34 +1,34 @@
 #!/usr/bin/env bash
 # Corivo Stop Hook - Context Push
-# 在 Claude 回复完成后触发，推送相关内容
+# Triggered after Claude finishes a reply to push relevant follow-up context
 #
-# 核心哲学（参考 Claude Code v2）：
-# "预测用户会打什么，不是你觉得他们该做什么"
+# Core philosophy (inspired by Claude Code v2):
+# "Predict what the user will type, not what you think they should do."
 
 set -euo pipefail
 
-# 读取 hook JSON 输入
+# Read hook JSON input
 INPUT=$(cat)
 
-# 提取 Claude 最后的回复消息
+# Extract Claude's last reply message
 LAST_MESSAGE=$(echo "$INPUT" | jq -r '.last_assistant_message // empty' )
 
-# 如果没有消息，静默退出
+# If there is no message, exit silently
 if [ "$LAST_MESSAGE" = "empty" ] || [ -z "$LAST_MESSAGE" ]; then
   exit 0
 fi
 
-# 检查 corivo CLI 是否可用
+# Check if Corivo CLI is available
 if ! command -v corivo &>/dev/null; then
   exit 0
 fi
 
-# 获取建议内容
+# Get suggested content
 SUGGESTION=$(corivo suggest --context post-request --last-message "$LAST_MESSAGE" --no-password 2>/dev/null || true)
 
-# 如果有建议内容，输出
+# Output the suggestion when one is available
 if [ -n "$SUGGESTION" ]; then
-  # 输出为 additionalContext
+  # The output is additionalContext
   jq -n \
     --arg suggestion "$SUGGESTION" \
     '{"additionalContext": $suggestion}' 2>/dev/null || echo ""

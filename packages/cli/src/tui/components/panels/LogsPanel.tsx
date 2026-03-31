@@ -5,11 +5,11 @@ import type { LogLine } from '../../hooks/useLogs.js';
 interface LogsPanelProps {
   lines: LogLine[];
   error: string | null;
-  scrollOffset: number;  // 距底部行数（0 = 最新，正数 = 向上滚动）
+  scrollOffset: number;  // Number of lines from bottom (0 = latest, positive = scroll up)
   panelHeight: number;
 }
 
-// 根据日志内容返回对应颜色
+// Return the corresponding color based on the log content
 function colorize(text: string): string {
   if (/\[ERR\]|\[错误\]|error:/i.test(text))            return 'red';
   if (/\[BEAT\]|\[心跳\]/.test(text))                   return 'green';
@@ -20,7 +20,7 @@ function colorize(text: string): string {
   return 'gray';
 }
 
-// 与 OverviewPanel 保持一致的 section 标题样式
+// Section title style consistent with OverviewPanel
 function SectionTitle({ label }: { label: string }) {
   return (
     <Box marginBottom={0}>
@@ -30,7 +30,7 @@ function SectionTitle({ label }: { label: string }) {
 }
 
 export const LogsPanel = React.memo(function LogsPanel({ lines, error, scrollOffset, panelHeight }: LogsPanelProps) {
-  // 减去 bordered box 的开销（上下边框 + 标题行）
+  // Subtract the overhead of bordered box (top and bottom borders + title row)
   const maxVisible = Math.max(5, panelHeight - 4);
 
   if (error) {
@@ -50,7 +50,7 @@ export const LogsPanel = React.memo(function LogsPanel({ lines, error, scrollOff
     );
   }
 
-  // 计算可见区域：scrollOffset=0 时显示最新行
+  // Calculate the visible area: display the latest row when scrollOffset=0
   const start = Math.max(0, lines.length - maxVisible - scrollOffset);
   const end = Math.max(0, lines.length - scrollOffset);
   const visible = lines.slice(start, end);
@@ -72,7 +72,7 @@ export const LogsPanel = React.memo(function LogsPanel({ lines, error, scrollOff
         {visible.length === 0
           ? <Text color="gray" dimColor>  No logs yet</Text>
           : visible.map(line => (
-            // 使用稳定的 id（全局递增），避免 slice 后 index 变化导致节点重建
+            // Use stable id (global increment) to avoid node reconstruction caused by index changes after slice
             <Text key={line.id} color={colorize(line.text)}>{line.text}</Text>
           ))
         }

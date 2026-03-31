@@ -1,27 +1,27 @@
 /**
- * 动态指纹采集系统
+ * Dynamic fingerprint collection system
  *
- * 核心思想：
- * - 不硬编码平台列表
- * - 扫描用户系统，动态发现已安装的软件
- * - 根据发现的软件，加载对应的指纹采集器
+ * Core idea:
+ * - No hard-coded platform list
+ * - Scan user systems and dynamically discover installed software
+ * - Load the corresponding fingerprint collector based on the discovered software
  *
- * 隐私保护（重要）：
- * - 只采集配置的哈希指纹，不采集原始内容
- * - 使用 SHA256 单向哈希，不可逆
- * - 只取哈希的前 16 位，进一步降低信息量
- * - 指纹仅用于身份识别，无法还原出原始数据
+ * Privacy Protection (Important):
+ * - Only the configured hash fingerprint is collected, and the original content is not collected
+ * - Use SHA256 one-way hash, irreversible
+ * - Only take the first 16 bits of the hash to further reduce the amount of information
+ * - Fingerprints are only used for identification, and the original data cannot be restored
  *
- * 具体措施：
- * - 不存储 token、密码、私钥等原始敏感信息
- * - 不采集聊天记录、文件内容等用户数据
- * - 哈希值只存储在用户本地设备
- * - 用户可随时查看和删除 identity.json
+ * Specific measures:
+ * - Does not store original sensitive information such as tokens, passwords, private keys, etc.
+ * - Do not collect user data such as chat records, file contents, etc.
+ * - Hash values are only stored locally on the user's device
+ * - User can view and delete identity.json at any time
  *
- * 优势：
- * - 新平台只需添加采集器，无需修改核心代码
- * - 用户没有的软件不会尝试采集
- * - 可以自动发现新的指纹来源
+ * Advantages:
+ * - New platforms only need to add collectors without modifying the core code
+ * - Software that the user does not own will not attempt to collect
+ * - Can automatically discover new fingerprint sources
  */
 
 import fs from 'node:fs/promises';
@@ -30,139 +30,139 @@ import crypto from 'node:crypto';
 import type { Fingerprint } from './fingerprint.js';
 
 /**
- * 指纹采集器接口
+ * Fingerprint collector interface
  *
- * 每个采集器负责：
- * 1. 检测对应软件是否已安装
- * 2. 从软件配置中提取用户标识
- * 3. 返回标准化指纹
+ * Each collector is responsible for:
+ * 1. Check whether the corresponding software has been installed
+ * 2. Extract user ID from software configuration
+ * 3. Return the standardized fingerprint
  */
 export interface FingerprintCollectorPlugin {
-  /** 采集器唯一标识 */
+  /** Collector unique identifier */
   id: string;
-  /** 平台名称 */
+  /** Platform name */
   platform: string;
-  /** 检测软件是否已安装 */
+  /** Check if the software is installed */
   detect(): Promise<boolean>;
-  /** 提取指纹 */
+  /** Extract fingerprints */
   collect(): Promise<Fingerprint | null>;
-  /** 置信度 */
+  /** Confidence */
   confidence: 'high' | 'medium' | 'low';
 }
 
 /**
- * 软件配置位置定义
+ * Software configuration location definition
  */
 interface SoftwareConfig {
-  /** 软件名称 */
+  /** Software name */
   name: string;
-  /** 平台标识 */
+  /** Platform identification */
   platform: string;
-  /** 配置文件路径（支持通配符） */
+  /** Configuration file path (supports wildcard characters) */
   configPaths: string[];
   /**
-   * 提取指纹的函数
+   * Function to extract fingerprints
    *
-   * 隐私要求：
-   * - 只返回用户 ID、用户名等非敏感标识
-   * - 不要返回 token、密钥、密码等敏感信息
-   * - 返回值会被哈希处理，只取前 16 位
+   * Privacy requirements:
+   * - Only return non-sensitive identifiers such as user ID and user name
+   * - Do not return sensitive information such as tokens, keys, passwords, etc.
+   * - The return value will be hashed and only the first 16 bits will be taken
    */
   extractor: (content: string, filePath: string) => string | null;
-  /** 置信度 */
+  /** Confidence */
   confidence: 'high' | 'medium' | 'low';
-  /** 提取方法描述 */
+  /** Extraction method description */
   method: string;
 }
 
 /**
- * 动态指纹采集器
+ * Dynamic fingerprint collector
  */
 export class DynamicFingerprintCollector {
-  /** 软件配置注册表 */
+  /** Software configuration registry */
   private static softwareRegistry: SoftwareConfig[] = [];
 
   /**
-   * 注册软件配置
+   * Register software configuration
    *
-   * 新平台只需调用此方法注册，无需修改核心代码
+   * New platforms only need to call this method to register, without modifying the core code.
    */
   static registerSoftware(config: SoftwareConfig): void {
     this.softwareRegistry.push(config);
   }
 
   /**
-   * 批量注册软件配置
+   * Batch registration software configuration
    */
   static registerSoftwareConfigs(configs: SoftwareConfig[]): void {
     this.softwareRegistry.push(...configs);
   }
 
   /**
-   * 自动发现并收集所有指纹
+   * Automatically discover and collect all fingerprints
    *
-   * 流程：
-   * 1. 扫描已注册的软件配置
-   * 2. 检测每个软件的配置文件是否存在
-   * 3. 对存在的配置文件提取指纹
-   * 4. 哈希处理（单向，不可逆）
-   * 5. 返回收集到的所有指纹
+   * Process:
+   * 1. Scan registered software configurations
+   * 2. Check whether the configuration file of each software exists
+   * 3. Extract fingerprints from existing configuration files
+   * 4. Hash processing (one-way, irreversible)
+   * 5. Return all collected fingerprints
    */
   static async collectAll(): Promise<Fingerprint[]> {
     const fingerprints: Fingerprint[] = [];
 
     for (const software of this.softwareRegistry) {
       try {
-        // 检测软件是否已安装（配置文件是否存在）
+        // Check whether the software is installed (whether the configuration file exists)
         const configPath = await this.findConfigPath(software.configPaths);
         if (!configPath) {
-          continue; // 软件未安装，跳过
+          continue; // Software is not installed, skip
         }
 
-        // 读取配置文件
+        // Read configuration file
         const content = await fs.readFile(configPath, 'utf-8');
 
-        // 提取指纹标识符（extractor 设计为只采集非敏感信息）
+        // Extract fingerprint identifiers (extractor is designed to capture only non-sensitive information)
         const identifier = software.extractor(content, configPath);
         if (!identifier) {
-          continue; // 无法提取标识，跳过
+          continue; // Unable to extract id, skipping
         }
 
-        // 🔒 哈希处理：单向哈希，只取前 16 位
+        // 🔒 Hash processing: one-way hashing, only the first 16 bits are taken
         const hash = crypto.createHash('sha256').update(identifier).digest('hex');
         const fingerprint = hash.substring(0, 16);
 
         fingerprints.push({
-          platform: software.platform as any, // 动态平台类型
+          platform: software.platform as any, // Dynamic platform type
           value: fingerprint,
           method: software.method,
           confidence: software.confidence,
         });
       } catch {
-        // 单个软件采集失败，不影响其他软件
+        // If a single software fails to collect, other software will not be affected.
         continue;
       }
     }
 
-    // 添加设备指纹（总是存在）
+    // Add device fingerprint (always present)
     try {
       const deviceFp = await this.collectDeviceFingerprint();
       fingerprints.push(deviceFp);
     } catch {
-      // 设备指纹失败，忽略
+      // Device fingerprint failed, ignored
     }
 
     return fingerprints;
   }
 
   /**
-   * 查找第一个存在的配置文件路径
+   * Find the first existing configuration file path
    */
   private static async findConfigPath(paths: string[]): Promise<string | null> {
     for (const p of paths) {
       const expandedPath = this.expandPath(p);
       try {
-        // 支持通配符
+        // Supports wildcards
         if (p.includes('*')) {
           const dir = path.dirname(expandedPath);
           const pattern = path.basename(expandedPath);
@@ -172,12 +172,12 @@ export class DynamicFingerprintCollector {
             return path.join(dir, match);
           }
         } else {
-          // 普通路径
+          // normal path
           await fs.access(expandedPath);
           return expandedPath;
         }
       } catch {
-        // 路径不存在，继续尝试下一个
+        // The path does not exist, continue to try the next one
         continue;
       }
     }
@@ -185,7 +185,7 @@ export class DynamicFingerprintCollector {
   }
 
   /**
-   * 展开路径中的环境变量和 ~
+   * Expand environment variables and ~ in the path
    */
   private static expandPath(p: string): string {
     return p
@@ -195,7 +195,7 @@ export class DynamicFingerprintCollector {
   }
 
   /**
-   * 采集设备指纹
+   * Collect device fingerprints
    */
   private static async collectDeviceFingerprint(): Promise<Fingerprint> {
     const infos: string[] = [];
@@ -204,7 +204,7 @@ export class DynamicFingerprintCollector {
     infos.push(process.env.HOME || process.env.USERPROFILE || '');
     infos.push(process.env.HOSTNAME || process.env.COMPUTERNAME || 'unknown');
 
-    // macOS 读取硬件 UUID
+    // macOS reads hardware UUID
     if (process.platform === 'darwin') {
       try {
         const { execSync } = await import('node:child_process');
@@ -215,7 +215,7 @@ export class DynamicFingerprintCollector {
       } catch { /* 忽略 */ }
     }
 
-    // Linux 读取 machine-id
+    // Linux reads machine-id
     if (process.platform === 'linux') {
       try {
         const machineId = await fs.readFile('/etc/machine-id', 'utf-8');
@@ -238,14 +238,14 @@ export class DynamicFingerprintCollector {
   }
 
   /**
-   * 获取已注册的软件列表
+   * Get a list of registered software
    */
   static getRegisteredSoftware(): string[] {
     return this.softwareRegistry.map(s => s.name);
   }
 
   /**
-   * 获取已安装的软件列表
+   * Get a list of installed software
    */
   static async getInstalledSoftware(): Promise<string[]> {
     const installed: string[] = [];
@@ -262,15 +262,15 @@ export class DynamicFingerprintCollector {
 }
 
 /**
- * 初始化默认软件配置
+ * Initialize default software configuration
  *
- * 注册常见开发工具的指纹采集规则
+ * Register fingerprint collection rules for common development tools
  */
 export function initializeDefaultSoftwareConfigs(): void {
   const home = process.env.HOME || process.env.USERPROFILE || '';
 
   DynamicFingerprintCollector.registerSoftwareConfigs([
-    // ========== AI 编程工具 ==========
+    // ========== AI programming tools ==========
     {
       name: 'Claude Code',
       platform: 'claude_code',
@@ -315,7 +315,7 @@ export function initializeDefaultSoftwareConfigs(): void {
       method: 'sha256(cursor_machine_id)[:16]',
     },
 
-    // ========== 版本控制 ==========
+    // ========== Version Control ==========
     {
       name: 'GitHub',
       platform: 'github',
@@ -344,7 +344,7 @@ export function initializeDefaultSoftwareConfigs(): void {
       method: 'sha256(git_email)[:16]',
     },
 
-    // ========== 开发工具 ==========
+    // ========== Development Tools ==========
     {
       name: 'VS Code',
       platform: 'vscode',
@@ -382,14 +382,14 @@ export function initializeDefaultSoftwareConfigs(): void {
         path.join(home, '.config', 'JetBrains'),
       ],
       extractor: (content, filePath) => {
-        // 使用安装路径作为特征
+        // Use installation path as feature
         return filePath;
       },
       confidence: 'medium',
       method: 'sha256(jetbrains_install)[:16]',
     },
 
-    // ========== 云服务 ==========
+    // ========== Cloud Services ==========
     {
       name: 'AWS CLI',
       platform: 'aws',
@@ -407,7 +407,7 @@ export function initializeDefaultSoftwareConfigs(): void {
       method: 'sha256(aws_profiles)[:16]',
     },
 
-    // ========== 通讯协作 ==========
+    // ========== Communication and collaboration ==========
     {
       name: '飞书',
       platform: 'feishu',
@@ -441,7 +441,7 @@ export function initializeDefaultSoftwareConfigs(): void {
       method: 'slack team/user id',
     },
 
-    // ========== 包管理器 ==========
+    // ========== Package Manager ==========
     {
       name: 'npm',
       platform: 'npm',
@@ -467,7 +467,7 @@ export function initializeDefaultSoftwareConfigs(): void {
       method: 'bun_install_detected',
     },
 
-    // ========== SSH 密钥 ==========
+    // ========== SSH Key ==========
     {
       name: 'SSH Keys',
       platform: 'ssh',
@@ -490,6 +490,6 @@ export function initializeDefaultSoftwareConfigs(): void {
 }
 
 /**
- * 创建便捷的导出别名
+ * Create convenient export aliases
  */
 export const DynamicCollector = DynamicFingerprintCollector;

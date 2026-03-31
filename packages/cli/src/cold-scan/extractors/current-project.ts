@@ -1,6 +1,6 @@
 /**
- * Current Project 提取器
- * 提取当前项目信息
+ * Current Project Extractor
+ * Extract current project information
  */
 
 import { readFileSafe, createBlock } from '../utils.js';
@@ -13,7 +13,7 @@ async function extractCurrentProject(_content: string, filePath: string) {
   const cwd = process.cwd();
 
   try {
-    // 读取 README
+    // Read README
     const readmes = [
       'README.md',
       'README.txt',
@@ -36,7 +36,7 @@ async function extractCurrentProject(_content: string, filePath: string) {
       }
     }
 
-    // 提取项目名称
+    // Extract project name
     const projectName = path.basename(cwd);
     blocks.push(
       createBlock({
@@ -48,9 +48,9 @@ async function extractCurrentProject(_content: string, filePath: string) {
       })
     );
 
-    // 提取项目描述
+    // Extract project description
     if (readmeContent) {
-      // 尝试提取标题和第一段
+      // Try to extract title and first paragraph
       const titleMatch = readmeContent.match(/^#\s+(.+)$/m);
       const descriptionMatch = readmeContent.match(
         /^#\s+.+\n+([^#\n].{10,200})$/m
@@ -83,7 +83,7 @@ async function extractCurrentProject(_content: string, filePath: string) {
       }
     }
 
-    // 读取 package.json 获取更多信息
+    // Read package.json for more information
     const pkgPath = path.join(cwd, 'package.json');
     try {
       const pkgContent = await fs.readFile(pkgPath, 'utf-8');
@@ -113,10 +113,10 @@ async function extractCurrentProject(_content: string, filePath: string) {
         );
       }
     } catch {
-      // 没有 package.json，忽略
+      // No package.json, ignored
     }
   } catch {
-    // 出错，至少记录项目名
+    // An error occurred, at least record the project name
     const projectName = path.basename(cwd);
     blocks.push(
       createBlock({

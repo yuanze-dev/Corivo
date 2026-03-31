@@ -1,5 +1,5 @@
 /**
- * 密钥管理单元测试
+ * Unit tests for key management (KeyManager)
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';

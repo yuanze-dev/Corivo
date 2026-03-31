@@ -1,5 +1,5 @@
 /**
- * Claude Code 采集器集成测试
+ * Integration tests for the Claude Code ingestor
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -14,11 +14,11 @@ describe('ClaudeCodeIngestor (Integration)', () => {
   let claudeMdPath: string;
 
   beforeEach(async () => {
-    // 创建临时目录
+    // Create temporary directory
     tempDir = `${os.tmpdir()}/corivo-test-${Date.now()}`;
     await fs.mkdir(tempDir, { recursive: true });
 
-    // 创建 CLAUDE.md 文件
+    // Create CLAUDE.md file
     claudeMdPath = path.join(tempDir, 'CLAUDE.md');
     await fs.writeFile(claudeMdPath, '# 项目配置\n\n原始内容\n');
 
@@ -26,7 +26,7 @@ describe('ClaudeCodeIngestor (Integration)', () => {
   });
 
   afterEach(async () => {
-    // 清理临时目录
+    // Clean up temporary directory
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
@@ -41,23 +41,23 @@ describe('ClaudeCodeIngestor (Integration)', () => {
     });
 
     it('should not inject rules if already present', async () => {
-      // 首次注入
+      // first injection
       await ingestor.injectRules(tempDir);
       const firstContent = await fs.readFile(claudeMdPath, 'utf-8');
 
-      // 二次注入
+      // secondary injection
       await ingestor.injectRules(tempDir);
       const secondContent = await fs.readFile(claudeMdPath, 'utf-8');
 
-      // 内容应该相同（规则没有重复添加）
+      // The content should be the same (the rules are not added repeatedly)
       expect(secondContent).toBe(firstContent);
     });
 
     it('should handle missing CLAUDE.md gracefully', async () => {
-      // 删除 CLAUDE.md
+      // Delete CLAUDE.md
       await fs.unlink(claudeMdPath);
 
-      // 应该抛出错误或静默失败
+      // should throw an error or fail silently
       await expect(ingestor.injectRules(tempDir)).resolves.toBeUndefined();
     });
 
@@ -68,9 +68,9 @@ describe('ClaudeCodeIngestor (Integration)', () => {
 
       const newContent = await fs.readFile(claudeMdPath, 'utf-8');
 
-      // 原始内容应该保留
+      // Original content should be retained
       expect(newContent).toContain('原始内容');
-      // 新规则应该添加
+      // New rules should be added
       expect(newContent).toContain('## Corivo 记忆层');
       expect(newContent.length).toBeGreaterThan(originalContent.length);
     });
@@ -82,7 +82,7 @@ describe('ClaudeCodeIngestor (Integration)', () => {
 
       const content = await fs.readFile(claudeMdPath, 'utf-8');
 
-      // 检查关键部分
+      // Check the key parts
       expect(content).toContain('性质（nature）');
       expect(content).toContain('事实');
       expect(content).toContain('知识');

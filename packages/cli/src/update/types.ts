@@ -1,90 +1,90 @@
 /**
- * 自动更新系统类型定义
+ * Automatically update system type definitions
  */
 
 /**
- * 平台标识
+ * Platform identification
  */
 export type Platform = 'Darwin-arm64' | 'Darwin-x64' | 'Linux-x64';
 
 /**
- * 版本信息
+ * Version information
  */
 export interface VersionInfo {
-  /** 版本号 */
+  /** version number */
   version: string;
-  /** 发布时间 */
+  /** Release time */
   released_at: string;
-  /** 是否有破坏性变更 */
+  /** Are there any breaking changes? */
   breaking: boolean;
-  /** 更新日志 */
+  /** Change log */
   changelog: string;
-  /** 各平台二进制包（旧二进制更新链路保留字段） */
+  /** Binary packages for each platform (old binary update link reserved fields) */
   binaries?: Record<Platform, BinaryInfo>;
 }
 
 /**
- * 二进制包信息
+ * Binary package information
  */
 export interface BinaryInfo {
-  /** 下载 URL */
+  /** Download URL */
   url: string;
-  /** SHA256 校验和 */
+  /** SHA256 checksum */
   checksum: string;
-  /** 文件大小（字节） */
+  /** File size (bytes) */
   size?: number;
 }
 
 /**
- * 更新配置
+ * Update configuration
  */
 export interface UpdateConfig {
-  /** 是否启用自动更新 */
+  /** Whether to enable automatic updates */
   auto?: boolean;
-  /** 版本固定（如 "0.10.x"） */
+  /** Fixed version (such as "0.10.x") */
   pin?: string;
-  /** 检查间隔（毫秒） */
+  /** Check interval (milliseconds) */
   checkInterval?: number;
 }
 
 /**
- * 更新状态
+ * update status
  */
 export interface UpdateStatus {
-  /** 当前版本 */
+  /** Current version */
   currentVersion: string;
-  /** 最新版本 */
+  /** latest version */
   latestVersion: string | null;
-  /** 是否有可用更新 */
+  /** Is there an update available? */
   hasUpdate: boolean;
-  /** 是否为破坏性更新 */
+  /** Is it a destructive update? */
   isBreaking: boolean;
-  /** 上次检查时间 */
+  /** Last check time */
   lastCheck: number | null;
-  /** 下次检查时间 */
+  /** Next inspection time */
   nextCheck: number | null;
 }
 
 /**
- * 更新结果
+ * Update results
  */
 export interface UpdateResult {
-  /** 是否成功 */
+  /** Is it successful? */
   success: boolean;
-  /** 从哪个版本更新 */
+  /** Which version to update from */
   from?: string;
-  /** 更新到哪个版本 */
+  /** Which version to update to */
   to?: string;
-  /** 更新时间 */
+  /** Update time */
   at?: string;
-  /** 更新日志 */
+  /** Change log */
   changelog?: string;
-  /** 错误信息 */
+  /** error message */
   error?: string;
 }
 
 /**
- * version.json 结构
+ * version.json structure
  */
 export interface VersionJson {
   version: string;

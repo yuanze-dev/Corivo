@@ -5,7 +5,7 @@ import path from 'node:path';
 
 const MAX_LINES = 100;
 
-// 每条日志行带稳定 ID，避免 key 不稳定导致 React 重建节点
+// Each log line has a stable ID to avoid key instability causing React to rebuild the node.
 export interface LogLine {
   id: number;
   text: string;
@@ -18,13 +18,13 @@ export function useLogs(
   const [lines, setLines] = useState<LogLine[]>([]);
   const [error, setError] = useState<string | null>(null);
   const posRef = useRef(0);
-  // 全局递增 ID，保证每条日志行的 key 唯一且稳定
+  // Increment the ID globally to ensure that the key of each log line is unique and stable
   const idCounterRef = useRef(0);
   // fs.watch debounce timer
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!enabled) return; // 非 logs tab 时不启动文件监听
+    if (!enabled) return; // Do not start file monitoring when not in logs tab
 
     const logPath = path.join(configDir, 'daemon.log');
     let watcher: fs.FSWatcher | null = null;
@@ -37,7 +37,7 @@ export function useLogs(
         if (size === 0) return;
 
         if (posRef.current === 0) {
-          // 首次读取：从末尾 8KB 开始，避免读取全部历史
+          // First read: start from the last 8KB to avoid reading the entire history
           posRef.current = Math.max(0, size - 8192);
         }
 
@@ -52,7 +52,7 @@ export function useLogs(
         const newLines = buf.toString('utf-8').split('\n').filter(l => l.trim());
         if (newLines.length === 0) return;
 
-        // 给每条新行分配稳定 ID
+        // Assign a stable ID to each new row
         const tagged: LogLine[] = newLines.map(text => ({
           id: idCounterRef.current++,
           text,
@@ -68,14 +68,14 @@ export function useLogs(
 
     const debouncedRead = () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      // 100ms 去抖：合并 daemon 快速连续写入触发的多次 watch 事件
+      // 100ms debounce: merge multiple watch events triggered by daemon's rapid continuous writes
       debounceRef.current = setTimeout(() => readNew(), 100);
     };
 
     try {
       watcher = fs.watch(logPath, debouncedRead);
     } catch {
-      // 文件不存在时退回轮询
+      // Return to polling when file does not exist
       pollInterval = setInterval(readNew, 2000);
     }
 

@@ -1,6 +1,6 @@
 /**
- * EditorConfig 提取器
- * 提取编辑器配置偏好
+ * EditorConfig Extractor
+ * Extract editor configuration preferences
  */
 
 import { readFileSafe, createBlock } from '../utils.js';
@@ -17,21 +17,21 @@ async function extractEditorconfig(content: string, filePath: string) {
   for (const line of lines) {
     const trimmed = line.trim();
 
-    // 跳过注释和空行
+    // Skip comments and blank lines
     if (!trimmed || trimmed.startsWith('#')) {
       continue;
     }
 
-    // 检测 section
+    // Detect section
     const sectionMatch = line.match(/^\[([^\]]+)\]$/);
     if (sectionMatch) {
       currentSection = sectionMatch[1];
       continue;
     }
 
-    // 只处理全局配置 (*) 和特定语言配置
+    // Only handles global configuration (*) and language-specific configuration
     if (currentSection === '*' || currentSection.startsWith('*.')) {
-      // 提取缩进风格
+      // Extract indent style
       if (trimmed.startsWith('indent_style=')) {
         const value = trimmed.split('=')[1]?.trim();
         if (value) {
@@ -48,7 +48,7 @@ async function extractEditorconfig(content: string, filePath: string) {
         }
       }
 
-      // 提取缩进大小
+      // Extract indent size
       if (trimmed.startsWith('indent_size=')) {
         const value = trimmed.split('=')[1]?.trim();
         if (value && value !== 'tab') {
@@ -64,7 +64,7 @@ async function extractEditorconfig(content: string, filePath: string) {
         }
       }
 
-      // 提取换行符
+      // Extract newline characters
       if (trimmed.startsWith('end_of_line=')) {
         const value = trimmed.split('=')[1]?.trim();
         if (value) {
@@ -86,7 +86,7 @@ async function extractEditorconfig(content: string, filePath: string) {
         }
       }
 
-      // 提取编码
+      // Extract encoding
       if (trimmed.startsWith('charset=')) {
         const value = trimmed.split('=')[1]?.trim();
         if (value) {
@@ -102,7 +102,7 @@ async function extractEditorconfig(content: string, filePath: string) {
         }
       }
 
-      // 提取尾随空格
+      // Extract trailing spaces
       if (trimmed.startsWith('trim_trailing_whitespace=')) {
         const value = trimmed.split('=')[1]?.trim();
         if (value === 'true') {

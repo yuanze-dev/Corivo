@@ -10,23 +10,23 @@ export interface FeatureItem {
 }
 
 export const FEATURE_ITEMS: FeatureItem[] = [
-  // 同步
+  // sync
   { key: 'sync',              label: 'Multi-device sync',       group: 'Sync' },
   { key: 'autoPushOnSave',    label: 'Auto-push on save',       group: 'Sync' },
   { key: 'syncOnWake',        label: 'Sync on wake',            group: 'Sync' },
-  // 守护进程
+  // daemon
   { key: 'heartbeatEngine',   label: 'Heartbeat engine',        group: 'Daemon' },
   { key: 'autoStartOnLogin',  label: 'Auto-start on login',     group: 'Daemon' },
-  // 记忆引擎
+  // memory engine
   { key: 'passiveListening',      label: 'Passive listening',       group: 'Memory Engine' },
   { key: 'associationDiscovery',  label: 'Association discovery',   group: 'Memory Engine' },
   { key: 'consolidation',         label: 'Consolidation',           group: 'Memory Engine' },
   { key: 'cjkFtsFallback',        label: 'CJK FTS fallback',        group: 'Memory Engine' },
-  // 集成
+  // Integrate
   { key: 'claudeCode',  label: 'Claude Code',   group: 'Integrations' },
   { key: 'cursor',      label: 'Cursor',         group: 'Integrations' },
   { key: 'feishu',      label: 'Feishu',         group: 'Integrations' },
-  // 安全
+  // safe
   { key: 'dbEncryption', label: 'Database encryption', group: 'Security' },
   { key: 'telemetry',    label: 'Telemetry',            group: 'Security' },
 ];
@@ -68,14 +68,14 @@ interface ConfigPanelProps {
   panelHeight: number;
 }
 
-// ─── 扁平行类型（用于虚拟滚动） ──────────────────────────────────
+// ─── Flat row type (for virtual scrolling) ─────────────────────────────────
 
 type FlatRow =
   | { kind: 'group'; label: string }
   | { kind: 'item'; item: FeatureItem; globalIndex: number }
   | { kind: 'syncInterval' };
 
-/** 将 FEATURE_ITEMS 展开成扁平行列表，group header 作为分隔行 */
+/** Expand FEATURE_ITEMS into a flat list of rows, with group header as delimited row */
 function buildFlatRows(): FlatRow[] {
   const rows: FlatRow[] = [];
   let lastGroup = '';
@@ -99,7 +99,7 @@ function buildFlatRows(): FlatRow[] {
 
 const FLAT_ROWS = buildFlatRows();
 
-/** 计算 focusIndex 对应的扁平行下标 */
+/** Calculate the flat row index corresponding to focusIndex */
 function focusRowIndex(focusIndex: number): number {
   if (focusIndex === SYNC_INTERVAL_INDEX) {
     return FLAT_ROWS.findIndex(r => r.kind === 'syncInterval');
@@ -107,7 +107,7 @@ function focusRowIndex(focusIndex: number): number {
   return FLAT_ROWS.findIndex(r => r.kind === 'item' && r.globalIndex === focusIndex);
 }
 
-// ─── 与 OverviewPanel 一致的 section 标题 ────────────────────────
+// ─── Section title consistent with OverviewPanel ───────────────────────
 
 function SectionTitle({ label }: { label: string }) {
   return (
@@ -117,7 +117,7 @@ function SectionTitle({ label }: { label: string }) {
   );
 }
 
-// ─── 同步间隔行渲染 ──────────────────────────────────────────────
+// ─── Synchronized spaced row rendering ───────────────────────────────────────────
 
 function SyncIntervalRow({
   seconds,
@@ -145,7 +145,7 @@ function SyncIntervalRow({
   );
 }
 
-// ─── 单条 item 行渲染 ────────────────────────────────────────────
+// ─── Single item row rendering ─────────────────────────────────────────
 
 function ItemRow({
   item,
@@ -174,7 +174,7 @@ function ItemRow({
   );
 }
 
-// ─── 分组 bordered 样式（高度充足时） ───────────────────────────
+// ───Group bordered style (when the height is sufficient) ────────────────────────────
 
 function GroupedView({
   config,
@@ -232,7 +232,7 @@ function GroupedView({
   );
 }
 
-// ─── 虚拟滚动样式（高度不足时） ─────────────────────────────────
+// ─── Virtual scrolling style (when the height is insufficient) ─────────────────────────────────
 
 function ScrollView({
   config,
@@ -301,14 +301,14 @@ function ScrollView({
   );
 }
 
-// ─── 每个 group 的静态高度（border×2 + title + items + marginBottom） ──
+// ─── The static height of each group (border×2 + title + items + marginBottom) ──
 
 function groupedContentRows(): number {
   const groups = new Map<string, number>();
   for (const item of FEATURE_ITEMS) {
     groups.set(item.group, (groups.get(item.group) ?? 0) + 1);
   }
-  let total = 1; // hint 行
+  let total = 1; // hint line
   for (const [group, count] of groups.entries()) {
     const extraRows = group === 'Sync' ? 1 : 0; // SyncIntervalRow
     total += 2 + 1 + count + extraRows + 1; // border×2 + title + items + extra + marginBottom
@@ -318,7 +318,7 @@ function groupedContentRows(): number {
 
 const GROUPED_ROWS_NEEDED = groupedContentRows();
 
-// ─── 主组件 ────────────────────────────────────────────────────────
+// ─── Main component ────────────────────────────────────────────────────
 
 export const ConfigPanel = React.memo(function ConfigPanel({ configState, focusIndex, panelHeight }: ConfigPanelProps) {
   const { config, loading } = configState;
@@ -329,7 +329,7 @@ export const ConfigPanel = React.memo(function ConfigPanel({ configState, focusI
 
   const availableRows = Math.max(5, panelHeight);
 
-  // hysteresis：±2 行缓冲防止临界抖动
+  // hysteresis: ±2 line buffering to prevent critical jitter
   if (scrollModeRef.current === null) {
     scrollModeRef.current = availableRows < GROUPED_ROWS_NEEDED;
   } else if (scrollModeRef.current && availableRows >= GROUPED_ROWS_NEEDED + 2) {
@@ -339,10 +339,10 @@ export const ConfigPanel = React.memo(function ConfigPanel({ configState, focusI
   }
 
   if (!scrollModeRef.current) {
-    // 高度充足：使用分组 bordered 样式
+    // Sufficient height: use grouped bordered style
     return <GroupedView config={config} focusIndex={focusIndex} />;
   }
 
-  // 高度不足：虚拟滚动
+  // Not enough height: virtual scrolling
   return <ScrollView config={config} focusIndex={focusIndex} availableRows={availableRows} />;
 });

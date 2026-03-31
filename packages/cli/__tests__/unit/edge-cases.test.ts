@@ -1,5 +1,5 @@
 /**
- * 边界情况测试
+ * Edge case tests
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -17,7 +17,7 @@ describe('Edge Cases', () => {
   let dbKey: Buffer;
 
   beforeEach(async () => {
-    // 创建临时目录
+    // Create temporary directory
     tempDir = `${os.tmpdir()}/corivo-edge-test-${Date.now()}`;
     await fs.mkdir(tempDir, { recursive: true });
 
@@ -135,13 +135,13 @@ describe('Edge Cases', () => {
   describe('annotation 验证', () => {
     it('should reject invalid annotation formats', () => {
       const invalidAnnotations = [
-        '', // 空
-        '事实', // 只有一部分
-        '事实 · asset', // 只有两部分
-        ' · asset · test', // 第一部分为空
-        '事实 ·  · test', // 第二部分为空
-        '事实 · asset · ', // 第三部分为空
-        // 注意：前后空格现在被接受（用户友好），如果需要严格验证可添加 trim 检查
+        '', // null
+        '事实', // only part
+        '事实 · asset', // only two parts
+        ' · asset · test', // The first part is empty
+        '事实 ·  · test', // The second part is empty
+        '事实 · asset · ', // The third part is empty
+        // NOTE: leading and trailing spaces are now accepted (user friendly), add trim check if strict validation is required
       ];
 
       for (const annotation of invalidAnnotations) {

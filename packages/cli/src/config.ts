@@ -1,7 +1,7 @@
 /**
- * 配置管理模块
+ * Configuration management module
  *
- * 统一管理 Corivo 的配置文件读取和验证
+ * Centralized loading and validation for Corivo configuration files
  */
 
 import fs from 'node:fs/promises';
@@ -12,69 +12,69 @@ import { getConfigDir } from './storage/database.js';
  * Feature flags (opt-out model: missing key = true = enabled)
  */
 export interface CorivoFeatures {
-  /** 多设备同步 */
+  /** Multi-device sync */
   sync?: boolean;
-  /** 保存时自动推送 */
+  /** Automatically push when saving */
   autoPushOnSave?: boolean;
-  /** 唤醒时同步 */
+  /** Sync on wake up */
   syncOnWake?: boolean;
-  /** 心跳引擎 */
+  /** Heartbeat engine */
   heartbeatEngine?: boolean;
-  /** 登录时自动启动 */
+  /** Automatically start on login */
   autoStartOnLogin?: boolean;
-  /** 被动监听（Claude Code / Cursor 对话） */
+  /** Passive listening (Claude Code / Cursor dialogue) */
   passiveListening?: boolean;
-  /** 关联发现 */
+  /** Association discovery */
   associationDiscovery?: boolean;
-  /** 整合去重 */
+  /** Consolidation and deduplication */
   consolidation?: boolean;
-  /** CJK 全文搜索降级 */
+  /** CJK full-text-search fallback */
   cjkFtsFallback?: boolean;
-  /** Claude Code 集成 */
+  /** Claude Code integration */
   claudeCode?: boolean;
-  /** Cursor 集成 */
+  /** Cursor integration */
   cursor?: boolean;
-  /** 飞书集成 */
+  /** Feishu integration */
   feishu?: boolean;
-  /** 数据库加密 */
+  /** Database encryption */
   dbEncryption?: boolean;
-  /** 遥测 */
+  /** Telemetry */
   telemetry?: boolean;
 }
 
 /**
- * Corivo 数值型配置
+ * Corivo numerical configuration
  */
 export interface CorivoSettings {
-  /** 自动同步间隔（秒），默认 300（5 分钟） */
+  /** Auto-sync interval (seconds), default 300 (5 minutes) */
   syncIntervalSeconds?: number;
-  /** 日志级别 */
+  /** Log level */
   logLevel?: 'error' | 'info' | 'debug';
 }
 
 /**
- * Corivo 配置
+ * Corivo configuration
  */
 export interface CorivoConfig {
-  /** 配置版本 */
+  /** Configuration version */
   version: string;
-  /** 创建时间 */
+  /** Creation time */
   created_at: string;
-  /** 身份 ID */
+  /** Identity ID */
   identity_id: string;
-  /** 数据库密钥（base64 编码） */
+  /** Database key (base64 encoded) */
   db_key: string;
   features?: CorivoFeatures;
   settings?: CorivoSettings;
-  /** 已启用的插件 npm 包名列表（需全局安装：npm install -g <pkg>） */
+  /** Enabled plugin package names (installed globally via `npm install -g <pkg>`) */
   plugins?: string[];
 }
 
 /**
- * 加载配置文件
+ * Load configuration file
  *
- * @param configDir - 配置目录，默认为 ~/.corivo
- * @returns 配置对象，如果文件不存在或无效则返回 null
+ * @param configDir - Configuration directory, defaults to `~/.corivo`
+ * @returns Configuration object, or `null` if the file is missing or invalid
  */
 export async function loadConfig(configDir?: string): Promise<CorivoConfig | null> {
   const dir = configDir || getConfigDir();
@@ -84,7 +84,7 @@ export async function loadConfig(configDir?: string): Promise<CorivoConfig | nul
     const content = await fs.readFile(configPath, 'utf-8');
     const config = JSON.parse(content) as CorivoConfig;
 
-    // 验证必需字段
+    // Validate required fields
     if (!config.db_key || !config.identity_id) {
       return null;
     }
@@ -96,10 +96,10 @@ export async function loadConfig(configDir?: string): Promise<CorivoConfig | nul
 }
 
 /**
- * 保存配置文件
+ * Save configuration file
  *
- * @param config - 配置对象
- * @param configDir - 配置目录，默认为 ~/.corivo
+ * @param config - Configuration object
+ * @param configDir - Configuration directory, defaults to `~/.corivo`
  */
 export async function saveConfig(
   config: CorivoConfig,
@@ -121,10 +121,10 @@ export async function saveConfig(
 }
 
 /**
- * 获取数据库密钥
+ * Get database key
  *
- * @param configDir - 配置目录
- * @returns 数据库密钥（Buffer），如果配置无效则返回 null
+ * @param configDir - configuration directory
+ * @returns database key (Buffer), or null if the configuration is invalid
  */
 export async function getDatabaseKey(configDir?: string): Promise<Buffer | null> {
   const config = await loadConfig(configDir);
@@ -140,10 +140,10 @@ export async function getDatabaseKey(configDir?: string): Promise<Buffer | null>
 }
 
 /**
- * 检查 Corivo 是否已初始化
+ * Check if Corivo has been initialized
  *
- * @param configDir - 配置目录
- * @returns 是否已初始化
+ * @param configDir - configuration directory
+ * @returns whether it has been initialized
  */
 export async function isInitialized(configDir?: string): Promise<boolean> {
   const config = await loadConfig(configDir);
@@ -151,7 +151,7 @@ export async function isInitialized(configDir?: string): Promise<boolean> {
 }
 
 /**
- * Solver 同步配置（存于 ~/.corivo/solver.json）
+ * Solver synchronization configuration (stored in ~/.corivo/solver.json)
  */
 export interface SolverConfig {
   server_url: string;
@@ -162,7 +162,7 @@ export interface SolverConfig {
 }
 
 /**
- * 加载 solver 配置
+ * Load solver configuration
  */
 export async function loadSolverConfig(configDir?: string): Promise<SolverConfig | null> {
   const dir = configDir || getConfigDir();
@@ -180,7 +180,7 @@ export async function loadSolverConfig(configDir?: string): Promise<SolverConfig
 }
 
 /**
- * 保存 solver 配置
+ * Save solver configuration
  */
 export async function saveSolverConfig(
   config: SolverConfig,

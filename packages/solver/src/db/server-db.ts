@@ -82,7 +82,7 @@ function createSchema(db: SQLiteDatabase): void {
       ON changesets(identity_id, site_id, table_name, pk, col_version);
   `);
 
-  // 迁移：为已有 devices 表添加 platform 和 arch 列
+  // Migration: add platform and arch columns to pre-existing devices tables
   const cols = db.pragma('table_info(devices)') as { name: string }[];
   const colNames = cols.map(c => c.name);
   if (!colNames.includes('platform')) {

@@ -1,5 +1,5 @@
 /**
- * Cold Scan Extractors 单元测试
+ * Unit tests for cold scan extractors
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';

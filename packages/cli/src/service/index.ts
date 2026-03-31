@@ -24,9 +24,9 @@ export function getServiceManager(): ServiceManager {
 }
 
 /**
- * 探测当前环境的 corivo 二进制路径。
- * 注意：fallback 中 process.cwd() 取决于用户执行 corivo 时的目录，
- * 这是继承自旧 daemon.ts 的开发模式假设。
+ * Detect the corivo binary path of the current environment.
+ * Note: process.cwd() in fallback depends on the directory when the user executes corivo.
+ * This is a development model assumption inherited from the old daemon.ts.
  */
 export async function resolveCorivoBin(): Promise<string> {
   const candidates = [
@@ -41,8 +41,8 @@ export async function resolveCorivoBin(): Promise<string> {
     }
   }
 
-  // fallback: 用 import.meta.url 定位当前文件，推导 cli/index.js 的绝对路径
-  // dist/service/index.js → ../../dist/cli/index.js（与 cwd 无关）
+  // fallback: Use import.meta.url to locate the current file and deduce the absolute path of cli/index.js
+  // dist/service/index.js → ../../dist/cli/index.js (not related to cwd)
   const thisFile = fileURLToPath(import.meta.url)
   const cliPath = path.resolve(path.dirname(thisFile), '..', 'cli', 'index.js')
   return `${process.execPath} ${cliPath}`

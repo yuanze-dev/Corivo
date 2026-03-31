@@ -1,11 +1,11 @@
 /**
- * E2E 测试 — Corivo 同步链路
+ * E2E tests — Corivo sync pipeline
  *
- * 完整验证：solver 启动 → 注册 → save → push → 配对 → join → pull
+ * Full verification: solver startup → registration → save → push → pairing → join → pull
  *
- * 注意：
- * - Pull 当前不写入本地 DB（只记录条数），测试只验证 pull count > 0
- * - init 会尝试启动 launchd 心跳，测试环境会失败，但 init 会优雅跳过
+ * Notes:
+ * - Pull currently does not write to the local DB (only records the count); tests only verify pull count > 0
+ * - init attempts to start the launchd heartbeat, which fails in the test environment but is gracefully skipped
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -30,7 +30,7 @@ const SOLVER_DATA = path.join(TMP, 'solver-data');
 
 let solverProcess: ReturnType<typeof spawn> | null = null;
 
-/** 调用 CLI，隔离 HOME 目录 */
+/** Call the CLI to isolate the HOME directory */
 function cli(args: string, homeDir: string): string {
   return execSync(`node ${CLI} ${args}`, {
     encoding: 'utf-8',
@@ -44,7 +44,7 @@ function cli(args: string, homeDir: string): string {
   });
 }
 
-/** 轮询 /health，等待 solver 就绪 */
+/** Poll /health, waiting for solver to be ready */
 async function waitForSolver(maxMs = 15_000): Promise<void> {
   const deadline = Date.now() + maxMs;
   while (Date.now() < deadline) {
@@ -67,13 +67,13 @@ describe('E2E: Solver 同步链路', () => {
       fs.mkdir(SOLVER_DATA, { recursive: true }),
     ]);
 
-    // 构建 solver
+    // Build solver
     execSync('npm run build', {
       cwd: path.join(ROOT, 'packages/solver'),
       stdio: 'pipe',
     });
 
-    // 启动 solver 子进程
+    // Start the solver subprocess
     solverProcess = spawn('node', [SOLVER_DIST], {
       stdio: 'pipe',
       env: {
@@ -90,7 +90,7 @@ describe('E2E: Solver 同步链路', () => {
     });
 
     await waitForSolver();
-  }, 90_000); // solver build 可能较慢
+  }, 90_000); // solver build may be slower
 
   afterAll(async () => {
     solverProcess?.kill('SIGTERM');
@@ -101,7 +101,7 @@ describe('E2E: Solver 同步链路', () => {
     const out = cli('init', DEVICE_A);
     expect(out).toContain('初始化完成');
     expect(fsSync.existsSync(path.join(DEVICE_A, '.corivo', 'config.json'))).toBe(true);
-    // init 结束时会自动尝试注册 solver（CORIVO_SOLVER_URL 指向测试服务器）
+    // At the end of init, it will automatically try to register the solver (CORIVO_SOLVER_URL points to the test server)
     expect(fsSync.existsSync(path.join(DEVICE_A, '.corivo', 'solver.json'))).toBe(true);
   }, 30_000);
 
@@ -110,7 +110,7 @@ describe('E2E: Solver 同步链路', () => {
       'save --content "e2e测试：验证同步链路" --annotation "事实 · project · e2e"',
       DEVICE_A,
     );
-    // save 成功时输出包含 block ID 或保存确认
+    // When the save is successful, the output contains the block ID or save confirmation.
     expect(out).toMatch(/blk_|已保存|保存成功/i);
   }, 15_000);
 

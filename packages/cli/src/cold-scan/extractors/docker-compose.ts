@@ -1,6 +1,6 @@
 /**
- * docker-compose 提取器
- * 提取基础设施偏好
+ * docker-compose extractor
+ * Extract infrastructure preferences
  */
 
 import { readFileSafe, getRecentGitProjects, createBlock } from '../utils.js';
@@ -14,14 +14,14 @@ async function extractDockerCompose(content: string, filePath: string) {
   if (!content) return blocks;
 
   try {
-    // YAML 解析简化版（不引入 yaml 依赖）
+    // Simplified version of YAML parsing (without introducing yaml dependency)
     const services: string[] = [];
     const images: string[] = [];
 
-    // 提取 services
+    // Extract services
     const servicesMatch = content.match(/^services:\s*$/m);
     if (servicesMatch) {
-      // 提取服务名
+      // Extract service name
       const serviceMatches = content.match(/^\s{2}([a-z0-9_-]+):\s*$/gim);
       if (serviceMatches) {
         for (const match of serviceMatches) {
@@ -30,7 +30,7 @@ async function extractDockerCompose(content: string, filePath: string) {
         }
       }
 
-      // 提取镜像名
+      // Extract image name
       const imageMatches = content.match(/^\s{4}image:\s*(.+)$/gim);
       if (imageMatches) {
         for (const match of imageMatches) {
@@ -40,7 +40,7 @@ async function extractDockerCompose(content: string, filePath: string) {
       }
     }
 
-    // 分析基础设施偏好
+    // Analyze infrastructure preferences
     const infra: string[] = [];
 
     if (images.some(i => /postgres|mysql|mariadb|mongodb|redis|memcached/i.test(i))) {
@@ -92,7 +92,7 @@ async function extractDockerCompose(content: string, filePath: string) {
       );
     }
   } catch {
-    // 解析失败，跳过
+    // Parsing failed, skipped
   }
 
   return blocks;
@@ -101,7 +101,7 @@ async function extractDockerCompose(content: string, filePath: string) {
 export const source: ScanSource = {
   name: 'docker-compose',
   path: async () => {
-    // 查找最近的 Git 项目中的 docker-compose.yml
+    // Find docker-compose.yml in the nearest Git project
     const projects = await getRecentGitProjects(5);
     const results: string[] = [];
 
@@ -117,13 +117,13 @@ export const source: ScanSource = {
         try {
           await fs.access(p);
           results.push(p);
-          break; // 找到一个就停止
+          break; // Stop when you find one
         } catch {
           continue;
         }
       }
 
-      if (results.length >= 3) break; // 最多扫描 3 个
+      if (results.length >= 3) break; // Scan up to 3
     }
 
     return results;

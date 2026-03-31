@@ -1,5 +1,5 @@
 /**
- * 上下文推送模块单元测试
+ * Unit tests for the context push module
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -15,12 +15,12 @@ describe('ContextPusher', () => {
   let pusher: ContextPusher;
 
   beforeEach(async () => {
-    // 创建临时数据库（使用随机数避免冲突）
+    // Create temporary database (use random numbers to avoid conflicts)
     const randomId = Math.random().toString(36).slice(2, 10);
     dbPath = `/tmp/corivo-test-${randomId}.db`;
     const dbKey = KeyManager.generateDatabaseKey();
 
-    // 初始化数据库（包括 FTS5）
+    // Initialize database (including FTS5)
     const sqliteDb = new Database(dbPath);
     sqliteDb.exec(`
       CREATE TABLE IF NOT EXISTS blocks (
@@ -43,7 +43,7 @@ describe('ContextPusher', () => {
       CREATE INDEX IF NOT EXISTS idx_blocks_vitality ON blocks(vitality);
     `);
 
-    // 创建 FTS5 全文搜索表
+    // Create an FTS5 full-text search table
     sqliteDb.exec(`
       CREATE VIRTUAL TABLE IF NOT EXISTS blocks_fts USING fts5(
         id UNINDEXED,
@@ -52,7 +52,7 @@ describe('ContextPusher', () => {
       )
     `);
 
-    // 创建触发器同步数据到 FTS5（先删除可能存在的旧触发器）
+    // Create triggers to synchronize data to FTS5 (delete any old triggers that may exist first)
     sqliteDb.exec(`
       DROP TRIGGER IF EXISTS blocks_ai;
       DROP TRIGGER IF EXISTS blocks_au;
@@ -81,16 +81,16 @@ describe('ContextPusher', () => {
   });
 
   afterEach(async () => {
-    // 关闭当前数据库实例
+    // Close the current database instance
     db.close();
 
-    // 清理单例缓存中当前路径的实例
+    // Clear the instance of the current path in the singleton cache
     const instances = (CorivoDatabase as any).instances;
     if (instances && instances.has(dbPath)) {
       instances.delete(dbPath);
     }
 
-    // 删除文件
+    // Delete files
     await fs.unlink(dbPath).catch(() => {});
   });
 
@@ -100,10 +100,10 @@ describe('ContextPusher', () => {
       const block2 = db.createBlock({ content: 'Vue.js 提供了渐进式架构', annotation: '知识 · frontend · Vue' });
       const block3 = db.createBlock({ content: 'Angular 是 Google 的框架', annotation: '知识 · frontend · Angular' });
 
-      // 手动同步到 FTS5 表（因为触发器在不同连接上不会触发）
+      // Manual synchronization to FTS5 tables (as triggers don't fire on different connections)
       const sqliteDb = new Database(dbPath);
       for (const block of [block1, block2, block3]) {
-        // 先删除可能存在的记录，再插入新记录
+        // Delete possible existing records first, then insert new records
         sqliteDb.exec(`DELETE FROM blocks_fts WHERE id = '${block.id}'`);
         sqliteDb.exec(`
           INSERT INTO blocks_fts(id, content, annotation)
@@ -115,7 +115,7 @@ describe('ContextPusher', () => {
 
     it('should return empty string for no results', () => {
       const result = pusher.pushContext('NonExistent', 5);
-      // 返回的是字符串，需要 await
+      // What is returned is a string and requires await
       return result.then(text => {
         expect(text).toBe('');
       });
@@ -133,7 +133,7 @@ describe('ContextPusher', () => {
     });
 
     it('should update access count', async () => {
-      // 搜索包含 React 的 block
+      // Search for blocks containing React
       const reactBlocks = db.searchBlocks('React', 5);
       expect(reactBlocks.length).toBeGreaterThan(0);
 
@@ -215,7 +215,7 @@ describe('ContextPusher', () => {
     });
 
     it('should return patterns for matching query', async () => {
-      // 先添加 pattern
+      // Add pattern first
       const blocks = db.queryBlocks({ limit: 100 });
       const block = blocks[0];
       db.updateBlock(block.id, {

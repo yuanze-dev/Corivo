@@ -1,7 +1,7 @@
 /**
- * Phase 1: 基础设施测试
+ * Phase 1: Infrastructure tests
  *
- * 测试数据模型、错误处理、密钥管理
+ * Covers data models, error handling, and key management
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -20,7 +20,7 @@ import { KeyManager } from '../../src/crypto/keys.js';
 // Mock BIP39 wordlist for testing
 const TEST_WORDLIST = [
   'abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract', 'absurd', 'abuse',
-  // ... 至少需要 2048 个词的完整列表，这里简化测试
+  // ...a full list of at least 2048 words is required, simplified testing here
 ];
 
 describe('Block Model', () => {
@@ -49,8 +49,8 @@ describe('Block Model', () => {
 
     it('should reject invalid annotation', () => {
       expect(validateAnnotation('invalid')).toBe(false);
-      expect(validateAnnotation('事实 · asset')).toBe(false); // 只有两部分
-      expect(validateAnnotation('事实 · asset · ')).toBe(false); // 标签为空
+      expect(validateAnnotation('事实 · asset')).toBe(false); // only two parts
+      expect(validateAnnotation('事实 · asset · ')).toBe(false); // Tag is empty
     });
   });
 

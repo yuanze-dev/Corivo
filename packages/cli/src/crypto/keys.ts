@@ -1,7 +1,7 @@
 /**
- * 密钥管理（静态工具类）
+ * Key management (static tool class)
  *
- * 提供密钥派生、加解密、恢复密钥等功能
+ * Provide key derivation, encryption and decryption, key recovery and other functions
  */
 
 import crypto from 'node:crypto';
@@ -9,10 +9,10 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { CryptoError, ValidationError } from '../errors/index.js';
 
 /**
- * BIP39 英文词表（完整版 2048 个单词）
+ * BIP39 English vocabulary list (full version 2048 words)
  *
- * 来源: BIP39 标准
- * 用于生成和恢复 12/24 词助记词
+ * Source: BIP39 standard
+ * Used to generate and recover 12/24 word mnemonics
  */
 const BIP39_WORDLIST: string[] = [
   'abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract', 'absurd', 'abuse',
@@ -224,11 +224,11 @@ const BIP39_WORDLIST: string[] = [
 export class KeyManager {
 
   /**
-   * 从密码派生主密钥（PBKDF2）
+   * Derive master key from password (PBKDF2)
    *
-   * @param password - 用户密码
-   * @param salt - 盐值
-   * @returns 派生的主密钥
+   * @param password - user password
+   * @param salt - salt value
+   * @returns derived master key
    */
   static deriveMasterKey(password: string, salt: Buffer): Buffer {
     try {
@@ -239,31 +239,31 @@ export class KeyManager {
   }
 
   /**
-   * 生成随机盐值
+   * Generate random salt value
    *
-   * @returns 16 字节随机盐值
+   * @returns 16 bytes random salt value
    */
   static generateSalt(): Buffer {
     return randomBytes(16);
   }
 
   /**
-   * 生成随机数据库密钥
+   * Generate random database keys
    *
-   * @returns 32 字节随机密钥
+   * @returns 32-byte random key
    */
   static generateDatabaseKey(): Buffer {
     return randomBytes(32);
   }
 
   /**
-   * 加密数据库密钥
+   * Encrypt database key
    *
-   * 使用 AES-256-GCM 加密
+   * Encrypted using AES-256-GCM
    *
-   * @param dbKey - 数据库密钥
-   * @param masterKey - 主密钥
-   * @returns Base64 编码的密文（IV + AuthTag + 密文）
+   * @param dbKey - database key
+   * @param masterKey - master key
+   * @returns Base64 encoded ciphertext (IV + AuthTag + ciphertext)
    */
   static encryptDatabaseKey(dbKey: Buffer, masterKey: Buffer): string {
     try {
@@ -277,7 +277,7 @@ export class KeyManager {
 
       const authTag = cipher.getAuthTag();
 
-      // 格式: iv(16) + authTag(16) + encrypted
+      // Format: iv(16) + authTag(16) + encrypted
       const combined = Buffer.concat([iv, authTag, encrypted]);
       return combined.toString('base64');
     } catch (error) {
@@ -286,11 +286,11 @@ export class KeyManager {
   }
 
   /**
-   * 解密数据库密钥
+   * Decrypt database key
    *
-   * @param encrypted - Base64 编码的密文
-   * @param masterKey - 主密钥
-   * @returns 解密后的数据库密钥
+   * @param encrypted - Base64 encoded ciphertext
+   * @param masterKey - master key
+   * @returns decrypted database key
    */
   static decryptDatabaseKey(encrypted: string, masterKey: Buffer): Buffer {
     try {
@@ -322,35 +322,35 @@ export class KeyManager {
   }
 
   /**
-   * 生成恢复密钥（24 词 BIP39 风格）
+   * Generate recovery key (24 words BIP39 style)
    *
-   * 使用标准 BIP39 方法：每个词代表 11 位，24 词 = 264 位
-   * 其中 256 位是密钥，8 位是校验和
+   * Using standard BIP39 approach: 11 bits per word, 24 words = 264 bits
+   * 256 bits are the key and 8 bits are the checksum
    *
-   * @param masterKey - 主密钥（32 字节）
-   * @returns 24 个空格分隔的单词
+   * @param masterKey - master key (32 bytes)
+   * @returns 24 space separated words
    */
   static generateRecoveryKey(masterKey: Buffer): string {
-    // 确保 masterKey 是 32 字节
+    // Make sure masterKey is 32 bytes
     if (masterKey.length !== 32) {
       throw new CryptoError('主密钥必须是 32 字节');
     }
 
-    // 计算 checksum (SHA256 的前 8 位)
+    // Calculate checksum (first 8 bits of SHA256)
     const hash = crypto.createHash('sha256').update(masterKey).digest();
-    const checksum = hash[0] >> 0; // 取第一个字节作为校验和（8 位）
+    const checksum = hash[0] >> 0; // Take the first byte as checksum (8 bits)
 
-    // 将 32 字节 + 1 字节校验和 = 33 字节 = 264 位
+    // 32 bytes + 1 byte checksum = 33 bytes = 264 bits
     const bits: string[] = [];
     for (const byte of masterKey) {
       bits.push(byte.toString(2).padStart(8, '0'));
     }
     bits.push(checksum.toString(2).padStart(8, '0'));
 
-    // 拼接成完整的位串
+    // Spliced ​​into a complete bit string
     const allBits = bits.join('');
 
-    // 将 264 位转换为 24 个 11 位的索引
+    // Convert 264 bits to 24 11-bit indices
     const words: string[] = [];
     for (let i = 0; i < 24; i++) {
       const startBit = i * 11;
@@ -363,12 +363,12 @@ export class KeyManager {
   }
 
   /**
-   * 从恢复密钥派生主密钥
+   * Derive master key from recovery key
    *
-   * 从 24 个单词解码还原主密钥
+   * Restore master key from 24 word decoding
    *
-   * @param recoveryKey - 24 个空格分隔的单词
-   * @returns 派生的主密钥（32 字节）
+   * @param recoveryKey - 24 space separated words
+   * @returns derived master key (32 bytes)
    */
   static deriveFromRecoveryKey(recoveryKey: string): Buffer {
     const words = recoveryKey.trim().split(/\s+/);
@@ -377,8 +377,8 @@ export class KeyManager {
       throw new ValidationError('恢复密钥必须是 24 个单词');
     }
 
-    // 将词转换为 11 位索引，然后拼接成位串
-    // indexOf 会同时验证单词有效性（返回 -1 表示无效）
+    // Convert words to 11-bit indices and concatenate into bit strings
+    // indexOf will also verify the validity of the word (returning -1 means invalid)
     let bits = '';
     for (const word of words) {
       const index = BIP39_WORDLIST.indexOf(word);
@@ -388,18 +388,18 @@ export class KeyManager {
       bits += index.toString(2).padStart(11, '0');
     }
 
-    // 提取密钥（前 256 位）和校验和（后 8 位）
+    // Extract key (first 256 bits) and checksum (last 8 bits)
     const keyBits = bits.slice(0, 256);
     const checksumBits = bits.slice(256, 264);
 
-    // 将位串转换为字节
+    // Convert bit string to bytes
     const masterKey = Buffer.alloc(32);
     for (let i = 0; i < 32; i++) {
       const byteBits = keyBits.slice(i * 8, (i + 1) * 8);
       masterKey[i] = parseInt(byteBits, 2);
     }
 
-    // 验证校验和
+    // Verify checksum
     const hash = crypto.createHash('sha256').update(masterKey).digest();
     const expectedChecksum = hash[0] >> 0;
     const actualChecksum = parseInt(checksumBits, 2);
@@ -412,28 +412,28 @@ export class KeyManager {
   }
 
   /**
-   * 验证密码强度
+   * Verify password strength
    *
-   * @param password - 待验证的密码
-   * @returns 是否足够强
+   * @param password - the password to be verified
+   * Is @returns strong enough?
    */
   static validatePasswordStrength(password: string): boolean {
     if (password.length < 8) {
       return false;
     }
 
-    // 检查是否包含字母
+    // Check if it contains letters
     const hasLetter = /[a-zA-Z]/.test(password);
-    // 检查是否包含数字
+    // Check if it contains a number
     const hasNumber = /[0-9]/.test(password);
 
     return hasLetter && hasNumber;
   }
 
   /**
-   * 生成加密盐值提示
+   * Generate encryption salt prompt
    *
-   * @returns 用于显示的盐值提示
+   * @returns Salt hint for display
    */
   static getSaltHint(): string {
     const salt = this.generateSalt();
@@ -441,13 +441,13 @@ export class KeyManager {
   }
 
   /**
-   * 加密内容（用于数据库存储）
+   * Encrypted content (for database storage)
    *
-   * 使用 AES-256-GCM 加密，返回 Base64 编码的密文
+   * Encrypted using AES-256-GCM, returning Base64 encoded ciphertext
    *
-   * @param content - 明文内容
-   * @param dbKey - 数据库密钥
-   * @returns Base64 编码的密文（IV + AuthTag + 密文）
+   * @param content - plain text content
+   * @param dbKey - database key
+   * @returns Base64 encoded ciphertext (IV + AuthTag + ciphertext)
    */
   static encryptContent(content: string, dbKey: Buffer): string {
     try {
@@ -461,7 +461,7 @@ export class KeyManager {
 
       const authTag = cipher.getAuthTag();
 
-      // 格式: iv(16) + authTag(16) + encrypted
+      // Format: iv(16) + authTag(16) + encrypted
       const combined = Buffer.concat([iv, authTag, encrypted]);
       return combined.toString('base64');
     } catch (error) {
@@ -470,11 +470,11 @@ export class KeyManager {
   }
 
   /**
-   * 解密内容（从数据库读取）
+   * Decrypt content (read from database)
    *
-   * @param encrypted - Base64 编码的密文
-   * @param dbKey - 数据库密钥
-   * @returns 解密后的明文
+   * @param encrypted - Base64 encoded ciphertext
+   * @param dbKey - database key
+   * @returns decrypted plaintext
    */
   static decryptContent(encrypted: string, dbKey: Buffer): string {
     try {
@@ -506,20 +506,20 @@ export class KeyManager {
   }
 
   /**
-   * 检测内容是否为加密格式
+   * Detect whether the content is in encrypted format
    *
-   * 加密的内容是有效的 Base64，且解密后长度合理
+   * The encrypted content is valid Base64 and has a reasonable length after decryption
    *
-   * @param content - 待检测内容
-   * @returns 是否为加密格式
+   * @param content - the content to be detected
+   * @returns whether it is in encrypted format
    */
   static isEncryptedContent(content: string): boolean {
     try {
-      // 基本检查：是否为有效 Base64
+      // Basic check: valid Base64
       const decoded = Buffer.from(content, 'base64');
-      // 加密后的内容至少应该是 32 字节（IV + AuthTag）
-      // 加上至少 1 字节的实际内容
-      return decoded.length >= 33 && content.length > 44; // 33 字节编码后至少 44 字符
+      // The encrypted content should be at least 32 bytes (IV + AuthTag)
+      // plus at least 1 byte of actual content
+      return decoded.length >= 33 && content.length > 44; // 33 bytes encoded to at least 44 characters
     } catch {
       return false;
     }

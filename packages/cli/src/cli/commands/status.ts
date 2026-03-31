@@ -1,8 +1,8 @@
 /**
- * CLI 命令 - status（纯文本输出模式）
+ * CLI command - status (plain-text output mode)
  *
- * TUI 模式由 src/tui/index.ts 的 renderTui() 处理，
- * 通过 index.ts 的 --tui 标志动态导入。
+ * TUI mode is handled by renderTui() in src/tui/index.ts,
+ * dynamically imported via the --tui flag in index.ts.
  */
 
 import fs from 'node:fs/promises';
@@ -26,7 +26,7 @@ export async function statusCommand(_options: { noPassword?: boolean } = {}): Pr
     throw new ConfigError('Corivo 未初始化。请先运行: corivo init');
   }
 
-  // 检查守护进程状态（通过 ServiceManager）
+  // Check daemon status (via ServiceManager)
   const serviceManager = getServiceManager()
   const serviceStatus = await serviceManager.getStatus()
 

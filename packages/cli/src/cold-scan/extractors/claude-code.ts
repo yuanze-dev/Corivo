@@ -1,6 +1,6 @@
 /**
- * Claude Code 配置提取器
- * 提取 Claude Code 的全局规则、设置、MCP 配置等
+ * Claude Code configuration extractor.
+ * Extracts Claude Code global rules, settings, and MCP configuration.
  */
 
 import { readFileSafe, expandHome, findFilesInHome, createBlock } from '../utils.js';
@@ -10,20 +10,20 @@ import * as path from 'path';
 import * as os from 'os';
 
 /**
- * 提取 CLAUDE.md 内容
+ * Extracts content from a CLAUDE.md file.
  */
 async function extractClaudeMd(content: string, filePath: string) {
   const blocks: ReturnType<typeof createBlock>[] = [];
 
   if (!content) return blocks;
 
-  // 提取标题和主要段落（不包含对话历史等敏感内容）
+  // Extract headings and main paragraphs — exclude conversation history and other sensitive content
   const lines = content.split('\n');
   const mainSections: string[] = [];
   let currentSection: string[] = [];
 
   for (const line of lines) {
-    // 跳过可能的敏感内容
+    // Skip lines that may contain secrets
     if (
       line.includes('API_KEY') ||
       line.includes('SECRET') ||
@@ -33,7 +33,7 @@ async function extractClaudeMd(content: string, filePath: string) {
       continue;
     }
 
-    // 收集主要标题段落
+    // Collect heading-delimited sections
     if (line.match(/^#{1,3}\s/)) {
       if (currentSection.length > 0) {
         mainSections.push(currentSection.join('\n'));
@@ -49,10 +49,10 @@ async function extractClaudeMd(content: string, filePath: string) {
     mainSections.push(currentSection.join('\n'));
   }
 
-  // 提取关键规则片段
+  // Save concise rule sections (long blocks are too noisy to be useful)
   for (const section of mainSections) {
     if (section.length < 500) {
-      // 只保存较短的规则
+      // Only persist short rule fragments
       blocks.push(
         createBlock({
           content: section.trim(),
@@ -65,7 +65,7 @@ async function extractClaudeMd(content: string, filePath: string) {
     }
   }
 
-  // 如果内容过长，只记录摘要
+  // If the file is too long and no sections were saved, record a summary block instead
   if (content.length > 1000 && blocks.length === 0) {
     blocks.push(
       createBlock({
@@ -82,7 +82,7 @@ async function extractClaudeMd(content: string, filePath: string) {
 }
 
 /**
- * 提取 settings.json
+ * Extracts relevant fields from settings.json.
  */
 async function extractSettings(content: string, filePath: string) {
   const blocks: ReturnType<typeof createBlock>[] = [];
@@ -92,7 +92,7 @@ async function extractSettings(content: string, filePath: string) {
   try {
     const settings = JSON.parse(content);
 
-    // 提取 allowedTools（反映权限偏好）
+    // Extract allowedTools — reflects the user's tool permission preferences
     if (settings.allowedTools && Array.isArray(settings.allowedTools)) {
       blocks.push(
         createBlock({
@@ -105,7 +105,7 @@ async function extractSettings(content: string, filePath: string) {
       );
     }
 
-    // 提取模型偏好
+    // Extract model preference
     if (settings.apiSettings?.model) {
       blocks.push(
         createBlock({
@@ -118,7 +118,7 @@ async function extractSettings(content: string, filePath: string) {
       );
     }
 
-    // 提取 temperature
+    // Extract temperature setting
     if (settings.apiSettings?.temperature !== undefined) {
       blocks.push(
         createBlock({
@@ -131,14 +131,14 @@ async function extractSettings(content: string, filePath: string) {
       );
     }
   } catch {
-    // 解析失败
+    // Parsing failed
   }
 
   return blocks;
 }
 
 /**
- * 提取 MCP 配置
+ * Extracts MCP server configuration.
  */
 async function extractMcpConfig(content: string, filePath: string) {
   const blocks: ReturnType<typeof createBlock>[] = [];
@@ -163,14 +163,14 @@ async function extractMcpConfig(content: string, filePath: string) {
       );
     }
   } catch {
-    // 解析失败
+    // Parsing failed
   }
 
   return blocks;
 }
 
 /**
- * 提取自定义命令
+ * Extracts custom slash commands from the commands directory.
  */
 async function extractCommands(commandsDir: string) {
   const blocks: ReturnType<typeof createBlock>[] = [];
@@ -192,7 +192,7 @@ async function extractCommands(commandsDir: string) {
       );
     }
   } catch {
-    // 目录不存在
+    // Directory does not exist
   }
 
   return blocks;
@@ -203,7 +203,7 @@ export const source: ScanSource = {
   path: async () => {
     const results: string[] = [];
 
-    // 检查全局 CLAUDE.md
+    // Check for global CLAUDE.md
     const claudeDirs = [
       path.join(os.homedir(), '.claude'),
       path.join(os.homedir(), '.config', 'claude'),
@@ -220,7 +220,7 @@ export const source: ScanSource = {
       }
     }
 
-    // 检查 .claude.json (MCP 配置)
+    // Check for .claude.json (MCP configuration)
     try {
       await fs.access(path.join(os.homedir(), '.claude.json'));
       results.push(path.join(os.homedir(), '.claude.json'));
@@ -228,7 +228,7 @@ export const source: ScanSource = {
       // ignore
     }
 
-    // 检查自定义命令目录
+    // Check for custom commands directory
     for (const dir of claudeDirs) {
       const commandsDir = path.join(dir, 'commands');
       try {

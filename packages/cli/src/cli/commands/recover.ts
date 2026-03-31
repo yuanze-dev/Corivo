@@ -1,7 +1,7 @@
 /**
- * CLI 命令 - recover
+ * CLI command-recover
  *
- * 密钥恢复流程
+ * Key recovery process
  */
 
 import fs from 'node:fs/promises';
@@ -16,7 +16,7 @@ export async function recoverCommand(): Promise<void> {
   console.log('                      数据恢复向导');
   console.log('═══════════════════════════════════════════════════════\n');
 
-  // 检查配置文件
+  // Check configuration file
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');
 
@@ -39,7 +39,7 @@ export async function recoverCommand(): Promise<void> {
     return;
   }
 
-  // 输入恢复密钥
+  // Enter recovery key
   console.log('\n请输入您的恢复密钥（24 个单词，用空格分隔）:\n');
 
   const recoveryKey = await readPassword('恢复密钥: ');
@@ -50,7 +50,7 @@ export async function recoverCommand(): Promise<void> {
     return;
   }
 
-  // 验证恢复密钥
+  // Verify recovery key
   console.log('\n正在验证恢复密钥...');
 
   try {
@@ -66,7 +66,7 @@ export async function recoverCommand(): Promise<void> {
 
   console.log('✅ 恢复密钥验证通过');
 
-  // 设置新密码
+  // Set new password
   console.log('\n请设置新的主密码（至少 8 位，包含字母和数字）\n');
 
   const password1 = await readPassword('新密码: ');
@@ -81,7 +81,7 @@ export async function recoverCommand(): Promise<void> {
     return;
   }
 
-  // 重新生成密钥
+  // Regenerate key
   console.log('\n正在重新生成密钥链...');
 
   const salt = KeyManager.generateSalt();
@@ -89,7 +89,7 @@ export async function recoverCommand(): Promise<void> {
   const dbKey = KeyManager.generateDatabaseKey();
   const encryptedDbKey = KeyManager.encryptDatabaseKey(dbKey, newMasterKey);
 
-  // 更新配置
+  // Update configuration
   const newConfig = {
     ...config,
     salt: salt.toString('base64'),
@@ -99,7 +99,7 @@ export async function recoverCommand(): Promise<void> {
 
   await fs.writeFile(configPath, JSON.stringify(newConfig, null, 2));
 
-  // 验证数据库
+  // Verify database
   const dbPath = getDefaultDatabasePath();
   try {
     const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
@@ -118,7 +118,7 @@ export async function recoverCommand(): Promise<void> {
     console.log('   请从其他设备同步最新数据');
   }
 
-  // 生成新的恢复密钥
+  // Generate new recovery key
   const newRecoveryKey = KeyManager.generateRecoveryKey(newMasterKey);
   const recoveryWords = newRecoveryKey.split(' ');
 

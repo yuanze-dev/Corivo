@@ -1,7 +1,7 @@
 /**
- * 推送管理器
+ * Push manager
  *
- * 统一 Corivo 的所有推送逻辑
+ * Unified entry point for all Corivo push logic
  */
 
 import type { CorivoDatabase } from '../storage/database.js';
@@ -18,21 +18,21 @@ import {
 import { getDedupManager } from './dedup.js';
 
 /**
- * 推送管理器配置
+ * PushManager configuration
  */
 export interface PushManagerConfig {
-  /** 数据库实例 */
+  /** Database instance */
   db: CorivoDatabase;
-  /** 去重管理器（可选，默认使用全局单例） */
+  /** Deduplication manager (optional, defaults to the global singleton) */
   dedup?: ReturnType<typeof getDedupManager>;
-  /** 会话 ID（可选，用于去重） */
+  /** Session ID (optional, used for session-scoped deduplication) */
   sessionId?: string;
 }
 
 /**
- * 推送管理器
+ * Push manager
  *
- * 统一入口，根据上下文生成推送内容
+ * Unified entry point that generates push content based on the current context
  */
 export class PushManager {
   private db: CorivoDatabase;
@@ -50,11 +50,11 @@ export class PushManager {
   }
 
   /**
-   * 生成推送
+   * Generate push items for the given context
    *
-   * @param context 推送上下文
-   * @param options 额外选项
-   * @returns 推送结果
+   * @param context - The context triggering the push
+   * @param options - Additional options
+   * @returns Push result containing prioritized items
    */
   async push(
     context: PushContext,
@@ -92,10 +92,10 @@ export class PushManager {
         break;
     }
 
-    // 去重
+    // Deduplicate to avoid surfacing the same content repeatedly
     const filtered = this.dedupFilter(items);
 
-    // 限制数量
+    // Respect the caller's item cap
     const limited = filtered.slice(0, maxItems);
 
     return {
@@ -106,7 +106,7 @@ export class PushManager {
   }
 
   /**
-   * 格式化推送结果为文本
+   * Format a push result as a plain-text string
    */
   format(result: PushResult): string {
     if (result.items.length === 0) {
@@ -123,7 +123,7 @@ export class PushManager {
   }
 
   /**
-   * 格式化单个推送项
+   * Format a single push item as a prefixed string
    */
   private formatItem(item: PushItem): string {
     const icon = this.getIcon(item.type);
@@ -131,7 +131,7 @@ export class PushManager {
   }
 
   /**
-   * 获取推送类型图标
+   * Return the emoji icon for a given push type
    */
   private getIcon(type: PushType): string {
     const icons: Record<PushType, string> = {
@@ -148,12 +148,12 @@ export class PushManager {
   }
 
   /**
-   * SessionStart 推送
+   * Build push items for the SESSION_START context
    */
   private async pushSessionStart(maxItems: number): Promise<PushItem[]> {
     const items: PushItem[] = [];
 
-    // 1. 建议（最高优先级）
+    // 1. Suggestions carry the highest priority — surface them first
     const suggestion = this.suggestionEngine.generate(SuggestionContext.SESSION_START);
     if (suggestion) {
       items.push({
@@ -163,10 +163,10 @@ export class PushManager {
       });
     }
 
-    // 2. 需要关注
+    // 2. Blocks that need user attention (cooling or cold status)
     const attention = await this.contextPusher.pushNeedsAttention();
     if (attention) {
-      // 解析数量
+      // Parse count from the formatted output string
       const match = attention.match(/\((\d+) 条\)/);
       const count = match ? parseInt(match[1], 10) : 0;
       items.push({
@@ -176,23 +176,22 @@ export class PushManager {
       });
     }
 
-    // 3. 统计（仅在第一次或数量变化大时）
-    // 暂时不推送统计，避免过于频繁
+    // 3. Stats are intentionally omitted here to avoid session-start noise
 
     return items;
   }
 
   /**
-   * PostRequest 推送
+   * PostRequest push
    */
   private async pushPostRequest(lastMessage?: string, maxItems = 1): Promise<PushItem[]> {
     const items: PushItem[] = [];
 
-    // 检查是否有明显的下一步
+    // Check if there is an obvious next step
     const hasObviousNextStep = lastMessage && this.hasObviousNextStep(lastMessage);
 
     if (!hasObviousNextStep) {
-      // 生成建议
+      // Generate suggestions
       const suggestion = this.suggestionEngine.generate(
         SuggestionContext.POST_REQUEST,
         lastMessage
@@ -210,12 +209,12 @@ export class PushManager {
   }
 
   /**
-   * Query 推送
+   * Query push
    */
   private async pushQuery(query: string, maxItems = 4): Promise<PushItem[]> {
     const items: PushItem[] = [];
 
-    // 1. 相关记忆（必推）
+    // 1. Related memories (must recommend)
     const contextText = await this.contextPusher.pushContext(query, 5);
     if (contextText) {
       const match = contextText.match(/\((\d+) 条\)/);
@@ -227,7 +226,7 @@ export class PushManager {
       });
     }
 
-    // 2. 关联记忆
+    // 2. Associative memory
     const relatedText = await this.contextPusher.pushRelated(query, 3);
     if (relatedText) {
       const match = relatedText.match(/\((\d+) 条\)/);
@@ -239,7 +238,7 @@ export class PushManager {
       });
     }
 
-    // 3. 决策经验
+    // 3. Decision-making experience
     const decisionText = await this.contextPusher.pushDecisions(query);
     if (decisionText) {
       const match = decisionText.match(/\((\d+) 条\)/);
@@ -255,12 +254,12 @@ export class PushManager {
   }
 
   /**
-   * Status 推送
+   * Status push
    */
   private async pushStatus(maxItems = 2): Promise<PushItem[]> {
     const items: PushItem[] = [];
 
-    // 1. 需要关注
+    // 1. Need attention
     const attention = await this.contextPusher.pushNeedsAttention();
     if (attention) {
       const match = attention.match(/\((\d+) 条\)/);
@@ -276,19 +275,19 @@ export class PushManager {
   }
 
   /**
-   * Save 推送（保存后的推送）
+   * Save push (push after saving)
    */
   private async pushSave(maxItems = 1): Promise<PushItem[]> {
     const items: PushItem[] = [];
 
-    // 检测矛盾
-    // TODO: 实现 conflict 检测
+    // Detect contradictions
+    // TODO: Implement conflict detection
 
     return items;
   }
 
   /**
-   * 判断是否有明显的下一步
+   * Determine whether there is an obvious next step
    */
   private hasObviousNextStep(message: string): boolean {
     const lower = message.toLowerCase();
@@ -317,7 +316,7 @@ export class PushManager {
   }
 
   /**
-   * 去重过滤
+   * Deduplication filtering
    */
   private dedupFilter(items: PushItem[]): PushItem[] {
     return items.filter(item => {
@@ -327,7 +326,7 @@ export class PushManager {
   }
 
   /**
-   * 获取默认最大推送数量
+   * Get the default maximum number of push items
    */
   private getDefaultMaxItems(context: PushContext): number {
     const defaults: Record<PushContext, number> = {

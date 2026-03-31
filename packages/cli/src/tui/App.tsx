@@ -32,7 +32,7 @@ interface AppProps {
   dbPath: string;
 }
 
-// 固定开销行数：header(3) + tabbar(4) + statusbar(2)
+// Fixed number of overhead lines: header(3) + tabbar(4) + statusbar(2)
 const PANEL_OVERHEAD = 9;
 
 export function App({ db, configDir, dbPath }: AppProps) {
@@ -40,27 +40,27 @@ export function App({ db, configDir, dbPath }: AppProps) {
   const { stdout } = useStdout();
   const [activeTab, setActiveTab] = useState<TabId>('overview');
 
-  // panel 区域固定高度 = 终端总行数 - 固定开销，确保切换时旧内容被清除
+  // Fixed height of panel area = total number of rows in the terminal - fixed overhead to ensure that old content is cleared when switching
   const panelHeight = Math.max(3, (stdout?.rows ?? 24) - PANEL_OVERHEAD);
 
-  // 各 panel 的滚动偏移，切换 tab 时重置
+  // The scroll offset of each panel is reset when switching tabs.
   const [panelScroll, setPanelScroll] = useState(0);
   const [configFocus, setConfigFocus] = useState(0);
   const [logScroll, setLogScroll] = useState(0);
 
-  // 数据 hooks
+  // Data hooks
   const { stats, loading: dbLoading } = useDatabase(db);
   const daemon = useDaemon(configDir);
   const { solver } = useSync(configDir);
   const device = useDevice(configDir, dbPath);
   const configState = useConfig(configDir);
-  // logs 只在 logs tab 时启用文件监听，非活跃时不触发渲染
+  // logs only enables file monitoring when the logs tab is active, and does not trigger rendering when it is inactive.
   const { lines: logLines, error: logError } = useLogs(configDir, activeTab === 'logs');
 
   const tabIds = TABS.map(t => t.id);
 
   const navigate = useCallback((dir: 1 | -1) => {
-    setPanelScroll(0); // 切 tab 时重置面板滚动
+    setPanelScroll(0); // Reset panel scrolling when switching tabs
     setActiveTab(prev => {
       const i = tabIds.indexOf(prev);
       return tabIds[(i + dir + tabIds.length) % tabIds.length] as TabId;
@@ -68,16 +68,16 @@ export function App({ db, configDir, dbPath }: AppProps) {
   }, [tabIds]);
 
   useInput((input, key) => {
-    // 退出
+    // Exit
     if (input === 'q' || (key.ctrl && input === 'c')) { exit(); return; }
 
-    // Tab 导航
+    // Tab navigation
     if (key.tab && !key.shift) { navigate(1); return; }
     if (key.tab && key.shift)  { navigate(-1); return; }
     if (key.rightArrow)        { navigate(1); return; }
     if (key.leftArrow)         { navigate(-1); return; }
 
-    // 数字键跳转（1-6）
+    // Number key jump (1-6)
     const n = parseInt(input, 10);
     if (!isNaN(n) && n >= 1 && n <= 6) {
       setPanelScroll(0);
@@ -85,7 +85,7 @@ export function App({ db, configDir, dbPath }: AppProps) {
       return;
     }
 
-    // Config panel 导航（j/k 移动焦点）
+    // Config panel navigation (j/k moving focus)
     if (activeTab === 'config') {
       if (input === 'j' || key.downArrow)  {
         setConfigFocus(f => Math.min(f + 1, CONFIG_ITEM_COUNT - 1));
@@ -118,13 +118,13 @@ export function App({ db, configDir, dbPath }: AppProps) {
       }
     }
 
-    // Logs panel 滚动
+    // Logs panel scroll
     if (activeTab === 'logs') {
       if (input === 'j' || key.downArrow)  { setLogScroll(s => Math.max(0, s - 1)); return; }
       if (input === 'k' || key.upArrow)    { setLogScroll(s => s + 1); return; }
     }
 
-    // 其他 panel 滚动（overview / sync / daemon / device）
+    // Other panel scrolling (overview/sync/daemon/device)
     if (activeTab !== 'config' && activeTab !== 'logs') {
       if (input === 'j' || key.downArrow)  { setPanelScroll(s => s + 1); return; }
       if (input === 'k' || key.upArrow)    { setPanelScroll(s => Math.max(0, s - 1)); return; }

@@ -1,5 +1,5 @@
 /**
- * 心跳引擎集成测试
+ * Integration tests for the heartbeat engine
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -18,11 +18,11 @@ describe('Heartbeat Integration', () => {
   let heartbeat: Heartbeat;
 
   beforeEach(async () => {
-    // 创建临时数据库
+    // Create temporary database
     dbPath = `/tmp/corivo-test-${Date.now()}.db`;
     const dbKey = KeyManager.generateDatabaseKey();
 
-    // 初始化数据库（不使用 FTS5）
+    // Initialize database (not using FTS5)
     const sqliteDb = new Database(dbPath);
     sqliteDb.exec(`
       CREATE TABLE IF NOT EXISTS blocks (
@@ -46,24 +46,24 @@ describe('Heartbeat Integration', () => {
     `);
     sqliteDb.close();
 
-    // 创建 CorivoDatabase 实例
+    // Create a CorivoDatabase instance
     db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
 
-    // 创建心跳引擎
+    // Create a heartbeat engine
     heartbeat = new Heartbeat({ db });
   });
 
   afterEach(async () => {
-    // 清理数据库实例
+    // Clean database instance
     db.close();
     CorivoDatabase.closeAll();
-    // 删除文件
+    // Delete files
     await fs.unlink(dbPath).catch(() => {});
   });
 
   describe('pending block processing', () => {
     it('should process pending blocks and annotate them', async () => {
-      // 创建一个包含决策内容的 pending block
+      // Create a pending block containing decision content
       const block = db.createBlock({
         content: '选择使用 React 作为前端框架',
         annotation: 'pending',
@@ -72,10 +72,10 @@ describe('Heartbeat Integration', () => {
 
       expect(block.annotation).toBe('pending');
 
-      // 运行心跳一次
+      // run heartbeat once
       await heartbeat.runOnce();
 
-      // 验证 block 已被标注
+      // Verify that the block has been marked
       const updated = db.queryBlocks({ limit: 100 }).find(b => b.id === block.id);
       expect(updated?.annotation).not.toBe('pending');
       expect(updated?.annotation).toContain('决策');
@@ -114,22 +114,22 @@ describe('Heartbeat Integration', () => {
 
   describe('vitality decay', () => {
     it('should decay vitality for old blocks', async () => {
-      // 创建一个 10 天前的 block
+      // Create a block from 10 days ago
       const oldTimestamp = Date.now() - 10 * 24 * 60 * 60 * 1000;
       const block = db.createBlock({
         content: '临时笔记',
         annotation: '知识 · knowledge · 临时笔记'
       });
 
-      // 手动更新时间戳（模拟）
+      // Manually update timestamps (simulation)
       db.updateBlock(block.id, {
         updated_at: Math.floor(oldTimestamp / 1000)
       });
 
-      // 运行心跳衰减
+      // running heartbeat decay
       await heartbeat.processVitalityDecay();
 
-      // 验证生命力已衰减
+      // Verify that vitality has declined
       const updated = db.queryBlocks({ limit: 100 }).find(b => b.id === block.id);
       expect(updated?.vitality).toBeLessThan(100);
     });
@@ -159,27 +159,27 @@ describe('Heartbeat Integration', () => {
 
   describe('error handling', () => {
     it('should handle short content gracefully', async () => {
-      // 测试心跳能优雅处理内容极短的 block
+      // Test heartbeat can handle blocks with extremely short content gracefully
       const block = db.createBlock({
-        content: 'a', // 极短内容
+        content: 'a', // Very short content
         annotation: 'pending'
       });
 
-      // 不应抛出错误
+      // should not throw an error
       await expect(heartbeat.runOnce()).resolves.not.toThrow();
 
-      // 验证 block 被标注
+      // Verify block is marked
       const updated = db.queryBlocks({ limit: 100 }).find(b => b.id === block.id);
       expect(updated?.annotation).not.toBe('pending');
     });
 
     it('should continue processing after one block fails', async () => {
-      // 创建多个 block，其中一个可能失败
+      // Create multiple blocks, one of which may fail
       db.createBlock({ content: '正常内容1', annotation: 'pending' });
       db.createBlock({ content: '选择使用 React', annotation: 'pending' });
       db.createBlock({ content: '正常内容2', annotation: 'pending' });
 
-      // 应该处理所有 block，即使某个失败
+      // All blocks should be processed, even if one fails
       await expect(heartbeat.runOnce()).resolves.not.toThrow();
 
       const allBlocks = db.queryBlocks({ limit: 100 });
@@ -227,7 +227,7 @@ describe('Heartbeat Integration', () => {
 
   describe('association discovery', () => {
     it('should run association analysis without errors', async () => {
-      // 创建多个 active blocks
+      // Create multiple active blocks
       db.createBlock({
         content: '今天天气不错',
         annotation: '事实 · self · 天气',
@@ -238,19 +238,19 @@ describe('Heartbeat Integration', () => {
       });
       db.createBlock({
         content: '决定选择 TypeScript',
-        annotation: 'pending', // 会被标注为决策
+        annotation: 'pending', // will be marked as a decision
       });
 
-      // 运行心跳（包含关联分析）- 验证不抛错
+      // Run heartbeat (including correlation analysis) - verify that no errors are thrown
       await expect(heartbeat.runOnce()).resolves.not.toThrow();
 
-      // 验证关联分析被执行（至少调用了 processAssociations）
+      // Verify that association analysis is performed (at least processAssociations is called)
       const allBlocks = db.queryBlocks({ limit: 100 });
       expect(allBlocks.length).toBe(3);
     });
 
     it('should not create associations for unrelated content', async () => {
-      // 创建两个完全不相关的内容
+      // Create two completely unrelated pieces of content
       db.createBlock({
         content: '今天天气不错',
         annotation: '事实 · self · 天气',
@@ -260,10 +260,10 @@ describe('Heartbeat Integration', () => {
         annotation: '事实 · self · 晚餐',
       });
 
-      // 运行心跳
+      // running heartbeat
       await heartbeat.runOnce();
 
-      // 验证没有创建关联（无关内容不应该有关联）
+      // Verify that no association is created (irrelevant content should not be associated)
       const associations = db.queryAssociations({ limit: 100 });
       expect(associations.length).toBe(0);
     });

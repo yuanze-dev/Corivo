@@ -1,5 +1,5 @@
 /**
- * Daemon 命令 - 内部使用，由 service manager 调用
+ * Daemon command - internal use only, invoked by the service manager.
  */
 
 import { spawn } from 'node:child_process'
@@ -22,12 +22,12 @@ daemonCommand
   .action(async () => {
     const pidPath = path.join(getConfigDir(), 'heartbeat.pid')
 
-    // 写入自身 PID，供 TUI hook（useDaemon.ts）检测存活状态
+    // Write its own PID for TUI hook (useDaemon.ts) to detect the survival status
     await fs.writeFile(pidPath, String(process.pid))
 
-    // 解析 dist/engine/heartbeat.js 的绝对路径
-    // 在 tsup 打包后，import.meta.url 指向 dist/cli/index.js
-    // ../engine/heartbeat.js 即为 dist/engine/heartbeat.js
+    // Parse the absolute path of dist/engine/heartbeat.js
+    // After tsup packaging, import.meta.url points to dist/cli/index.js
+    // ../engine/heartbeat.js is dist/engine/heartbeat.js
     const heartbeatPath = path.resolve(
       path.dirname(fileURLToPath(import.meta.url)),
       '../engine/heartbeat.js'
@@ -35,20 +35,20 @@ daemonCommand
 
     logger.log('[corivo] 后台心跳启动中...')
 
-    // 以独立子进程启动 heartbeat，继承 launchd 注入的环境变量
+    // Start heartbeat as an independent child process and inherit the environment variables injected by launchd
     const child = spawn(process.execPath, [heartbeatPath], {
       env: process.env,
       stdio: 'inherit',
     })
 
-    // 收到信号时转发给子进程，并清理 PID 文件
+    // When a signal is received, it is forwarded to the child process and the PID file is cleaned up.
     const cleanup = (signal: NodeJS.Signals) => {
       child.kill(signal)
     }
     process.once('SIGTERM', () => cleanup('SIGTERM'))
     process.once('SIGINT', () => cleanup('SIGINT'))
 
-    // 子进程退出时清理 PID 文件并透传退出码
+    // When the child process exits, clean the PID file and transparently transmit the exit code
     child.once('exit', async (code) => {
       await fs.unlink(pidPath).catch(() => {})
       process.exit(code ?? 1)

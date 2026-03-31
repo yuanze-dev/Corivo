@@ -1,7 +1,7 @@
 /**
- * CLI 命令 - stop
+ * CLI command - stop
  *
- * 停止心跳守护进程
+ * Stops the heartbeat daemon process.
  */
 
 import { getServiceManager } from '../../service/index.js'

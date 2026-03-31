@@ -8,7 +8,7 @@ interface SyncPanelProps {
   panelHeight: number;
 }
 
-// ─── 平铺行类型（虚拟滚动用） ─────────────────────────────────────
+// ───Tile row type (for virtual scrolling) ────────────────────────────────────
 
 type FlatRow = { key: string; node: React.ReactNode };
 
@@ -27,7 +27,7 @@ function kvRow(k: string, labelStr: string, value: React.ReactNode): FlatRow {
   };
 }
 
-// ─── 构建平铺行列表 ───────────────────────────────────────────────
+// ─── Constructing a tiled row list ─────────────────────────────────────────────
 
 function buildRows(solver: SolverConfig | null): FlatRow[] {
   const rows: FlatRow[] = [];
@@ -57,7 +57,7 @@ function buildRows(solver: SolverConfig | null): FlatRow[] {
   return rows;
 }
 
-// ─── 分组 bordered 样式（高度充足时） ────────────────────────────
+// ─── Grouped bordered style (when the height is sufficient) ─────────────────────────────
 
 function FullView({ solver }: { solver: SolverConfig | null }) {
   if (!solver) {
@@ -99,7 +99,7 @@ function FullView({ solver }: { solver: SolverConfig | null }) {
   );
 }
 
-// ─── 主组件 ─────────────────────────────────────────────────────
+// ─── Main component ──────────────────────────────────────────────────
 
 export const SyncPanel = React.memo(function SyncPanel({ solver, scrollOffset, panelHeight }: SyncPanelProps) {
   const availableRows = Math.max(5, panelHeight);
@@ -107,7 +107,7 @@ export const SyncPanel = React.memo(function SyncPanel({ solver, scrollOffset, p
   const scrollModeRef = React.useRef<boolean | null>(null);
   const threshold = rows.length + 2;
 
-  // hysteresis：±2 行缓冲防止临界抖动
+  // hysteresis: ±2 line buffering to prevent critical jitter
   if (scrollModeRef.current === null) {
     scrollModeRef.current = availableRows < threshold;
   } else if (scrollModeRef.current && availableRows >= threshold + 2) {
@@ -120,8 +120,8 @@ export const SyncPanel = React.memo(function SyncPanel({ solver, scrollOffset, p
     return <FullView solver={solver} />;
   }
 
-  // 高度不足：虚拟滚动（单个 bordered 容器）
-  const innerH = Math.max(2, availableRows - 3); // 3 = 上下边框 + 标题行
+  // Insufficient height: virtual scrolling (single bordered container)
+  const innerH = Math.max(2, availableRows - 3); // 3 = top and bottom borders + title row
   const maxScroll = Math.max(0, rows.length - innerH);
   const offset = Math.min(scrollOffset, maxScroll);
   const visible = rows.slice(offset, offset + innerH);

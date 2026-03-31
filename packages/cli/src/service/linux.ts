@@ -1,5 +1,5 @@
 /**
- * Linux systemd --user 守护进程管理
+ * Linux systemd --user daemon management
  */
 
 import fs from 'node:fs/promises'
@@ -20,11 +20,11 @@ const LOG_FILE = path.join(CORIVO_CONFIG_DIR, 'daemon.log')
 const ERR_FILE = path.join(CORIVO_CONFIG_DIR, 'daemon.err')
 
 /**
- * 生成 systemd unit 文件内容
+ * Generate systemd unit file contents
  */
 function generateUnitFile(config: ServiceConfig): string {
-  // 解析命令：如果 corivoBin 包含空格（如 "node /path/to/cli.js"），
-  // 需要拆分为 ExecStart 的可执行文件 + 参数形式
+  // Parse command: if corivoBin contains spaces (such as "node /path/to/cli.js"),
+  // Need to be split into executable file + parameter form of ExecStart
   const parts = config.corivoBin.trim().split(/\s+/)
   const execParts = [...parts, 'daemon', 'run']
   const execStart = execParts.join(' ')
@@ -49,7 +49,7 @@ WantedBy=default.target
 }
 
 /**
- * 执行 systemctl --user 命令，忽略非零退出码（通过 ignoreError）
+ * Execute the systemctl --user command, ignoring non-zero exit codes (via ignoreError)
  */
 async function systemctl(args: string[], ignoreError = false): Promise<string> {
   try {
@@ -70,20 +70,20 @@ export class LinuxServiceManager implements ServiceManager {
 
   async install(config: ServiceConfig): Promise<ServiceResult> {
     try {
-      // 确保 ~/.config/systemd/user/ 目录存在
+      // Make sure the ~/.config/systemd/user/ directory exists
       await fs.mkdir(SYSTEMD_USER_DIR, { recursive: true })
 
-      // 写入 unit 文件
+      // Write unit file
       const unitContent = generateUnitFile(config)
       await fs.writeFile(UNIT_FILE_PATH, unitContent, { mode: 0o644 })
 
-      // 重新加载 systemd 配置
+      // Reload systemd configuration
       await systemctl(['daemon-reload'])
 
-      // 设置开机自启
+      // Set up auto-start at power on
       await systemctl(['enable', SERVICE_NAME])
 
-      // 启动服务
+      // Start service
       await systemctl(['start', SERVICE_NAME])
 
       return { success: true }
@@ -97,18 +97,18 @@ export class LinuxServiceManager implements ServiceManager {
 
   async uninstall(): Promise<ServiceResult> {
     try {
-      // 尝试停止服务，失败不中断
+      // Try to stop the service, if it fails, it will not be interrupted.
       await systemctl(['stop', SERVICE_NAME], true)
 
-      // 尝试禁用开机自启，失败不中断
+      // Try disabling auto-start at boot, but it will not be interrupted if it fails.
       await systemctl(['disable', SERVICE_NAME], true)
 
-      // 删除 unit 文件
+      // delete unit file
       await fs.unlink(UNIT_FILE_PATH).catch(() => {
-        // 文件可能不存在，忽略
+        // File may not exist, ignore
       })
 
-      // 重新加载 systemd 配置
+      // Reload systemd configuration
       await systemctl(['daemon-reload'], true)
 
       return { success: true }
@@ -122,29 +122,29 @@ export class LinuxServiceManager implements ServiceManager {
 
   async getStatus(): Promise<ServiceStatus> {
     try {
-      // 检查 unit 文件是否存在
+      // Check if unit file exists
       const loaded = await fs.access(UNIT_FILE_PATH).then(() => true).catch(() => false)
 
       if (!loaded) {
         return { running: false, loaded: false }
       }
 
-      // 检查服务是否处于 active 状态（exit 0 = running）
+      // Check if the service is in active state (exit 0 = running)
       const isActiveOutput = await systemctl(['is-active', SERVICE_NAME], true)
       const running = isActiveOutput.trim() === 'active'
 
-      // 获取 MainPID
+      // Get MainPID
       let pid: number | undefined
       try {
         const showOutput = await systemctl(['show', SERVICE_NAME, '--property=MainPID'])
         const match = showOutput.match(/MainPID=(\d+)/)
         if (match) {
           const parsedPid = parseInt(match[1], 10)
-          // PID 为 0 表示服务未运行
+          // A PID of 0 means the service is not running
           if (parsedPid > 0) pid = parsedPid
         }
       } catch {
-        // 无法获取 PID，忽略
+        // Unable to get PID, ignored
       }
 
       return { running, loaded: true, pid }

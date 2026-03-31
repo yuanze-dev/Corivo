@@ -1,6 +1,6 @@
 /**
- * Push 命令
- * 输出推送消息
+ * Push command
+ * Output push message
  */
 
 import fs from 'node:fs/promises';
@@ -19,14 +19,14 @@ pushCommand
   .action(async (options) => {
     try {
       if (options.welcome) {
-        // 输出欢迎消息
+        // Output welcome message
         console.log('');
         console.log(chalk.cyan(getWelcomeMessage()));
         console.log('');
         return;
       }
 
-      // 读取配置
+      // Read configuration
       const configDir = getConfigDir();
       const configPath = path.join(configDir, 'config.json');
 
@@ -41,7 +41,7 @@ pushCommand
         return;
       }
 
-      // 获取数据库密钥
+      // Get database key
       let dbKeyBase64 = process.env.CORIVO_DB_KEY;
       const dbPath = process.env.CORIVO_DB_PATH || getDefaultDatabasePath();
 
@@ -60,11 +60,11 @@ pushCommand
       const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
 
       if (options.firstActivation) {
-        // 输出首次激活的自我介绍
-        // 获取最近扫描的 blocks
+        // Output self-introduction for first activation
+        // Get recently scanned blocks
         const blocks = db.queryBlocks({ limit: 100 });
 
-        // 过滤出来自 Cold Scan 的 blocks（source 为 cold-scan 或已知的扫描源）
+        // Filter out blocks from Cold Scan (source is cold-scan or a known scan source)
         const scanSources = new Set(['cold-scan', 'package-json', 'claude-code', 'prettier-config', 'editorconfig', 'tsconfig', 'git-config', 'npm-config', 'yarn-config', 'pnpm-config']);
         const scannedBlocks = blocks.filter(
           (b: any) => scanSources.has(b.source)
@@ -84,7 +84,7 @@ pushCommand
         return;
       }
 
-      // 默认：显示待推送的消息
+      // Default: Display messages to be pushed
       const blocks = db.queryBlocks({ limit: 10 });
 
       if (blocks.length === 0) {

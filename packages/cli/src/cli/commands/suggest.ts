@@ -1,7 +1,7 @@
 /**
- * Suggest 命令
+ * Suggest command
  *
- * 兼容旧 hooks 的 suggest 入口。新的主路径是 carry-over / recall / review。
+ * Legacy entry point for older hooks. The primary paths are now carry-over / recall / review.
  */
 
 import { Command } from 'commander';

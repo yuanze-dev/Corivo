@@ -1,7 +1,7 @@
 /**
- * CLI 命令 - query
+ * CLI command - query
  *
- * 查询 Corivo 中的信息
+ * Searches for information stored in Corivo memory blocks.
  */
 
 import fs from 'node:fs/promises';
@@ -22,7 +22,7 @@ interface QueryOptions {
 }
 
 export async function queryCommand(query: string, options: QueryOptions): Promise<void> {
-  // 读取配置
+  // Read configuration
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');
 
@@ -34,12 +34,12 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
     throw new ConfigError('Corivo 未初始化。请先运行: corivo init');
   }
 
-  // 解密数据库密钥（可选密码）
+  // Decrypt database key (optional password)
   let dbKey: Buffer;
   const skipPassword = options.password === false || process.env.CORIVO_NO_PASSWORD === '1';
 
   if (skipPassword) {
-    // 无密码模式：使用 config 中的 db_key（如果有）
+    // Passwordless mode: use db_key from config if available
     if (config.db_key) {
       dbKey = Buffer.from(config.db_key, 'base64');
     } else if (config.encrypted_db_key) {
@@ -72,11 +72,11 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
     }
   }
 
-  // 打开数据库
+  // Open database
   const dbPath = getDefaultDatabasePath();
   const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey, enableEncryption: config.encrypted_db_key !== undefined });
 
-  // 搜索
+  // Search
   const limit = options.limit ? parseInt(options.limit, 10) : 10;
   if (options.limit && isNaN(limit)) {
     throw new Error('--limit 参数必须是有效数字');
@@ -88,14 +88,14 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
     return;
   }
 
-  // 显示结果
+  // Show results
   console.log(chalk.cyan(`\n找到 ${results.length} 条相关记忆:\n`));
 
   for (const block of results) {
-    // ID 和内容
+    // ID and content
     console.log(chalk.gray(block.id) + ' ' + chalk.white(block.content));
 
-    // 元信息
+    // Meta information
     const annotation = block.annotation || 'pending';
     const statusColor = getStatusColor(block.status);
     const statusText = statusColor(block.status);
@@ -104,7 +104,7 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
       chalk.gray(`  标注: ${annotation} | 生命力: ${block.vitality} | 状态: ${statusText}`)
     );
 
-    // 详细信息
+    // Details
     if (options.verbose) {
       console.log(chalk.gray(`  访问次数: ${block.access_count}`));
       if (block.last_accessed) {
@@ -120,20 +120,20 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
     console.log();
   }
 
-  // 附加上下文推送
+  // Additional contextual push
   const pusher = new ContextPusher(db);
   const queryTracker = new QueryHistoryTracker(db);
 
-  // 记录本次查询
+  // Record this query
   queryTracker.recordQuery(query, results);
 
-  // 检查是否有相似的历史查询
+  // Check if there are similar historical queries
   const similarReminder = queryTracker.findSimilarQueries(query);
   if (similarReminder.hasSimilar) {
     console.log(chalk.gray(similarReminder.message));
   }
 
-  // 决策模式推送
+  // Decision mode push
   if (options.pattern) {
     const patternContext = await pusher.pushPatterns(query, 3);
     if (patternContext) {
@@ -141,7 +141,7 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
     }
   }
 
-  // 相关记忆推送
+  // Related memory push
   const context = await pusher.pushContext(query, 5, {
     showAnnotation: true,
     showVitality: true,
@@ -154,7 +154,7 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
 }
 
 /**
- * 获取状态对应的颜色函数
+ * Get the color function corresponding to the state
  */
 function getStatusColor(status: string): (text: string) => string {
   switch (status) {

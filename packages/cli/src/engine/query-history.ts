@@ -1,7 +1,7 @@
 /**
- * 查询历史追踪器
+ * Query history tracker
  *
- * 记录用户的查询，用于"你之前也查过类似的"提醒
+ * Record the user's query for "You have also checked similar queries before" reminder
  */
 
 import type { CorivoDatabase } from '../storage/database.js';
@@ -9,7 +9,7 @@ import type { Block } from '../models/index.js';
 import { generateBlockId } from '../models/block.js';
 
 /**
- * 查询记录
+ * Query records
  */
 export interface QueryRecord {
   id: string;
@@ -20,7 +20,7 @@ export interface QueryRecord {
 }
 
 /**
- * 相似查询提醒
+ * Similar query reminder
  */
 export interface SimilarQueryReminder {
   hasSimilar: boolean;
@@ -29,13 +29,13 @@ export interface SimilarQueryReminder {
 }
 
 /**
- * 查询历史追踪器
+ * Query history tracker
  */
 export class QueryHistoryTracker {
   constructor(private db: CorivoDatabase) {}
 
   /**
-   * 记录查询
+   * Record query
    */
   recordQuery(query: string, results: Block[]): void {
     const record: QueryRecord = {
@@ -46,7 +46,7 @@ export class QueryHistoryTracker {
       resultIds: results.map((r) => r.id),
     };
 
-    // 保存到数据库
+    // Save to database
     try {
       const stmt = (this.db as any).db.prepare(`
         INSERT INTO query_logs (id, timestamp, query, result_count)
@@ -55,20 +55,20 @@ export class QueryHistoryTracker {
 
       stmt.run(record.id, record.timestamp, record.query, record.resultCount);
     } catch (error) {
-      // 表可能还不存在，静默失败
+      // The table may not exist yet, failing silently
       console.debug('[query-history] 记录查询失败:', error);
     }
   }
 
   /**
-   * 查找相似的历史查询
+   * Find similar historical queries
    *
-   * @param currentQuery - 当前查询
-   * @returns 相似查询提醒
+   * @param currentQuery - the current query
+   * @returns similar query reminder
    */
   findSimilarQueries(currentQuery: string): SimilarQueryReminder {
     try {
-      // 获取最近 7 天的查询记录
+      // Get query records for the last 7 days
       const stmt = (this.db as any).db.prepare(`
         SELECT query, timestamp FROM query_logs
         WHERE timestamp > ?
@@ -83,7 +83,7 @@ export class QueryHistoryTracker {
         return { hasSimilar: false, message: '', similarQueries: [] };
       }
 
-      // 找出相似查询
+      // Find similar queries
       const similar: Array<{ query: string; timestamp: number }> = [];
 
       for (const row of rows) {
@@ -96,13 +96,13 @@ export class QueryHistoryTracker {
         return { hasSimilar: false, message: '', similarQueries: [] };
       }
 
-      // 生成提醒语
+      // Generate reminder
       const message = this.generateReminderMessage(similar);
 
       return {
         hasSimilar: true,
         message,
-        similarQueries: similar.slice(0, 3), // 最多返回 3 个
+        similarQueries: similar.slice(0, 3), // Returns up to 3
       };
     } catch (error) {
       return { hasSimilar: false, message: '', similarQueries: [] };
@@ -110,15 +110,15 @@ export class QueryHistoryTracker {
   }
 
   /**
-   * 判断两个查询是否相似
+   * Determine whether two queries are similar
    */
   private isSimilarQuery(query1: string, query2: string): boolean {
-    // 完全相同
+    // exactly the same
     if (query1 === query2) {
-      return false; // 同样的查询不算"相似"，是重复
+      return false; // The same query is not considered "similar" but is a duplicate
     }
 
-    // 计算相似度
+    // Calculate similarity
     const words1 = new Set(this.extractWords(query1));
     const words2 = new Set(this.extractWords(query2));
 
@@ -131,11 +131,11 @@ export class QueryHistoryTracker {
 
     const similarity = intersection.size / union.size;
 
-    return similarity > 0.4; // 40% 相似度
+    return similarity > 0.4; // 40% similarity
   }
 
   /**
-   * 提取词语
+   * Extract words
    */
   private extractWords(text: string): string[] {
     const chinese = text.match(/[\u4e00-\u9fa5]/g) || [];
@@ -144,7 +144,7 @@ export class QueryHistoryTracker {
   }
 
   /**
-   * 生成友好的提醒语
+   * Generate friendly reminders
    */
   private generateReminderMessage(similarQueries: Array<{ query: string; timestamp: number }>): string {
     if (similarQueries.length === 1) {
@@ -164,7 +164,7 @@ export class QueryHistoryTracker {
   }
 
   /**
-   * 清理旧记录（保留最近 30 天）
+   * Clean up old records (retain the last 30 days)
    */
   cleanupOldRecords(): void {
     try {
@@ -172,7 +172,7 @@ export class QueryHistoryTracker {
       const stmt = (this.db as any).db.prepare('DELETE FROM query_logs WHERE timestamp < ?');
       stmt.run(thirtyDaysAgo);
     } catch (error) {
-      // 静默失败
+      // Silently fails
     }
   }
 }

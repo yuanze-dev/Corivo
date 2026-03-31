@@ -1,6 +1,6 @@
 /**
- * Git Config 提取器
- * 提取用户姓名、邮箱等身份信息
+ * Git Config Extractor
+ * Extract user name, email and other identity information
  */
 
 import { readFileSafe, expandHome, createBlock } from '../utils.js';
@@ -11,7 +11,7 @@ async function extractGitConfig(content: string, filePath: string) {
 
   if (!content) return blocks;
 
-  // 提取 user.name
+  // Extract user.name
   const nameMatch = content.match(/^\s*name\s*=\s*(.+)$/m);
   if (nameMatch) {
     blocks.push(
@@ -25,7 +25,7 @@ async function extractGitConfig(content: string, filePath: string) {
     );
   }
 
-  // 提取 user.email
+  // Extract user.email
   const emailMatch = content.match(/^\s*email\s*=\s*(.+)$/m);
   if (emailMatch) {
     blocks.push(
@@ -39,7 +39,7 @@ async function extractGitConfig(content: string, filePath: string) {
     );
   }
 
-  // 提取常用别名（来自 [alias] 段落）
+  // Extract common aliases (from [alias] paragraph)
   const aliasMatches = content.match(/^\s*(\w+)\s*=\s*(.+)$/gm);
   if (aliasMatches && aliasMatches.length > 0) {
     const aliases = aliasMatches
@@ -47,7 +47,7 @@ async function extractGitConfig(content: string, filePath: string) {
       .filter(Boolean)
       .map((m) => (m ? m[1] : null))
       .filter(Boolean)
-      .slice(0, 10); // 最多记录 10 个
+      .slice(0, 10); // Maximum of 10 records
 
     if (aliases.length > 0) {
       blocks.push(
@@ -62,7 +62,7 @@ async function extractGitConfig(content: string, filePath: string) {
     }
   }
 
-  // 提取默认分支名
+  // Extract default branch name
   const defaultBranchMatch = content.match(/^\s*init\.defaultBranch\s*=\s*(.+)$/m);
   if (defaultBranchMatch) {
     blocks.push(

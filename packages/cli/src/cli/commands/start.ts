@@ -1,7 +1,7 @@
 /**
- * CLI 命令 - start
+ * CLI command - start
  *
- * 启动心跳守护进程（通过系统 service manager）
+ * Starts the heartbeat daemon process via the system service manager.
  */
 
 import fs from 'node:fs/promises'

@@ -1,23 +1,23 @@
 /**
- * 矛盾检测器
+ * Contradiction detector
  *
- * 检测新保存的内容是否与已有内容矛盾
- * 像朋友一样提醒："不过你之前说的是..."
+ * Check whether newly saved content conflicts with existing content
+ * Remind like a friend: "But what you said before is..."
  */
 
 import type { Block } from '../models/index.js';
 
 /**
- * 矛盾类型
+ * type of contradiction
  */
 enum ConflictType {
-  DECISION_CHANGE = 'decision_change', // 决策变更
-  VALUE_CONFLICT = 'value_conflict',   // 价值观冲突
-  FACT_CONFLICT = 'fact_conflict',     // 事实冲突
+  DECISION_CHANGE = 'decision_change', // decision change
+  VALUE_CONFLICT = 'value_conflict',   // conflict of values
+  FACT_CONFLICT = 'fact_conflict',     // conflict of facts
 }
 
 /**
- * 矛盾提醒
+ * Conflict reminder
  */
 export interface ConflictReminder {
   hasConflict: boolean;
@@ -26,18 +26,18 @@ export interface ConflictReminder {
 }
 
 /**
- * 矛盾检测器
+ * Contradiction detector
  */
 export class ConflictDetector {
   /**
-   * 检测新内容是否与已有内容矛盾
+   * Check whether new content conflicts with existing content
    *
-   * @param newContent - 新保存的内容
-   * @param existingBlocks - 已有的 block 列表
-   * @returns 矛盾提醒，如果没有矛盾返回 null
+   * @param newContent - the newly saved content
+   * @param existingBlocks - list of existing blocks
+   * @returns conflict reminder, if there is no conflict, return null
    */
   detect(newContent: string, existingBlocks: Block[]): ConflictReminder | null {
-    // 只检测决策类内容
+    // Only detect decision-making content
     const decisions = existingBlocks.filter((b) =>
       b.annotation.includes('决策') && b.status !== 'archived'
     );
@@ -48,7 +48,7 @@ export class ConflictDetector {
 
     const conflicting: Block[] = [];
 
-    // 检测决策变更
+    // Detect decision changes
     for (const decision of decisions) {
       if (this.isDecisionChange(newContent, decision.content)) {
         conflicting.push(decision);
@@ -59,7 +59,7 @@ export class ConflictDetector {
       return null;
     }
 
-    // 生成友好的提醒语
+    // Generate friendly reminders
     const message = this.generateReminderMessage(newContent, conflicting);
 
     return {
@@ -70,12 +70,12 @@ export class ConflictDetector {
   }
 
   /**
-   * 检测是否是决策变更
+   * Check whether it is a decision change
    *
-   * 规则：之前说"选择 X"，现在说"选择 Y"（X ≠ Y）
+   * Rule: Before it said "Choose X", now it says "Choose Y" (X ≠ Y)
    */
   private isDecisionChange(newContent: string, oldContent: string): boolean {
-    // 提取决策内容
+    // Extract decision content
     const oldDecision = this.extractDecision(oldContent);
     const newDecision = this.extractDecision(newContent);
 
@@ -83,7 +83,7 @@ export class ConflictDetector {
       return false;
     }
 
-    // 不同领域，不算矛盾
+    // Different fields, not a contradiction
     const oldDomain = this.extractDomain(oldContent);
     const newDomain = this.extractDomain(newContent);
 
@@ -91,16 +91,16 @@ export class ConflictDetector {
       return false;
     }
 
-    // 决策不同，算矛盾
+    // Different decisions are regarded as contradictions
     return oldDecision !== newDecision &&
            this.isSimilarTopic(oldContent, newContent);
   }
 
   /**
-   * 提取决策内容
+   * Extract decision content
    */
   private extractDecision(content: string): string | null {
-    // 匹配 "选择 X"、"决定 X"、"采用 X"、"使用 X"
+    // Match "choose X", "decide X", "adopt X", "use X"
     const patterns = [
       /选择(?:了)?(?:使用)?用\s+([^\u3000-\u303f\s,。,，.]+)/,
       /决定(?:了)?(?:使用)?\s+([^\u3000-\u303f\s,。,，.]+)/,
@@ -119,10 +119,10 @@ export class ConflictDetector {
   }
 
   /**
-   * 提取领域
+   * Extract fields
    */
   private extractDomain(content: string): string {
-    // 从 annotation 提取，这里简化处理
+    // Extracted from annotation, simplified processing here
     if (content.includes('框架') || content.includes('库') || content.includes('React') || content.includes('Vue')) {
       return 'frontend';
     }
@@ -136,7 +136,7 @@ export class ConflictDetector {
   }
 
   /**
-   * 判断是否是相似主题
+   * Determine whether it is a similar topic
    */
   private isSimilarTopic(content1: string, content2: string): boolean {
     const words1 = new Set(this.extractWords(content1));
@@ -145,11 +145,11 @@ export class ConflictDetector {
     const intersection = new Set([...words1].filter((x) => words2.has(x)));
     const union = new Set([...words1, ...words2]);
 
-    return intersection.size / union.size > 0.3; // 30% 相似度
+    return intersection.size / union.size > 0.3; // 30% similarity
   }
 
   /**
-   * 提取词语
+   * Extract words
    */
   private extractWords(text: string): string[] {
     const chinese = text.match(/[\u4e00-\u9fa5]/g) || [];
@@ -158,7 +158,7 @@ export class ConflictDetector {
   }
 
   /**
-   * 生成友好的提醒语
+   * Generate friendly reminders
    */
   private generateReminderMessage(newContent: string, conflicting: Block[]): string {
     if (conflicting.length === 1) {

@@ -1,39 +1,39 @@
 /**
- * Pattern 数据模型
+ * Pattern data model
  *
- * 表示从决策类 block 中提取的结构化决策模式
+ * Represents a structured decision pattern extracted from a decision class block
  */
 
 export interface Pattern {
-  /** 决策类型：技术选型 / 沟通策略 / 时间相关 */
+  /** Decision type: technology selection/communication strategy/time-related */
   type: string;
-  /** 最终决定 */
+  /** final decision */
   decision: string;
-  /** 决策维度数组 */
+  /** decision dimension array */
   dimensions: Dimension[];
-  /** 被拒绝的选项 */
+  /** Denied option */
   alternatives_rejected?: string[];
-  /** 适用情境标签 */
+  /** Applicable context tags */
   context_tags: string[];
-  /** 模式提取置信度 0-1 */
+  /** Pattern extraction confidence 0-1 */
   confidence: number;
-  /** 决策理由 */
+  /** Reasons for decision */
   reason?: string;
-  /** 提取来源：rule / llm / mixed */
+  /** Extraction source: rule/llm/mixed */
   _source?: 'rule' | 'llm';
 }
 
 export interface Dimension {
-  /** 维度名称 */
+  /** Dimension name */
   name: string;
-  /** 权重 0-1 */
+  /** Weight 0-1 */
   weight: number;
-  /** 推理依据 */
+  /** Reasoning basis */
   reason: string;
 }
 
 /**
- * 验证 Pattern 对象
+ * Validate Pattern objects
  */
 export function validatePattern(pattern: unknown): pattern is Pattern {
   if (typeof pattern !== 'object' || pattern === null) {
@@ -53,7 +53,7 @@ export function validatePattern(pattern: unknown): pattern is Pattern {
 }
 
 /**
- * 决策类型枚举
+ * Decision type enum
  */
 export const DECISION_TYPES = {
   TECH_CHOICE: '技术选型',

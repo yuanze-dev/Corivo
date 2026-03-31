@@ -1,6 +1,6 @@
 /**
- * OpenClaw 配置提取器
- * 提取 OpenClaw AI 助手的配置、模型偏好、通道、技能等信息
+ * OpenClaw configuration extractor
+ * Extract OpenClaw AI assistant configuration, model preferences, channels, skills and other information
  */
 
 import { readFileSafe, expandHome, createBlock } from '../utils.js';
@@ -10,7 +10,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 /**
- * OpenClaw 配置结构（部分）
+ * OpenClaw configuration structure (part)
  */
 interface OpenClawConfig {
   models?: {
@@ -41,7 +41,7 @@ interface OpenClawConfig {
 }
 
 /**
- * 提取主配置文件
+ * Extract the main configuration file
  */
 async function extractConfig(content: string, filePath: string) {
   const blocks: ReturnType<typeof createBlock>[] = [];
@@ -51,7 +51,7 @@ async function extractConfig(content: string, filePath: string) {
   try {
     const config = JSON.parse(content) as OpenClawConfig;
 
-    // 提取模型偏好
+    // Extract model preferences
     const primaryModel = config.agents?.defaults?.model?.primary;
     if (primaryModel) {
       blocks.push(
@@ -65,7 +65,7 @@ async function extractConfig(content: string, filePath: string) {
       );
     }
 
-    // 提取可用的 agents
+    // Extract available agents
     const agents = config.agents?.list || [];
     if (agents.length > 0) {
       const agentNames = agents.map(a => a.name || a.id).join(', ');
@@ -80,7 +80,7 @@ async function extractConfig(content: string, filePath: string) {
       );
     }
 
-    // 提取启用的通道
+    // Extract enabled channels
     const enabledChannels: string[] = [];
     for (const [channel, channelConfig] of Object.entries(config.channels || {})) {
       if (channelConfig && typeof channelConfig === 'object' && 'enabled' in channelConfig && channelConfig.enabled) {
@@ -99,7 +99,7 @@ async function extractConfig(content: string, filePath: string) {
       );
     }
 
-    // 提取启用的插件
+    // Extract enabled plugins
     const enabledPlugins: string[] = [];
     const pluginVersions: Record<string, string> = {};
     for (const [plugin, pluginConfig] of Object.entries(config.plugins?.entries || {})) {
@@ -124,27 +124,27 @@ async function extractConfig(content: string, filePath: string) {
       );
     }
   } catch {
-    // 解析失败
+    // Parsing failed
   }
 
   return blocks;
 }
 
 /**
- * 提取 AGENTS.md（行为规则）
+ * Extract AGENTS.md (behavior rules)
  */
 async function extractAgentsMd(content: string, filePath: string) {
   const blocks: ReturnType<typeof createBlock>[] = [];
 
   if (!content) return blocks;
 
-  // 提取关键规则段落
+  // Extract key rule paragraphs
   const lines = content.split('\n');
   const rules: string[] = [];
   let currentSection: string[] = [];
 
   for (const line of lines) {
-    // 收集主要段落
+    // Collect main paragraphs
     if (line.match(/^#{2,4}\s/)) {
       if (currentSection.length > 0) {
         const section = currentSection.join('\n').trim();
@@ -166,7 +166,7 @@ async function extractAgentsMd(content: string, filePath: string) {
     }
   }
 
-  // 保存重要规则
+  // Save important rules
   for (const rule of rules.slice(0, 5)) {
     blocks.push(
       createBlock({
@@ -178,7 +178,7 @@ async function extractAgentsMd(content: string, filePath: string) {
     );
   }
 
-  // 如果内容过多，只记录摘要
+  // If there is too much content, only record the summary
   if (content.length > 1000 && blocks.length === 0) {
     blocks.push(
       createBlock({
@@ -194,7 +194,7 @@ async function extractAgentsMd(content: string, filePath: string) {
 }
 
 /**
- * 提取 SOUL.md（AI 个性）
+ * Extract SOUL.md (AI personality)
  */
 async function extractSoulMd(content: string, filePath: string) {
   const blocks: ReturnType<typeof createBlock>[] = [];
@@ -214,7 +214,7 @@ async function extractSoulMd(content: string, filePath: string) {
 }
 
 /**
- * 提取 USER.md（用户信息）
+ * Extract USER.md (user information)
  */
 async function extractUserMd(content: string, filePath: string) {
   const blocks: ReturnType<typeof createBlock>[] = [];
@@ -234,7 +234,7 @@ async function extractUserMd(content: string, filePath: string) {
 }
 
 /**
- * 提取技能列表
+ * Extract skill list
  */
 async function extractSkills(skillsDir: string) {
   const blocks: ReturnType<typeof createBlock>[] = [];
@@ -258,7 +258,7 @@ async function extractSkills(skillsDir: string) {
       );
     }
   } catch {
-    // 目录不存在或无法读取
+    // Directory does not exist or cannot be read
   }
 
   return blocks;
@@ -271,16 +271,16 @@ export const source: ScanSource = {
     const configDir = path.join(os.homedir(), '.openclaw');
     const workspaceDir = path.join(configDir, 'workspace');
 
-    // 主配置文件
+    // main configuration file
     results.push(path.join(configDir, 'openclaw.json'));
 
-    // 工作区文件
+    // workspace file
     results.push(path.join(workspaceDir, 'AGENTS.md'));
     results.push(path.join(workspaceDir, 'SOUL.md'));
     results.push(path.join(workspaceDir, 'USER.md'));
     results.push(path.join(workspaceDir, 'MEMORY.md'));
 
-    // Skills 目录
+    // Skills Catalog
     results.push(path.join(workspaceDir, 'skills'));
 
     return results.filter(p => p);

@@ -1,6 +1,6 @@
 /**
- * 版本检查器
- * 通过 npm registry 检查并安装新版本
+ * version checker
+ * Check and install new versions via npm registry
  */
 
 import fs from 'node:fs/promises';
@@ -25,7 +25,7 @@ interface NpmRegistryMetadata {
 }
 
 /**
- * 获取当前版本
+ * Get current version
  */
 export function getCurrentVersion(): string {
   if (process.env.CORIVO_CURRENT_VERSION) {
@@ -43,7 +43,7 @@ export function getCurrentVersion(): string {
 }
 
 /**
- * 获取版本信息（从 npm registry）
+ * Get version information (from npm registry)
  */
 export async function fetchVersionInfo(): Promise<VersionInfo | null> {
   const metadata = await fetchRegistryMetadata();
@@ -62,7 +62,7 @@ export async function fetchVersionInfo(): Promise<VersionInfo | null> {
 }
 
 /**
- * 检查是否有更新
+ * Check for updates
  */
 export async function checkForUpdate(config: UpdateConfig = {}): Promise<UpdateStatus> {
   const currentVersion = getCurrentVersion();
@@ -108,7 +108,7 @@ export async function checkForUpdate(config: UpdateConfig = {}): Promise<UpdateS
 }
 
 /**
- * 执行更新
+ * perform update
  */
 export async function performUpdate(
   versionInfo: VersionInfo,
@@ -142,7 +142,7 @@ export async function performUpdate(
 }
 
 /**
- * 获取当前平台
+ * Get current platform
  */
 export function getPlatform(): Platform {
   const platform = os.platform();
@@ -255,7 +255,7 @@ async function saveLastCheckTime(time: number): Promise<void> {
     record.checked_at = time;
     await fs.writeFile(lastUpdatePath, JSON.stringify(record, null, 2));
   } catch {
-    // 忽略错误
+    // ignore errors
   }
 }
 
@@ -272,7 +272,7 @@ async function saveUpdateRecord(record: {
     const lastUpdatePath = path.join(updateDir, 'last-update.json');
     await fs.writeFile(lastUpdatePath, JSON.stringify(record, null, 2));
   } catch {
-    // 忽略错误
+    // ignore errors
   }
 }
 

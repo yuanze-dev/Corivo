@@ -1,7 +1,7 @@
 /**
- * CLAUDE.md 规则注入模块
+ * CLAUDE.md rule injection module
  *
- * 自动将 Corivo 规则注入到项目的 CLAUDE.md 文件
+ * Automatically inject Corivo rules into your project's CLAUDE.md file
  */
 
 import fs from 'node:fs/promises';
@@ -12,7 +12,7 @@ const START_MARKER = '<!-- CORIVO START -->';
 const END_MARKER = '<!-- CORIVO END -->';
 
 /**
- * 标准规则模板
+ * Standard rule template
  */
 export const CORIVO_RULES = `
 <!-- CORIVO START -->
@@ -20,20 +20,20 @@ export const CORIVO_RULES = `
 
 你有一个名为 Corivo 的记忆伙伴。请遵循以下规则：
 
-**采集**：当用户说"记住..."或做出重要决策时，调用：
+**Collection**: When the user says "Remember..." or makes an important decision, call:
 \`\`\`bash
 corivo save --content "内容" --annotation "类型 · 领域 · 标签"
 \`\`\`
 
-**查询**：当用户问"我之前说过..."或需要历史上下文时，调用：
+**Query**: When the user asks "I said before..." or needs historical context, call:
 \`\`\`bash
 corivo query "关键词"
 \`\`\`
 
-**推送**：每次对话开始时，静默执行 \`corivo context\` 获取相关记忆。
+**Push**: When each conversation starts, execute \`corivo context\` silently to obtain relevant memory.
 如果有匹配的记忆，以 \`[corivo]\` 前缀自然地融入回复。
 
-**annotation 类型**：
+**annotation type**:
 - \`事实\` - 关于你或他人的事实
 - \`知识\` - 你学到的知识
 - \`决策\` - 你做过的选择
@@ -43,7 +43,7 @@ corivo query "关键词"
 `.trim();
 
 /**
- * 检查文件是否已包含 Corivo 规则
+ * Check if the file already contains Corivo rules
  */
 export async function hasCorivoRules(filePath: string): Promise<boolean> {
   try {
@@ -55,26 +55,26 @@ export async function hasCorivoRules(filePath: string): Promise<boolean> {
 }
 
 /**
- * 注入规则到文件
+ * Inject rules into files
  */
 export async function injectRules(
   filePath: string,
   options: { force?: boolean } = {}
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // 确保目录存在
+    // Make sure the directory exists
     const dir = path.dirname(filePath);
     await fs.mkdir(dir, { recursive: true });
 
-    // 检查文件是否存在
+    // Check if the file exists
     let content = '';
     try {
       content = await fs.readFile(filePath, 'utf-8');
     } catch {
-      // 文件不存在，创建新文件
+      // File does not exist, create new file
     }
 
-    // 检查是否已包含规则
+    // Check if the rule has been included
     const hasRules = await hasCorivoRules(filePath);
 
     if (hasRules && !options.force) {
@@ -82,11 +82,11 @@ export async function injectRules(
     }
 
     if (hasRules && options.force) {
-      // 替换现有规则
+      // Replace existing rules
       const regex = new RegExp(`${escapeRegExp(START_MARKER)}[\\s\\S]*${escapeRegExp(END_MARKER)}`, 'g');
       content = content.replace(regex, CORIVO_RULES);
     } else {
-      // 追加规则
+      // Append rules
       if (content && !content.endsWith('\n')) {
         content += '\n';
       }
@@ -104,7 +104,7 @@ export async function injectRules(
 }
 
 /**
- * 移除规则从文件
+ * Remove rules from file
  */
 export async function ejectRules(filePath: string): Promise<{ success: boolean; error?: string }> {
   try {
@@ -114,7 +114,7 @@ export async function ejectRules(filePath: string): Promise<{ success: boolean; 
       return { success: true };
     }
 
-    // 移除规则块
+    // Remove rule block
     const regex = new RegExp(`\\n?${escapeRegExp(START_MARKER)}[\\s\\S]*${escapeRegExp(END_MARKER)}\\n?`, 'g');
     const newContent = content.replace(regex, '\n');
 
@@ -129,13 +129,13 @@ export async function ejectRules(filePath: string): Promise<{ success: boolean; 
 }
 
 /**
- * 注入到全局 CLAUDE.md
+ * Inject into global CLAUDE.md
  */
 export async function injectGlobalRules(): Promise<{ success: boolean; path?: string; error?: string }> {
   const claudeDir = path.join(os.homedir(), '.claude');
   const configDir = path.join(os.homedir(), '.config', 'claude');
 
-  // 尝试两个位置
+  // Try two locations
   const paths = [
     path.join(claudeDir, 'CLAUDE.md'),
     path.join(configDir, 'CLAUDE.md'),
@@ -153,7 +153,7 @@ export async function injectGlobalRules(): Promise<{ success: boolean; path?: st
     }
   }
 
-  // 都失败了，创建默认位置
+  // All failed, create default location
   const defaultPath = path.join(claudeDir, 'CLAUDE.md');
   await fs.mkdir(claudeDir, { recursive: true });
 
@@ -166,7 +166,7 @@ export async function injectGlobalRules(): Promise<{ success: boolean; path?: st
 }
 
 /**
- * 注入到当前项目 CLAUDE.md
+ * Inject into current project CLAUDE.md
  */
 export async function injectProjectRules(projectPath?: string): Promise<{ success: boolean; path?: string; error?: string }> {
   const cwd = projectPath || process.cwd();
@@ -181,7 +181,7 @@ export async function injectProjectRules(projectPath?: string): Promise<{ succes
 }
 
 /**
- * 转义正则表达式特殊字符
+ * Escape regular expression special characters
  */
 function escapeRegExp(string: string): string {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

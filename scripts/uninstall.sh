@@ -1,17 +1,17 @@
 #!/bin/bash
-# Corivo 卸载脚本
-# 用法: curl -fsSL https://get.corivo.dev/uninstall | sh
+# Corivo uninstall script
+# Usage: curl -fsSL https://get.corivo.dev/uninstall | sh
 
 set -e
 
-# 颜色定义
+# color definition
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-# 日志函数
+# log function
 log_info() {
     echo -e "${BLUE}✔${NC} $1"
 }
@@ -28,10 +28,10 @@ log_step() {
     echo -e "${BLUE}⏳${NC} $1"
 }
 
-# 配置
+# Configuration
 CORIVO_HOME="${CORIVO_HOME:-$HOME/.corivo}"
 
-# 确认卸载
+# Confirm uninstall
 confirm_uninstall() {
     echo ""
     echo -e "${YELLOW}⚠ 警告: 即将卸载 Corivo${NC}"
@@ -50,7 +50,7 @@ confirm_uninstall() {
     fi
 }
 
-# 停止守护进程
+# Stop daemon
 stop_daemon() {
     log_step "停止守护进程..."
 
@@ -78,22 +78,22 @@ stop_daemon() {
         rm -f "$HOME/.config/systemd/user/corivo.service"
     fi
 
-    # 尝试直接停止进程
+    # Try stopping the process directly
     if pgrep -f "corivo daemon" >/dev/null 2>&1; then
         pkill -f "corivo daemon" 2>/dev/null || true
         log_info "已停止 corivo 进程"
     fi
 }
 
-# 清理 CLAUDE.md 规则
+# Clean up CLAUDE.md rules
 cleanup_claude_md() {
     log_step "清理 CLAUDE.md 规则..."
 
-    # 规则标记
+    # rule tag
     local start_marker="<!-- CORIVO START -->"
     local end_marker="<!-- CORIVO END -->"
 
-    # 要检查的文件列表
+    # List of files to check
     local files=(
         "$HOME/.claude/CLAUDE.md"
         "$HOME/.config/claude/CLAUDE.md"
@@ -104,13 +104,13 @@ cleanup_claude_md() {
 
     for file in "${files[@]}"; do
         if [ -f "$file" ]; then
-            # 检查是否包含标记
+            # Check if tag is included
             if grep -q "$start_marker" "$file" 2>/dev/null; then
-                # 使用 perl 删除标记之间的内容（包括标记）
-                # perl 在 macOS 和 Linux 上都可用
+                # Remove content between tags (including tags) using perl
+                # perl is available on both macOS and Linux
                 perl -i -ne "print unless /$start_marker/../$end_marker/" "$file" 2>/dev/null
 
-                # 检查是否成功（标记是否还存在）
+                # Check if it was successful (whether the tag still exists)
                 if ! grep -q "$start_marker" "$file" 2>/dev/null; then
                     log_info "已清理: $file"
                     ((cleaned_count++))
@@ -124,14 +124,14 @@ cleanup_claude_md() {
     fi
 }
 
-# 清理 PATH
+# Clear PATH
 cleanup_path() {
     log_step "清理 PATH 配置..."
 
     local config_files=()
     local backup_files=()
 
-    # 检测配置文件
+    # Detect configuration file
     [ -f "$HOME/.zshrc" ] && config_files+=("$HOME/.zshrc")
     [ -f "$HOME/.bashrc" ] && config_files+=("$HOME/.bashrc")
     [ -f "$HOME/.bash_profile" ] && config_files+=("$HOME/.bash_profile")
@@ -140,11 +140,11 @@ cleanup_path() {
 
     for file in "${config_files[@]}"; do
         if grep -q "\.corivo/bin" "$file" 2>/dev/null; then
-            # 备份
+            # backup
             cp "$file" "${file}.corivo.bak"
             backup_files+=("${file}.corivo.bak")
 
-            # 删除包含 .corivo/bin 的行
+            # Delete the line containing .corivo/bin
             if [[ "$OSTYPE" == "darwin"* ]]; then
                 sed -i '' '/\.corivo\/bin/d' "$file" 2>/dev/null || true
             else
@@ -161,7 +161,7 @@ cleanup_path() {
     fi
 }
 
-# 删除数据目录
+# Delete data directory
 remove_data() {
     log_step "删除数据目录..."
 
@@ -173,7 +173,7 @@ remove_data() {
     fi
 }
 
-# 显示完成信息
+# Show completion information
 show_complete() {
     echo ""
     echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
@@ -187,7 +187,7 @@ show_complete() {
     echo ""
 }
 
-# 主流程
+# Main process
 main() {
     echo ""
     echo -e "${BLUE}══════════════════════════════════════════${NC}"
@@ -203,5 +203,5 @@ main() {
     show_complete
 }
 
-# 运行
+# run
 main "$@"

@@ -9,6 +9,7 @@ import { createHmac, randomBytes } from 'node:crypto';
 import os from 'node:os';
 import type { CorivoDatabase } from '@/storage/database';
 import { createCliContext } from '../context/create-context.js';
+import { createConfiguredCliContext } from '../context/configured-context.js';
 import type { Logger as SyncLogger } from '../../utils/logging.js';
 
 interface RegisterResponse {
@@ -216,7 +217,7 @@ export function createSyncCommand(): Command {
         console.error('Corivo is not initialized, please run corivo init');
         process.exit(1);
       }
-      const context = createCliContext({ logLevel: config.settings?.logLevel });
+      const context = createConfiguredCliContext(config);
       const { logger } = context;
       const solverConfig = await context.config.loadSolver();
       if (!solverConfig) {
@@ -246,7 +247,7 @@ export function createSyncCommand(): Command {
       console.error('Corivo is not initialized, please run corivo init');
       process.exit(1);
     }
-    const context = createCliContext({ logLevel: config.settings?.logLevel });
+    const context = createConfiguredCliContext(config);
     const { logger } = context;
 
     let solverConfig = await context.config.loadSolver();

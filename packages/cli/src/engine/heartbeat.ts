@@ -23,14 +23,12 @@ import type { BlockStatus, Pattern } from '../models/index.js';
 import { vitalityToStatus } from '../models/block.js';
 import { loadConfig } from '../config.js';
 import { createCliContext } from '../cli/context/create-context.js';
-import { createLogger } from '../utils/logging.js';
+import { createLogger, type Logger } from '../utils/logging.js';
 
 const HEARTBEAT_INTERVAL = 5000; // 5 seconds
 const PENDING_BATCH_SIZE = 10; // Number of pending blocks processed per cycle
 const HEALTH_CHECK_FILE = '.heartbeat-health'; // Health status file name
 const HEALTH_CHECK_INTERVAL = 30000; // Write health status every 30 seconds
-const logger = createLogger();
-
 /**
  * Heartbeat engine configuration
  */
@@ -41,6 +39,8 @@ export interface HeartbeatConfig {
   dbPath?: string;
   /** Sync interval in seconds (optional; for testing; production reads from config.json) */
   syncIntervalSeconds?: number;
+  /** Logger facade (optional; defaults to the process logger) */
+  logger?: Logger;
 }
 
 /**
@@ -61,6 +61,7 @@ export interface FirstRunConfig {
  * Heartbeat engine
  */
 export class Heartbeat {
+  private readonly logger: Logger;
   private running = false;
   private db: CorivoDatabase | null = null;
   private config?: HeartbeatConfig;
@@ -84,6 +85,7 @@ export class Heartbeat {
   constructor(config?: HeartbeatConfig) {
     // Persist constructor config for later use
     this.config = config;
+    this.logger = config?.logger ?? createLogger();
 
     // If a db instance was injected (test mode), use it directly
     if (config?.db) {
@@ -120,7 +122,7 @@ export class Heartbeat {
    */
   async start(): Promise<void> {
     if (this.running) {
-      logger.log('心跳已在运行');
+      this.logger.log('心跳已在运行');
       return;
     }
 
@@ -146,14 +148,17 @@ export class Heartbeat {
       const corivoConfig = await loadConfig(configDir);
       this.autoSync = new AutoSync(
         this.db,
-        createCliContext({ logLevel: corivoConfig?.settings?.logLevel })
+        createCliContext({
+          logger: this.logger,
+          logLevel: corivoConfig?.settings?.logLevel,
+        })
       );
       this.syncCycles = this.computeSyncCycles(corivoConfig?.settings?.syncIntervalSeconds);
 
       // Dynamically load configured plugins
       await this.loadPlugins(corivoConfig?.plugins ?? []);
 
-      logger.log(`心跳守护进程启动中... (规则: ${this.ruleEngine.ruleCount})`);
+      this.logger.log(`心跳守护进程启动中... (规则: ${this.ruleEngine.ruleCount})`);
     }
 
     this.running = true;
@@ -213,9 +218,9 @@ export class Heartbeat {
         }
       } catch (error) {
         if (error instanceof DatabaseError) {
-          logger.error('[心跳] 数据库错误:', error.message);
+          this.logger.error('[心跳] 数据库错误:', error.message);
         } else {
-          logger.error('[心跳] 处理错误:', error);
+          this.logger.error('[心跳] 处理错误:', error);
         }
       }
 
@@ -228,7 +233,7 @@ export class Heartbeat {
       }
     }
 
-    logger.log('心跳进程已停止');
+    this.logger.log('心跳进程已停止');
     // Remove the health file on clean shutdown
     await this.cleanupHealthCheck();
   }
@@ -249,7 +254,7 @@ export class Heartbeat {
         const plugin = (mod.default ?? mod) as CorivoPlugin;
         await this.loadPlugin(plugin);
       } catch (err) {
-        logger.error(`[Heartbeat] 加载 ${packageName} 失败，跳过:`, err);
+        this.logger.error(`[Heartbeat] 加载 ${packageName} 失败，跳过:`, err);
       }
     }
   }
@@ -266,7 +271,7 @@ export class Heartbeat {
     const collector = plugin.create();
     await collector.startWatching(this.db);
     this.plugins.push(collector);
-    logger.log(`[Heartbeat] 已加载插件: ${plugin.name}`);
+    this.logger.log(`[Heartbeat] 已加载插件: ${plugin.name}`);
   }
 
   /**
@@ -312,7 +317,7 @@ export class Heartbeat {
       skipColdZone = true,
     } = config;
 
-    logger.log('[corivo] 正在认识你...');
+    this.logger.log('[corivo] 正在认识你...');
 
     const startTime = Date.now();
     let processedBlocks = 0;
@@ -343,7 +348,7 @@ export class Heartbeat {
       for (const block of pending) {
         // Abort if the time budget is exceeded
         if (Date.now() - startTime > timeLimit) {
-          logger.log(`[corivo] 首次运行超时，已处理 ${processedBlocks}/${pending.length} 条`);
+          this.logger.log(`[corivo] 首次运行超时，已处理 ${processedBlocks}/${pending.length} 条`);
           break;
         }
 
@@ -379,12 +384,12 @@ export class Heartbeat {
       // Decay is intentionally skipped on first run — no historical data exists yet
 
     } catch (error) {
-      logger.error('[corivo] 首次运行出错:', error);
+      this.logger.error('[corivo] 首次运行出错:', error);
     }
 
     const elapsedTime = Date.now() - startTime;
 
-    logger.log(`[corivo] 首次运行完成，处理了 ${processedBlocks} 条信息`);
+    this.logger.log(`[corivo] 首次运行完成，处理了 ${processedBlocks} 条信息`);
 
     return { processedBlocks, elapsedTime };
   }
@@ -406,7 +411,7 @@ export class Heartbeat {
       await fs.writeFile(this.healthFilePath, JSON.stringify(healthData));
       this.lastHealthCheck = Date.now();
     } catch (error) {
-      logger.error('[心跳] 更新健康状态失败:', error);
+      this.logger.error('[心跳] 更新健康状态失败:', error);
     }
   }
 
@@ -478,13 +483,13 @@ export class Heartbeat {
 
     if (pending.length === 0) return;
 
-    logger.log(`[心跳] 处理 ${pending.length} 个待标注 block`);
+    this.logger.log(`[心跳] 处理 ${pending.length} 个待标注 block`);
 
     for (const block of pending) {
       try {
         // Skip empty content — assign a placeholder annotation
         if (!block.content || block.content.trim().length === 0) {
-          logger.log(`  ${block.id}: 跳过空内容`);
+          this.logger.log(`  ${block.id}: 跳过空内容`);
           this.db!.updateBlock(block.id, {
             annotation: '知识 · knowledge · 空',
           });
@@ -499,9 +504,9 @@ export class Heartbeat {
           annotation,
           ...(pattern && { pattern }),
         });
-        logger.log(`  ${block.id}: ${annotation}${pattern ? ` (${pattern.type})` : ''}`);
+        this.logger.log(`  ${block.id}: ${annotation}${pattern ? ` (${pattern.type})` : ''}`);
       } catch (error) {
-        logger.error(`  ${block.id}: 标注失败`, error);
+        this.logger.error(`  ${block.id}: 标注失败`, error);
       }
     }
   }
@@ -642,7 +647,7 @@ export class Heartbeat {
     // Flush batch updates to the database
     if (updates.length > 0) {
       const updatedCount = this.db.batchUpdateVitality(updates);
-      logger.log(`[心跳] 衰减处理: ${updatedCount} 个更新, ${unchangedCount} 个不变`);
+      this.logger.log(`[心跳] 衰减处理: ${updatedCount} 个更新, ${unchangedCount} 个不变`);
     }
   }
 
@@ -671,10 +676,10 @@ export class Heartbeat {
       if (associations.length > 0) {
         // Persist all discovered associations in one batch
         this.db.batchCreateAssociations(associations);
-        logger.log(`[心跳] 关联分析: 发现 ${associations.length} 个新关联`);
+        this.logger.log(`[心跳] 关联分析: 发现 ${associations.length} 个新关联`);
       }
     } catch (error) {
-      logger.error('[心跳] 关联分析失败:', error);
+      this.logger.error('[心跳] 关联分析失败:', error);
     }
   }
 
@@ -715,7 +720,7 @@ export class Heartbeat {
             }
           }
 
-          logger.log(`[心跳] 整合: 合并了 ${result.blocks.length} 个相似内容`);
+          this.logger.log(`[心跳] 整合: 合并了 ${result.blocks.length} 个相似内容`);
         }
       }
 
@@ -735,10 +740,10 @@ export class Heartbeat {
       }
 
       if (missingLinks.size > 0) {
-        logger.log(`[心跳] 整合: 为 ${missingLinks.size} 个 block 补充了关联`);
+        this.logger.log(`[心跳] 整合: 为 ${missingLinks.size} 个 block 补充了关联`);
       }
     } catch (error) {
-      logger.error('[心跳] 热区整合失败:', error);
+      this.logger.error('[心跳] 热区整合失败:', error);
     }
   }
 
@@ -758,10 +763,10 @@ export class Heartbeat {
 
       const summary = this.weeklySummary.generateSummary();
       if (summary) {
-        logger.log(`\n${summary}\n`);
+        this.logger.log(`\n${summary}\n`);
       }
     } catch (error) {
-      logger.error('[心跳] 周总结失败:', error);
+      this.logger.error('[心跳] 周总结失败:', error);
     }
   }
 
@@ -782,11 +787,11 @@ export class Heartbeat {
       const reminders = this.followUpManager.getWeeklyReminders();
       if (reminders.length > 0) {
         for (const reminder of reminders) {
-          logger.log(`\n${reminder}\n`);
+          this.logger.log(`\n${reminder}\n`);
         }
       }
     } catch (error) {
-      logger.error('[心跳] 进展提醒失败:', error);
+      this.logger.error('[心跳] 进展提醒失败:', error);
     }
   }
 
@@ -812,10 +817,10 @@ export class Heartbeat {
       // Enqueue any generated push items
       if (items.length > 0) {
         await this.pushQueue.addAll(items);
-        logger.log(`[心跳] 触发决策: 生成了 ${items.length} 条推送`);
+        this.logger.log(`[心跳] 触发决策: 生成了 ${items.length} 条推送`);
       }
     } catch (error) {
-      logger.error('[心跳] 触发决策失败:', error);
+      this.logger.error('[心跳] 触发决策失败:', error);
     }
   }
 
@@ -829,10 +834,10 @@ export class Heartbeat {
     try {
       const result = await this.autoSync.run();
       if (result) {
-        logger.log(`[心跳] 自动同步: Push ${result.pushed}, Pull ${result.pulled}`);
+        this.logger.log(`[心跳] 自动同步: Push ${result.pushed}, Pull ${result.pulled}`);
       }
     } catch (error) {
-      logger.error('[心跳] 自动同步失败:', error instanceof Error ? error.message : error);
+      this.logger.error('[心跳] 自动同步失败:', error instanceof Error ? error.message : error);
     }
   }
 
@@ -859,10 +864,11 @@ const isDirectRun = () => {
 };
 
 if (isDirectRun()) {
-  const heartbeat = new Heartbeat();
+  const processLogger = createLogger();
+  const heartbeat = new Heartbeat({ logger: processLogger });
 
   heartbeat.start().catch((error) => {
-    logger.error('启动失败:', error);
+    processLogger.error('启动失败:', error);
     process.exit(1);
   });
 
@@ -873,13 +879,13 @@ if (isDirectRun()) {
    * in a regular function to ensure it completes before exiting.
    */
   const gracefulShutdown = async (signal: string): Promise<void> => {
-    logger.log(`\n收到 ${signal} 信号，正在停止...`);
+    processLogger.log(`\n收到 ${signal} 信号，正在停止...`);
     try {
       await heartbeat.stop();
-      logger.log('清理完成，退出中...');
+      processLogger.log('清理完成，退出中...');
       process.exit(0);
     } catch (error) {
-      logger.error('清理失败:', error);
+      processLogger.error('清理失败:', error);
       process.exit(1);
     }
   };

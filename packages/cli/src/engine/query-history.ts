@@ -7,6 +7,12 @@
 import type { CorivoDatabase } from '../storage/database.js';
 import type { Block } from '../models/index.js';
 import { generateBlockId } from '../models/block.js';
+import { createLogger, type Logger } from '../utils/logging.js';
+
+interface QueryHistoryRuntime {
+  logger: Pick<Logger, 'debug'>;
+  clock: { now(): number };
+}
 
 /**
  * Query records
@@ -32,7 +38,18 @@ export interface SimilarQueryReminder {
  * Query history tracker
  */
 export class QueryHistoryTracker {
-  constructor(private db: CorivoDatabase) {}
+  private readonly runtime: QueryHistoryRuntime;
+
+  constructor(
+    private db: CorivoDatabase,
+    runtime?: Partial<QueryHistoryRuntime>
+  ) {
+    const fallbackLogger = createLogger();
+    this.runtime = {
+      logger: runtime?.logger ?? fallbackLogger,
+      clock: runtime?.clock ?? { now: () => Date.now() },
+    };
+  }
 
   /**
    * Record query
@@ -40,7 +57,7 @@ export class QueryHistoryTracker {
   recordQuery(query: string, results: Block[]): void {
     const record: QueryRecord = {
       id: generateBlockId().replace('blk_', 'qry_'),
-      timestamp: Date.now(),
+      timestamp: this.runtime.clock.now(),
       query,
       resultCount: results.length,
       resultIds: results.map((r) => r.id),
@@ -56,7 +73,9 @@ export class QueryHistoryTracker {
       stmt.run(record.id, record.timestamp, record.query, record.resultCount);
     } catch (error) {
       // The table may not exist yet, failing silently
-      console.debug('[query-history] 记录查询失败:', error);
+      this.runtime.logger.debug(
+        `[query-history] 记录查询失败: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -76,7 +95,7 @@ export class QueryHistoryTracker {
         LIMIT 50
       `);
 
-      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const sevenDaysAgo = this.runtime.clock.now() - 7 * 24 * 60 * 60 * 1000;
       const rows = stmt.all(sevenDaysAgo) as Array<{ query: string; timestamp: number }>;
 
       if (rows.length === 0) {
@@ -168,7 +187,7 @@ export class QueryHistoryTracker {
    */
   cleanupOldRecords(): void {
     try {
-      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const thirtyDaysAgo = this.runtime.clock.now() - 30 * 24 * 60 * 60 * 1000;
       const stmt = (this.db as any).db.prepare('DELETE FROM query_logs WHERE timestamp < ?');
       stmt.run(thirtyDaysAgo);
     } catch (error) {

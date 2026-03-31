@@ -4,13 +4,15 @@
  * Searches for information stored in Corivo memory blocks.
  */
 
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import chalk from 'chalk';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
+import path from 'node:path';
 import { ConfigError } from '../../errors/index.js';
 import { ContextPusher } from '../../push/context.js';
 import { QueryHistoryTracker } from '../../engine/query-history.js';
+import { createCliContext } from '../context/create-context.js';
+import { createConfiguredCliContext } from '../context/configured-context.js';
+import type { CliContext } from '../context/types.js';
+import type { CorivoConfig } from '../../config.js';
 
 interface QueryOptions {
   limit?: string;
@@ -18,26 +20,38 @@ interface QueryOptions {
   pattern?: boolean;
 }
 
-export async function queryCommand(query: string, options: QueryOptions): Promise<void> {
-  // Read configuration
-  const configDir = getConfigDir();
-  const configPath = path.join(configDir, 'config.json');
+type QueryConfig = CorivoConfig & {
+  encrypted_db_key?: unknown;
+};
 
-  let config;
-  try {
-    const content = await fs.readFile(configPath, 'utf-8');
-    config = JSON.parse(content);
-  } catch {
+export async function queryCommand(query: string, options: QueryOptions): Promise<void> {
+  const bootstrapContext = createCliContext();
+  const config = await loadQueryConfig(bootstrapContext);
+
+  if (!config) {
     throw new ConfigError('Corivo is not initialized. Please run: corivo init');
   }
+
+  const context = createConfiguredCliContext(config);
+  await runQueryCommand(context, query, options, config);
+}
+
+async function runQueryCommand(
+  context: CliContext,
+  query: string,
+  options: QueryOptions,
+  config: QueryConfig,
+): Promise<void> {
+  const output = context.output;
 
   if (config.encrypted_db_key) {
     throw new ConfigError('Detected a legacy password-based config. Corivo v0.10+ no longer supports passwords here; please run: corivo init');
   }
 
-  // Open database
-  const dbPath = getDefaultDatabasePath();
-  const db = CorivoDatabase.getInstance({ path: dbPath, enableEncryption: false });
+  const db = context.db.get({
+    path: context.paths.databasePath(),
+    enableEncryption: false,
+  });
 
   // Search
   const limit = options.limit ? parseInt(options.limit, 10) : 10;
@@ -47,45 +61,48 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
   const results = db.searchBlocks(query, limit);
 
   if (results.length === 0) {
-    console.log(chalk.yellow(`\nNo memories found related to "${query}"`));
+    output.info(chalk.yellow(`\nNo memories found related to "${query}"`));
     return;
   }
 
   // Show results
-  console.log(chalk.cyan(`\nFound ${results.length} related memories:\n`));
+  output.info(chalk.cyan(`\nFound ${results.length} related memories:\n`));
 
   for (const block of results) {
     // ID and content
-    console.log(chalk.gray(block.id) + ' ' + chalk.white(block.content));
+    output.info(chalk.gray(block.id) + ' ' + chalk.white(block.content));
 
     // Meta information
     const annotation = block.annotation || 'pending';
     const statusColor = getStatusColor(block.status);
     const statusText = statusColor(block.status);
 
-    console.log(
+    output.info(
       chalk.gray(`  Annotation: ${annotation} | Vitality: ${block.vitality} | Status: ${statusText}`)
     );
 
     // Details
     if (options.verbose) {
-      console.log(chalk.gray(`  Access count: ${block.access_count}`));
+      output.info(chalk.gray(`  Access count: ${block.access_count}`));
       if (block.last_accessed) {
         const lastAccess = new Date(block.last_accessed);
         const daysAgo = Math.floor((Date.now() - block.last_accessed) / 86400000);
-        console.log(chalk.gray(`  Last accessed: ${lastAccess.toLocaleString('en-US')} (${daysAgo} days ago)`));
+        output.info(chalk.gray(`  Last accessed: ${lastAccess.toLocaleString('en-US')} (${daysAgo} days ago)`));
       }
       if (block.pattern) {
-        console.log(chalk.gray(`  Pattern: ${block.pattern.type} - ${block.pattern.decision}`));
+        output.info(chalk.gray(`  Pattern: ${block.pattern.type} - ${block.pattern.decision}`));
       }
     }
 
-    console.log();
+    output.info('');
   }
 
   // Additional contextual push
   const pusher = new ContextPusher(db);
-  const queryTracker = new QueryHistoryTracker(db);
+  const queryTracker = new QueryHistoryTracker(db, {
+    logger: context.logger,
+    clock: context.clock,
+  });
 
   // Record this query
   queryTracker.recordQuery(query, results);
@@ -93,27 +110,41 @@ export async function queryCommand(query: string, options: QueryOptions): Promis
   // Check if there are similar historical queries
   const similarReminder = queryTracker.findSimilarQueries(query);
   if (similarReminder.hasSimilar) {
-    console.log(chalk.gray(similarReminder.message));
+    output.info(chalk.gray(similarReminder.message));
   }
 
   // Decision mode push
   if (options.pattern) {
     const patternContext = await pusher.pushPatterns(query, 3);
     if (patternContext) {
-      console.log(patternContext);
+      output.info(patternContext);
     }
   }
 
   // Related memory push
-  const context = await pusher.pushContext(query, 5, {
+  const relatedContext = await pusher.pushContext(query, 5, {
     showAnnotation: true,
     showVitality: true,
     showTime: options.verbose,
   });
 
-  if (context) {
-    console.log(context);
+  if (relatedContext) {
+    output.info(relatedContext);
   }
+}
+
+async function loadQueryConfig(context: CliContext): Promise<QueryConfig | null> {
+  const config = await context.config.load();
+  if (config) {
+    return config;
+  }
+
+  const configPath = path.join(context.paths.configDir(), 'config.json');
+  if (!(await context.fs.exists(configPath))) {
+    return null;
+  }
+
+  return context.fs.readJson<QueryConfig>(configPath);
 }
 
 /**

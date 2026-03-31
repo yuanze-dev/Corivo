@@ -4,8 +4,6 @@
  * Injects Corivo rules into project configuration files.
  */
 
-import path from 'node:path';
-import os from 'node:os';
 import chalk from 'chalk';
 import { printBanner } from '@/utils/banner';
 import { createHostInstallUseCase } from '../../application/hosts/install-host.js';
@@ -23,7 +21,7 @@ export async function injectCommand(options: {
   opencode?: boolean;
 }): Promise<void> {
   const host = resolveHost(options);
-  const target = resolveTarget(options, host);
+  const target = resolveTarget(options);
   const request = { host, target, force: options.force, global: options.global };
 
   if (options.eject) {
@@ -56,16 +54,8 @@ function resolveHost(options: {
   return 'project-claude';
 }
 
-function resolveTarget(options: { target?: string; global?: boolean }, host: HostId): string | undefined {
-  if (options.target) {
-    return options.target;
-  }
-
-  if (host === 'project-claude' && options.global) {
-    return path.join(os.homedir(), '.claude');
-  }
-
-  return undefined;
+function resolveTarget(options: { target?: string; global?: boolean }): string | undefined {
+  return options.target;
 }
 
 function resolveBanner(

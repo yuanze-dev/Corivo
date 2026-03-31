@@ -7,7 +7,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'os';
-import type { HostDoctorResult, HostInstallResult } from '../hosts/types.js';
+import type { HostDoctorResult, HostInstallOptions, HostInstallResult } from '../hosts/types.js';
 
 const START_MARKER = '<!-- CORIVO START -->';
 const END_MARKER = '<!-- CORIVO END -->';
@@ -145,9 +145,13 @@ export async function ejectRules(filePath: string): Promise<{ success: boolean; 
 /**
  * Inject into global CLAUDE.md
  */
-export async function injectGlobalRules(): Promise<{ success: boolean; path?: string; error?: string }> {
-  const claudeDir = path.join(os.homedir(), '.claude');
-  const configDir = path.join(os.homedir(), '.config', 'claude');
+export async function injectGlobalRules(options: {
+  force?: boolean;
+  homeDir?: string;
+} = {}): Promise<{ success: boolean; path?: string; error?: string }> {
+  const homeDir = options.homeDir || os.homedir();
+  const claudeDir = path.join(homeDir, '.claude');
+  const configDir = path.join(homeDir, '.config', 'claude');
 
   // Try two locations
   const paths = [
@@ -158,7 +162,7 @@ export async function injectGlobalRules(): Promise<{ success: boolean; path?: st
   for (const p of paths) {
     try {
       await fs.mkdir(path.dirname(p), { recursive: true });
-      const result = await injectRules(p);
+      const result = await injectRules(p, { force: options.force });
       if (result.success) {
         return { success: true, path: p };
       }
@@ -171,7 +175,7 @@ export async function injectGlobalRules(): Promise<{ success: boolean; path?: st
   const defaultPath = path.join(claudeDir, 'CLAUDE.md');
   await fs.mkdir(claudeDir, { recursive: true });
 
-  const result = await injectRules(defaultPath);
+  const result = await injectRules(defaultPath, { force: options.force });
   return {
     success: result.success,
     path: defaultPath,
@@ -191,9 +195,26 @@ export async function injectProjectRules(projectPath?: string): Promise<{ succes
   };
 }
 
-export async function installProjectClaudeHost(projectPath?: string): Promise<HostInstallResult> {
+export async function installProjectClaudeHost(
+  projectPath?: string,
+  options: Pick<HostInstallOptions, 'force' | 'global' | 'target'> = {}
+): Promise<HostInstallResult> {
+  if (options.global) {
+    const globalResult = await injectGlobalRules({
+      force: options.force,
+      homeDir: options.target,
+    });
+    return {
+      success: globalResult.success,
+      host: 'project-claude',
+      path: globalResult.path,
+      summary: globalResult.success ? 'Project Claude rules installed' : 'Project Claude rules install failed',
+      error: globalResult.error,
+    };
+  }
+
   const paths = getProjectClaudePaths(projectPath);
-  const result = await injectRules(paths.claudeMdPath);
+  const result = await injectRules(paths.claudeMdPath, { force: options.force });
   return {
     success: result.success,
     host: 'project-claude',

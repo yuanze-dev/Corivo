@@ -54,6 +54,20 @@ describe('inject command compatibility routing', () => {
     expect(installHostRun).toHaveBeenCalledWith(expect.objectContaining({ host: 'project-claude' }));
   });
 
+  it('routes --force on default project-claude path through install use case', async () => {
+    await injectCommand({ force: true });
+
+    expect(installHostRun).toHaveBeenCalledWith(expect.objectContaining({ host: 'project-claude', force: true }));
+  });
+
+  it('keeps default global project-claude target unresolved for helper fallback', async () => {
+    await injectCommand({ global: true });
+
+    const call = installHostRun.mock.calls.at(-1)?.[0];
+    expect(call).toMatchObject({ host: 'project-claude', global: true });
+    expect(call?.target).toBeUndefined();
+  });
+
   it('routes default --eject to project-claude uninstall use case', async () => {
     await injectCommand({ eject: true });
 

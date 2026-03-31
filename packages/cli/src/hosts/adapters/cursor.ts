@@ -5,7 +5,7 @@ export const cursorHostAdapter: HostAdapter = {
   id: 'cursor',
   displayName: 'Cursor',
   capabilities: ['global-install', 'rules', 'hooks', 'doctor', 'uninstall'],
-  install: async () => installCursorHost(),
-  doctor: async () => isCursorInstalled(),
-  uninstall: async () => uninstallCursorHost(),
+  install: async (options) => installCursorHost(options?.target),
+  doctor: async (options) => isCursorInstalled(options?.target),
+  uninstall: async (options) => uninstallCursorHost(options?.target),
 };

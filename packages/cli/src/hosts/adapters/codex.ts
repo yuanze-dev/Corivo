@@ -5,7 +5,7 @@ export const codexHostAdapter: HostAdapter = {
   id: 'codex',
   displayName: 'Codex',
   capabilities: ['global-install', 'rules', 'notify', 'plugin-file', 'doctor', 'uninstall'],
-  install: async () => installCodexHost(),
-  doctor: async () => isCodexInstalled(),
-  uninstall: async () => uninstallCodexHost(),
+  install: async (options) => installCodexHost(options?.target),
+  doctor: async (options) => isCodexInstalled(options?.target),
+  uninstall: async (options) => uninstallCodexHost(options?.target),
 };

@@ -5,7 +5,7 @@ export const claudeCodeHostAdapter: HostAdapter = {
   id: 'claude-code',
   displayName: 'Claude Code',
   capabilities: ['global-install', 'hooks', 'rules', 'notify', 'doctor', 'uninstall'],
-  install: async () => installClaudeCodeHost(),
-  doctor: async () => isClaudeCodeInstalled(),
-  uninstall: async () => uninstallClaudeCodeHost(),
+  install: async (options) => installClaudeCodeHost(options?.target),
+  doctor: async (options) => isClaudeCodeInstalled(options?.target),
+  uninstall: async (options) => uninstallClaudeCodeHost(options?.target),
 };

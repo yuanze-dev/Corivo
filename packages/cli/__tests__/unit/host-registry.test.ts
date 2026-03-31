@@ -172,6 +172,7 @@ describe('host registry', () => {
       'project-install',
       'rules',
       'doctor',
+      'uninstall',
     ]);
   });
 

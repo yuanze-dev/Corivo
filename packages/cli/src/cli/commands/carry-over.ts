@@ -1,6 +1,6 @@
 import { Command } from 'commander';
-import { generateCarryOver } from '../../runtime/carry-over.js';
-import { formatSurfaceItem } from '../../runtime/render.js';
+import { generateCarryOver } from '@/runtime/carry-over';
+import { formatSurfaceItem } from '@/runtime/render';
 import type { RuntimeCommandOptions } from './runtime-support.js';
 import { loadRuntimeDb } from './runtime-support.js';
 

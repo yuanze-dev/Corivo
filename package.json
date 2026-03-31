@@ -1,5 +1,5 @@
 {
-  "name": "corivo",
+  "name": "@corivo/mono",
   "version": "0.10.26",
   "private": true,
   "type": "module",

@@ -28,6 +28,7 @@ import { stopCommand } from './commands/stop.js';
 import { doctorCommand } from './commands/doctor.js';
 import { recoverCommand } from './commands/recover.js';
 import { injectCommand } from './commands/inject.js';
+import { hostCommand } from './commands/host.js';
 import { identityCommand } from './commands/identity.js';
 import { setupPasswordCommand } from './commands/setup-password.js';
 import { unlockCommand } from './commands/unlock.js';
@@ -153,6 +154,7 @@ program
   .action((options) => verifyIdentityCommand(options));
 
 program.addCommand(listCommand);
+program.addCommand(hostCommand);
 program.addCommand(coldScanCommand);
 program.addCommand(pushCommand);
 program.addCommand(pushQueueCommand);

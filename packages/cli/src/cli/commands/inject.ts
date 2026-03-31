@@ -8,10 +8,8 @@ import path from 'node:path';
 import chalk from 'chalk';
 import { printBanner } from '@/utils/banner';
 import { injectRules, ejectRules as ejectClaudeRules, injectGlobalRules, injectProjectRules, hasCorivoRules } from '../../inject/claude-rules.js';
-import { injectGlobalClaudeCodeHost } from '../../inject/claude-host.js';
-import { injectGlobalCodexRules } from '../../inject/codex-rules.js';
-import { injectGlobalCursorRules } from '../../inject/cursor-rules.js';
-import { injectGlobalOpencodePlugin } from '../../inject/opencode-plugin.js';
+import { createHostInstallUseCase } from '../../application/hosts/install-host.js';
+import type { HostId } from '../../hosts/types.js';
 
 export async function injectCommand(options: {
   target?: string;
@@ -23,6 +21,8 @@ export async function injectCommand(options: {
   cursor?: boolean;
   opencode?: boolean;
 }): Promise<void> {
+  const installHost = createHostInstallUseCase();
+
   if (options.eject) {
     // Remove rule
     await ejectRules(options.target);
@@ -30,79 +30,31 @@ export async function injectCommand(options: {
   }
 
   if (options.global) {
-    if (options.claudeCode) {
-      printBanner('Installing global Claude Code adapter', { color: chalk.cyan });
+    const host = resolveGlobalHost(options);
+    if (host) {
+      const banners: Record<HostId, string> = {
+        'claude-code': 'Installing global Claude Code adapter',
+        codex: 'Injecting global Codex rules',
+        cursor: 'Injecting global Cursor rules',
+        opencode: 'Installing global OpenCode plugin',
+        'project-claude': 'Injecting project Claude rules',
+      };
 
-      const result = await injectGlobalClaudeCodeHost();
+      printBanner(banners[host], { color: chalk.cyan });
+      const result = await installHost({ host, global: true, force: options.force, target: options.target });
 
       if (result.success) {
-        console.log(chalk.green('✔ Claude Code configured at:'));
-        console.log(`  ${result.path}`);
+        console.log(chalk.green('✔ Installed into:'));
+        if (result.path) {
+          console.log(`  ${result.path}`);
+        }
         console.log('');
-        console.log(chalk.gray('Claude Code will now automatically use the Corivo proactive-memory flow'));
+        console.log(chalk.gray(result.summary));
         console.log('');
       } else {
         console.log(chalk.red('✖ Installation failed:'), result.error);
         console.log('');
       }
-
-      return;
-    }
-
-    if (options.codex) {
-      printBanner('Injecting global Codex rules', { color: chalk.cyan });
-
-      const result = await injectGlobalCodexRules();
-
-      if (result.success) {
-        console.log(chalk.green('✔ Rules injected into:'));
-        console.log(`  ${result.path}`);
-        console.log('');
-        console.log(chalk.gray('Codex will now automatically use the Corivo proactive-memory flow'));
-        console.log('');
-      } else {
-        console.log(chalk.red('✖ Injection failed:'), result.error);
-        console.log('');
-      }
-
-      return;
-    }
-
-    if (options.cursor) {
-      printBanner('Injecting global Cursor rules', { color: chalk.cyan });
-
-      const result = await injectGlobalCursorRules();
-
-      if (result.success) {
-        console.log(chalk.green('✔ Rules injected into:'));
-        console.log(`  ${result.path}`);
-        console.log('');
-        console.log(chalk.gray('Cursor will now automatically use Corivo proactive-memory rules'));
-        console.log('');
-      } else {
-        console.log(chalk.red('✖ Injection failed:'), result.error);
-        console.log('');
-      }
-
-      return;
-    }
-
-    if (options.opencode) {
-      printBanner('Installing global OpenCode plugin', { color: chalk.cyan });
-
-      const result = await injectGlobalOpencodePlugin();
-
-      if (result.success) {
-        console.log(chalk.green('✔ Plugin installed at:'));
-        console.log(`  ${result.path}`);
-        console.log('');
-        console.log(chalk.gray('OpenCode will now automatically load the Corivo proactive-memory plugin'));
-        console.log('');
-      } else {
-        console.log(chalk.red('✖ Installation failed:'), result.error);
-        console.log('');
-      }
-
       return;
     }
 
@@ -177,3 +129,16 @@ async function ejectRules(targetPath?: string): Promise<void> {
 
 // Export for CLI use
 export default { injectCommand, ejectRules };
+
+function resolveGlobalHost(options: {
+  claudeCode?: boolean;
+  codex?: boolean;
+  cursor?: boolean;
+  opencode?: boolean;
+}): HostId | null {
+  if (options.claudeCode) return 'claude-code';
+  if (options.codex) return 'codex';
+  if (options.cursor) return 'cursor';
+  if (options.opencode) return 'opencode';
+  return null;
+}

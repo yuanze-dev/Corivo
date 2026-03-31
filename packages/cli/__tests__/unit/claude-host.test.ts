@@ -4,6 +4,11 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { injectGlobalClaudeCodeHost } from '../../src/inject/claude-host.js';
 
+const CLAUDE_SESSION_INIT_PATH = path.resolve('../plugins/hosts/claude-code/hooks/scripts/session-init.sh');
+const CLAUDE_INGEST_TURN_PATH = path.resolve('../plugins/hosts/claude-code/hooks/scripts/ingest-turn.sh');
+const CLAUDE_QUERY_SKILL_PATH = path.resolve('../plugins/hosts/claude-code/skills/corivo-query/skill.md');
+const CLAUDE_SAVE_SKILL_PATH = path.resolve('../plugins/hosts/claude-code/skills/corivo-save/skill.md');
+
 describe('Claude Code host installer', () => {
   let tempHome: string;
   let previousHome: string | undefined;
@@ -27,13 +32,18 @@ describe('Claude Code host installer', () => {
     const settings = JSON.parse(await fs.readFile(settingsPath, 'utf8'));
     const hooksDir = path.join(tempHome, '.corivo', 'hooks');
     const skillsDir = path.join(path.dirname(settingsPath), 'skills');
+    const packagedSessionInit = await fs.readFile(CLAUDE_SESSION_INIT_PATH, 'utf8');
+    const packagedIngestTurn = await fs.readFile(CLAUDE_INGEST_TURN_PATH, 'utf8');
+    const packagedQuerySkill = await fs.readFile(CLAUDE_QUERY_SKILL_PATH, 'utf8');
+    const packagedSaveSkill = await fs.readFile(CLAUDE_SAVE_SKILL_PATH, 'utf8');
 
     expect(result.path).toBe(settingsPath);
     expect(settings.hooks.SessionStart?.[0]?.hooks?.length).toBeGreaterThan(0);
     expect(settings.hooks.UserPromptSubmit?.[0]?.hooks?.length).toBeGreaterThan(0);
     expect(settings.hooks.Stop?.[0]?.hooks?.length).toBeGreaterThan(0);
-    await expect(fs.readFile(path.join(hooksDir, 'session-init.sh'), 'utf8')).resolves.toContain('corivo status');
-    await expect(fs.readFile(path.join(skillsDir, 'corivo-save', 'SKILL.md'), 'utf8')).resolves.toContain('Corivo 保存记忆');
-    await expect(fs.readFile(path.join(skillsDir, 'corivo-query', 'SKILL.md'), 'utf8')).resolves.toContain('Corivo 查询记忆');
+    await expect(fs.readFile(path.join(hooksDir, 'session-init.sh'), 'utf8')).resolves.toBe(packagedSessionInit);
+    await expect(fs.readFile(path.join(hooksDir, 'ingest-turn.sh'), 'utf8')).resolves.toBe(packagedIngestTurn);
+    await expect(fs.readFile(path.join(skillsDir, 'corivo-save', 'SKILL.md'), 'utf8')).resolves.toBe(packagedSaveSkill);
+    await expect(fs.readFile(path.join(skillsDir, 'corivo-query', 'SKILL.md'), 'utf8')).resolves.toBe(packagedQuerySkill);
   });
 });

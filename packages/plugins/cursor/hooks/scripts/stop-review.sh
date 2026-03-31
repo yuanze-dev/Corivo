@@ -14,7 +14,7 @@ if ! command -v corivo &>/dev/null; then
   exit 0
 fi
 
-OUTPUT=$(corivo review --last-message "$LAST_MESSAGE" --format hook-text --no-password 2>/dev/null || true)
+OUTPUT=$(corivo review --last-message "$LAST_MESSAGE" --format hook-text 2>/dev/null || true)
 
 if [ -n "$OUTPUT" ]; then
   jq -n --arg suggestion "$OUTPUT" '{"additionalContext": $suggestion}' 2>/dev/null || echo ""

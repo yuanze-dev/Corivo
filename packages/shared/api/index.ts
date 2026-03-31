@@ -94,8 +94,6 @@ export class CorivoAPI {
       if (options.annotation) {
         args.push('--annotation', options.annotation);
       }
-      args.push('--no-password');
-
       const output = execSync(`corivo ${args.join(' ')}`, {
         encoding: 'utf-8',
         stdio: ['ignore', 'pipe', 'pipe']
@@ -130,8 +128,6 @@ export class CorivoAPI {
       if (options.annotation) {
         args.push('--annotation', options.annotation);
       }
-      args.push('--no-password');
-
       const output = execSync(`corivo ${args.join(' ')}`, {
         encoding: 'utf-8',
         stdio: ['ignore', 'pipe', 'pipe']
@@ -152,7 +148,7 @@ export class CorivoAPI {
         return null;
       }
 
-      const output = execSync('corivo status --no-password', {
+      const output = execSync('corivo status', {
         encoding: 'utf-8',
         stdio: ['ignore', 'pipe', 'pipe']
       });

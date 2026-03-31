@@ -60,9 +60,8 @@ if ! command -v corivo &>/dev/null; then
 fi
 
 # Call the corivo save command to save to memory
-# Use --no-password to avoid interactive password prompts
 # Use the --source flag to collect real-time data from hooks
-if corivo save --content "$CONTENT" --annotation "$ANNOTATION" --source "claude-code-hooks" --no-password >> "$LOG_FILE" 2>&1; then
+if corivo save --content "$CONTENT" --annotation "$ANNOTATION" --source "claude-code-hooks" >> "$LOG_FILE" 2>&1; then
   echo "✓ Saved [$ROLE] turn to corivo (${#CONTENT} chars)" >> "$LOG_FILE"
 else
   echo "✗ Failed to save [$ROLE] turn to corivo" >> "$LOG_FILE"

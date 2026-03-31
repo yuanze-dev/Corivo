@@ -33,7 +33,7 @@ fi
 
 printf '%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "user-prompt-submit" "$(printf '%s' "$PROMPT" | head -c 200)" >> "$LOG_FILE"
 
-STATUS="$(corivo status --no-password 2>&1 || true)"
+STATUS="$(corivo status 2>&1 || true)"
 if printf '%s' "$STATUS" | grep -qi "未初始化"; then
   exit 0
 fi
@@ -79,7 +79,7 @@ EOF
 fi
 
 if [ -z "$RESULTS" ]; then
-  RESULTS="$(corivo query "$PROMPT" --limit 3 --no-password 2>/dev/null || true)"
+  RESULTS="$(corivo query "$PROMPT" --limit 3 2>/dev/null || true)"
 fi
 
 if [ -z "$RESULTS" ]; then

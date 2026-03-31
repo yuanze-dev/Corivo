@@ -83,7 +83,7 @@ if ! command -v corivo >/dev/null 2>&1; then
   exit 0
 fi
 
-if corivo save --content "$CONTENT" --annotation "$ANNOTATION" --source "codex-hooks" --no-password >> "$LOG_FILE" 2>&1; then
+if corivo save --content "$CONTENT" --annotation "$ANNOTATION" --source "codex-hooks" >> "$LOG_FILE" 2>&1; then
   echo "✓ Saved [$ROLE] turn to corivo (${#CONTENT} chars)" >> "$LOG_FILE"
 else
   echo "✗ Failed to save [$ROLE] turn to corivo" >> "$LOG_FILE"

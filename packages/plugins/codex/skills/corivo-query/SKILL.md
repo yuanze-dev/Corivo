@@ -76,7 +76,7 @@ corivo init
 2. Check runtime status:
 
 ```bash
-corivo status --no-password
+corivo status
 ```
 
 If the runtime is not initialized, tell the user instead of guessing.
@@ -84,13 +84,13 @@ If the runtime is not initialized, tell the user instead of guessing.
 3. Query with the user request or a distilled keyword set:
 
 ```bash
-corivo query "<keywords>" --limit 5 --no-password
+corivo query "<keywords>" --limit 5
 ```
 
 4. If the request clearly targets a category, narrow the search:
 
 ```bash
-corivo query "<keywords>" --annotation "<nature> · <domain>" --limit 5 --no-password
+corivo query "<keywords>" --annotation "<nature> · <domain>" --limit 5
 ```
 
 5. Summarize only the relevant memories and state when nothing useful was found.

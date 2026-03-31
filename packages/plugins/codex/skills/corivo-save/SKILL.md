@@ -101,7 +101,7 @@ corivo init
 2. Check whether the runtime is initialized:
 
 ```bash
-corivo status --no-password
+corivo status
 ```
 
 If it is not initialized, tell the user:
@@ -114,7 +114,7 @@ If it is not initialized, tell the user:
 4. Save the memory:
 
 ```bash
-corivo save --content "<content>" --annotation "<nature> · <domain> · <tag>" --no-password
+corivo save --content "<content>" --annotation "<nature> · <domain> · <tag>"
 ```
 
 5. Confirm the result:

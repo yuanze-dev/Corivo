@@ -9,7 +9,7 @@ async function runCorivo(
   args: string[],
 ): Promise<string> {
   try {
-    const { stdout } = await execFileAsync('corivo', [command, ...args, '--no-password'], {
+    const { stdout } = await execFileAsync('corivo', [command, ...args], {
       env: process.env,
     });
     return stdout.trim();

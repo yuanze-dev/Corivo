@@ -21,9 +21,9 @@ Recall relevant memory from Corivo before answering.
 ## Commands
 
 ```bash
-corivo status --no-password
-corivo query "<keywords>" --limit 5 --no-password
-corivo query "<keywords>" --annotation "<nature> · <domain>" --limit 5 --no-password
+corivo status
+corivo query "<keywords>" --limit 5
+corivo query "<keywords>" --annotation "<nature> · <domain>" --limit 5
 ```
 
 ## Verification

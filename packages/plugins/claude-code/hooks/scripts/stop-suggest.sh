@@ -24,7 +24,7 @@ if ! command -v corivo &>/dev/null; then
 fi
 
 # Get suggested content
-SUGGESTION=$(corivo suggest --context post-request --last-message "$LAST_MESSAGE" --no-password 2>/dev/null || true)
+SUGGESTION=$(corivo suggest --context post-request --last-message "$LAST_MESSAGE" 2>/dev/null || true)
 
 # Output the suggestion when one is available
 if [ -n "$SUGGESTION" ]; then

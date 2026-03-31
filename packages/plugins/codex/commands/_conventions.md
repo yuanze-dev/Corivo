@@ -27,7 +27,7 @@ description: One-line summary of what the command does.
 
 - Prefer `corivo` CLI commands over ad-hoc shell logic.
 - Always check whether `corivo` is installed and initialized before performing writes or reads.
-- Use `--no-password` for non-interactive flows.
+- Do not add password-related CLI flags to non-interactive flows.
 - Avoid echoing sensitive content such as secrets or raw private data unless the user asked for it.
 - If a command writes memory, show the proposed annotation before executing the save.
 

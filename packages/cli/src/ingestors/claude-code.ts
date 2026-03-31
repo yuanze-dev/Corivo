@@ -46,7 +46,7 @@ export class ClaudeCodeIngestor {
     return `
 ## Corivo 记忆层
 
-你有一个外部记忆工具 **Corivo**，可以帮你记住重要信息、查询历史记录。所有命令会自动添加 \`--no-password\` 标志跳过密码输入。
+你有一个外部记忆工具 **Corivo**，可以帮你记住重要信息、查询历史记录。相关命令不需要再传任何密码参数。
 
 ### 📊 查询记忆
 

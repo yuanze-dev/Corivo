@@ -9,7 +9,7 @@ if ! command -v corivo &>/dev/null; then
   exit 0
 fi
 
-STATUS=$(corivo status --no-password 2>&1) || true
+STATUS=$(corivo status 2>&1) || true
 
 if echo "$STATUS" | grep -q "未初始化"; then
   echo "[corivo] Database not initialized. Run: corivo init"

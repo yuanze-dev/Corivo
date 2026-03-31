@@ -61,6 +61,6 @@ Use this as the umbrella entrypoint for Corivo memory tasks.
 ## Operational Rules
 
 - Always check whether `corivo` CLI is installed before claiming success.
-- Always check `corivo status --no-password` before save/query actions.
+- Always check `corivo status` before save/query actions.
 - Never claim that memory was persisted unless the `corivo save` command actually succeeded.
 - When recall returns nothing relevant, say so explicitly.

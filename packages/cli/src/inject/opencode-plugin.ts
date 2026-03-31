@@ -10,7 +10,7 @@ const execFileAsync = promisify(execFile)
 
 async function runCorivo(command: 'carry-over' | 'recall' | 'review', args: string[]): Promise<string> {
   try {
-    const { stdout } = await execFileAsync('corivo', [command, ...args, '--no-password'], {
+    const { stdout } = await execFileAsync('corivo', [command, ...args], {
       env: process.env,
     })
     return stdout.trim()

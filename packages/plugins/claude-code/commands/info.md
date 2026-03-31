@@ -10,7 +10,7 @@ allowed-tools: Bash
 ## 执行
 
 ```bash
-corivo status --no-password
+corivo status
 ```
 
 ## 输出解读

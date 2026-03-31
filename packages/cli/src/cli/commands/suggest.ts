@@ -11,7 +11,6 @@ import { runReviewCommand } from './review.js';
 export interface SuggestCommandOptions {
   context?: string;
   lastMessage?: string;
-  password?: boolean;
   format?: 'text' | 'json' | 'hook-text';
 }
 
@@ -48,14 +47,12 @@ export async function runSuggestCommand(
     }
 
     return runReviewCommand({
-      password: options.password,
       format: options.format,
       lastMessage: options.lastMessage,
     });
   }
 
   return runCarryOverCommand({
-    password: options.password,
     format: options.format,
   });
 }
@@ -65,12 +62,10 @@ suggestCommand
   .option('-c, --context <type>', 'Context type: session-start | post-request', 'session-start')
   .option('-m, --last-message <text>', "Claude's last response")
   .option('-f, --format <type>', 'Output format: text | json | hook-text', 'text')
-  .option('--no-password', 'Skip password prompt (development mode)')
   .action(async (options) => {
     const output = await runSuggestCommand({
       context: options.context,
       lastMessage: options.lastMessage,
-      password: options.password,
       format: options.format,
     });
 

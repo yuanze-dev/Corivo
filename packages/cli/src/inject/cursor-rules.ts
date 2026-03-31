@@ -10,7 +10,7 @@ if ! command -v corivo &>/dev/null; then
   exit 0
 fi
 
-OUTPUT=$(corivo carry-over --format hook-text --no-password 2>/dev/null || true)
+OUTPUT=$(corivo carry-over --format hook-text 2>/dev/null || true)
 
 if [ -n "$OUTPUT" ]; then
   echo "$OUTPUT"
@@ -34,7 +34,7 @@ if ! command -v corivo &>/dev/null; then
   exit 0
 fi
 
-OUTPUT=$(corivo recall --prompt "$PROMPT" --format hook-text --no-password 2>/dev/null || true)
+OUTPUT=$(corivo recall --prompt "$PROMPT" --format hook-text 2>/dev/null || true)
 
 if [ -n "$OUTPUT" ]; then
   jq -n --arg suggestion "$OUTPUT" '{"additionalContext": $suggestion}' 2>/dev/null || echo ""
@@ -58,7 +58,7 @@ if ! command -v corivo &>/dev/null; then
   exit 0
 fi
 
-OUTPUT=$(corivo review --last-message "$LAST_MESSAGE" --format hook-text --no-password 2>/dev/null || true)
+OUTPUT=$(corivo review --last-message "$LAST_MESSAGE" --format hook-text 2>/dev/null || true)
 
 if [ -n "$OUTPUT" ]; then
   jq -n --arg suggestion "$OUTPUT" '{"additionalContext": $suggestion}' 2>/dev/null || echo ""
@@ -82,7 +82,7 @@ alwaysApply: true
 在会话开始或开始一个新任务时，如果需要回忆上次没收尾的事项，运行：
 
 \`\`\`bash
-corivo carry-over --format text --no-password
+corivo carry-over --format text
 \`\`\`
 
 ## 答前 recall
@@ -90,7 +90,7 @@ corivo carry-over --format text --no-password
 当用户问题可能涉及历史决策、偏好、上下文、项目约定时，先运行：
 
 \`\`\`bash
-corivo recall --prompt "<用户问题>" --format hook-text --no-password
+corivo recall --prompt "<用户问题>" --format hook-text
 \`\`\`
 
 如果你采纳了这条来自 Corivo 的记忆，请在回答中明确说“根据 Corivo 的记忆”或“从 Corivo 中查到”。
@@ -100,7 +100,7 @@ corivo recall --prompt "<用户问题>" --format hook-text --no-password
 在给出一段 substantive answer 或做出决策后，运行：
 
 \`\`\`bash
-corivo review --last-message "<你的回答摘要>" --format hook-text --no-password
+corivo review --last-message "<你的回答摘要>" --format hook-text
 \`\`\`
 
 ## 保存记忆
@@ -108,7 +108,7 @@ corivo review --last-message "<你的回答摘要>" --format hook-text --no-pass
 当用户要求记住，或当你识别到重要决策、偏好、事实时，运行：
 
 \`\`\`bash
-corivo save --content "内容" --annotation "类型 · 领域 · 标签" --no-password
+corivo save --content "内容" --annotation "类型 · 领域 · 标签"
 \`\`\`
 `.trim();
 

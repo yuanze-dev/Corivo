@@ -51,13 +51,13 @@ describe('Cursor hook wiring', () => {
 
   it('uses corivo recall --format hook-text in the prompt recall script', () => {
     const script = readFileSync(promptRecallScriptPath, 'utf8');
-    expect(script).toContain('corivo recall --prompt "$PROMPT" --format hook-text --no-password');
+    expect(script).toContain('corivo recall --prompt "$PROMPT" --format hook-text');
   });
 
   it('uses corivo review --format hook-text in the stop review script', () => {
     const script = readFileSync(stopReviewScriptPath, 'utf8');
     expect(script).toContain(
-      'corivo review --last-message "$LAST_MESSAGE" --format hook-text --no-password'
+      'corivo review --last-message "$LAST_MESSAGE" --format hook-text'
     );
   });
 });

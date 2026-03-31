@@ -106,12 +106,12 @@ Skills 是 Markdown 文件，Claude Code 在执行相关操作时读取并遵循
 
 **corivo-save**（`skills/corivo-save/skill.md`）：
 - 触发时机：用户说"记住"、"保存这个"、"不要忘了"等
-- 执行 `corivo save --content "..." --annotation "性质 · 领域 · 标签" --no-password`
+- 执行 `corivo save --content "..." --annotation "性质 · 领域 · 标签"`
 - Annotation 格式：性质（事实/知识/决策/指令）+ 领域（self/people/project/asset/knowledge）+ 标签
 
 **corivo-query**（`skills/corivo-query/skill.md`）：
 - 触发时机：用户问"我之前说过..."、"记得吗..."等
-- 执行 `corivo query "..." --no-password`
+- 执行 `corivo query "..."`
 
 ---
 

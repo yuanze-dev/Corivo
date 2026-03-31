@@ -24,12 +24,12 @@ npm install -g corivo
 corivo init
 ```
 
-创建 `~/.corivo/` 目录并设置加密数据库（AES-256-GCM via SQLCipher）。
+创建 `~/.corivo/` 目录并设置本地数据库。
 
 ## 步骤 3: 验证
 
 ```bash
-corivo status --no-password
+corivo status
 ```
 
 预期输出：

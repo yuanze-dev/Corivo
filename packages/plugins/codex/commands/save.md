@@ -9,7 +9,7 @@ Record durable user or project memory into Corivo.
 ## Preflight
 
 1. Verify `corivo` is available.
-2. Verify the database is initialized with `corivo status --no-password`.
+2. Verify the database is initialized with `corivo status`.
 3. Restate what will be saved and propose the annotation before executing.
 4. If the content looks temporary or sensitive in a risky way, pause and ask before saving.
 
@@ -23,8 +23,8 @@ Record durable user or project memory into Corivo.
 ## Commands
 
 ```bash
-corivo status --no-password
-corivo save --content "<content>" --annotation "<nature> · <domain> · <tag>" --no-password
+corivo status
+corivo save --content "<content>" --annotation "<nature> · <domain> · <tag>"
 ```
 
 ## Verification

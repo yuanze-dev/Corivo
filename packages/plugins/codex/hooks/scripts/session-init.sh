@@ -11,7 +11,7 @@ if ! command -v corivo >/dev/null 2>&1; then
   exit 0
 fi
 
-STATUS="$(corivo status --no-password 2>&1 || true)"
+STATUS="$(corivo status 2>&1 || true)"
 printf '%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "session-init" >> "$LOG_FILE"
 
 if printf '%s' "$STATUS" | grep -qi "未初始化"; then

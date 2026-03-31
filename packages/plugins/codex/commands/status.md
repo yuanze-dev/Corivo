@@ -10,7 +10,7 @@ Inspect the local Corivo runtime before relying on saved memory.
 
 1. Check `which corivo`.
 2. If missing, stop and show the install command.
-3. Run `corivo status --no-password` and capture both stdout and stderr.
+3. Run `corivo status` and capture both stdout and stderr.
 
 ## Plan
 
@@ -22,7 +22,7 @@ Inspect the local Corivo runtime before relying on saved memory.
 
 ```bash
 which corivo
-corivo status --no-password
+corivo status
 ```
 
 ## Verification

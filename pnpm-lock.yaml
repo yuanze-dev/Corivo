@@ -48,7 +48,7 @@ importers:
         specifier: ^12.1.0
         version: 12.1.0
       consola:
-        specifier: 3.4.2
+        specifier: ^3.4.2
         version: 3.4.2
       ink:
         specifier: ^5.2.1

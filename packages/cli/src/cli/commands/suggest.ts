@@ -1,7 +1,7 @@
 /**
  * Suggest command
  *
- * Legacy entry point for older hooks. The primary paths are now carry-over / recall / review.
+ * Legacy entry point for older hooks. The primary paths are now carry-over / query / review.
  */
 
 import { Command } from 'commander';

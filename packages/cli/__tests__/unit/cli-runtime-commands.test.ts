@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Block } from '../../src/models/block.js';
 import { runCarryOverCommand } from '../../src/cli/commands/carry-over.js';
-import { runRecallCommand } from '../../src/cli/commands/recall.js';
+import { runPromptQueryCommand } from '../../src/cli/commands/query.js';
 import { runReviewCommand } from '../../src/cli/commands/review.js';
 import { runSuggestCommand } from '../../src/cli/commands/suggest.js';
 
@@ -68,7 +68,7 @@ describe('runtime CLI command helpers', () => {
     expect(output).toContain('日志归档');
   });
 
-  it('returns structured json output for recall', async () => {
+  it('returns structured json output for query --prompt', async () => {
     loadRuntimeDb.mockResolvedValue(createDb([
       createBlock({
         id: 'blk_pg',
@@ -77,7 +77,7 @@ describe('runtime CLI command helpers', () => {
       }),
     ]));
 
-    const output = await runRecallCommand({
+    const output = await runPromptQueryCommand({
       password: false,
       format: 'json',
       prompt: 'Should we keep PostgreSQL for this database work?',
@@ -89,7 +89,7 @@ describe('runtime CLI command helpers', () => {
     });
   });
 
-  it('returns hook-text output for recall with explicit Corivo attribution guidance', async () => {
+  it('returns hook-text output for query --prompt with explicit Corivo attribution guidance', async () => {
     loadRuntimeDb.mockResolvedValue(createDb([
       createBlock({
         id: 'blk_pg',
@@ -98,7 +98,7 @@ describe('runtime CLI command helpers', () => {
       }),
     ]));
 
-    const output = await runRecallCommand({
+    const output = await runPromptQueryCommand({
       password: false,
       format: 'hook-text',
       prompt: 'Should we keep PostgreSQL for this database work?',

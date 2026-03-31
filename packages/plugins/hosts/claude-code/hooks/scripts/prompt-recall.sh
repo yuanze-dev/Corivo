@@ -14,7 +14,7 @@ if ! command -v corivo &>/dev/null; then
   exit 0
 fi
 
-OUTPUT=$(corivo recall --prompt "$PROMPT" --format hook-text 2>/dev/null || true)
+OUTPUT=$(corivo query --prompt "$PROMPT" --format hook-text 2>/dev/null || true)
 
 if [ -n "$OUTPUT" ]; then
   jq -n --arg suggestion "$OUTPUT" '{"additionalContext": $suggestion}' 2>/dev/null || echo ""

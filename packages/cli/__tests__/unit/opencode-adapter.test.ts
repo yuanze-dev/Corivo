@@ -15,8 +15,8 @@ describe('OpenCode Corivo adapter', () => {
       if (command === 'carry-over') {
         return '[corivo] carry-over context';
       }
-      if (command === 'recall') {
-        return '[corivo] recall context';
+      if (command === 'query') {
+        return '[corivo] query context';
       }
       if (command === 'review') {
         return '[corivo] review context';
@@ -99,7 +99,7 @@ describe('OpenCode Corivo adapter', () => {
     expect(secondOutput.system).not.toContain('[corivo] carry-over context');
   });
 
-  it('stores recall on chat.message and appends it to later system transform', async () => {
+  it('stores query on chat.message and appends it to later system transform', async () => {
     const hooks = createOpencodeCorivoHooks(deps);
 
     await hooks['chat.message']?.(
@@ -128,13 +128,13 @@ describe('OpenCode Corivo adapter', () => {
       output,
     );
 
-    expect(runCorivo).toHaveBeenCalledWith('recall', [
+    expect(runCorivo).toHaveBeenCalledWith('query', [
       '--prompt',
       'Should we keep Redis?',
       '--format',
       'hook-text',
     ]);
-    expect(output.system).toContain('[corivo] recall context');
+    expect(output.system).toContain('[corivo] query context');
   });
 
   it('runs review on session.idle using the latest assistant message', async () => {
@@ -217,8 +217,8 @@ describe('OpenCode Corivo adapter', () => {
       if (command === 'carry-over') {
         return '[corivo] carry-over context';
       }
-      if (command === 'recall') {
-        return '[corivo] recall context';
+      if (command === 'query') {
+        return '[corivo] query context';
       }
       if (command === 'review') {
         reviewAttempts += 1;

@@ -23,12 +23,12 @@ describe('Codex Corivo integration', () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
-  it('loads Codex rules lazily with carry-over, recall, review, and explicit Corivo attribution guidance', async () => {
+  it('loads Codex rules lazily with carry-over, query, review, and explicit Corivo attribution guidance', async () => {
     const { getCodexRules } = await import(CODEX_RULES_MODULE_PATH);
     const rules = await getCodexRules();
 
     expect(rules).toContain('corivo carry-over');
-    expect(rules).toContain('corivo recall');
+    expect(rules).toContain('corivo query --prompt');
     expect(rules).toContain('corivo review');
     expect(rules).toContain('根据 Corivo 的记忆');
     expect(rules).toContain('--format text');
@@ -42,7 +42,7 @@ describe('Codex Corivo integration', () => {
 
     expect(result.success).toBe(true);
     expect(content).toContain('## Corivo 记忆层（Codex）');
-    expect(content).toContain('corivo recall');
+    expect(content).toContain('corivo query --prompt');
   });
 
   it('builds injected rules from the packaged Codex template asset', async () => {

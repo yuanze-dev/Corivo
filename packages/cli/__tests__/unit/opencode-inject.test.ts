@@ -43,7 +43,7 @@ describe('OpenCode Corivo integration', () => {
     expect(result.path).toBe(pluginPath);
     expect(content).toBe(packagedPlugin);
     expect(content).toContain('experimental.chat.system.transform');
-    expect(content).toContain("runCorivo('recall'");
+    expect(content).toContain("runCorivo('query'");
   });
 
   it('prefers the bundled dist asset over the repo source asset when both exist', async () => {

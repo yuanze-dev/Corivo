@@ -10,7 +10,7 @@ describe('Claude Code hook wiring', () => {
     expect(commands).toContain('bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-carry-over.sh');
   });
 
-  it('wires UserPromptSubmit to ingestion and recall hooks', () => {
+  it('wires UserPromptSubmit to ingestion and query hooks', () => {
     const hooks = hooksConfig.hooks.UserPromptSubmit?.[0]?.hooks ?? [];
     const commands = hooks.map((hook) => hook.command);
 

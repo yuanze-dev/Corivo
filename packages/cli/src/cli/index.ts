@@ -39,7 +39,6 @@ import { pushQueueCommand } from './commands/push-queue.js';
 import { remindersCommand } from './commands/reminders.js';
 import { suggestCommand } from './commands/suggest.js';
 import { carryOverCommand } from './commands/carry-over.js';
-import { recallCommand } from './commands/recall.js';
 import { reviewCommand } from './commands/review.js';
 import { firstRunCommand } from './commands/heartbeat-first-run.js';
 import { daemonCommand } from './commands/daemon.js';
@@ -74,10 +73,12 @@ program
 program
   .command('query')
   .description('Query information')
-  .argument('<query>', 'Search keywords')
+  .argument('[query]', 'Search keywords')
   .option('-l, --limit <number>', 'Result limit', '10')
   .option('-v, --verbose', 'Show detailed information')
   .option('-p, --pattern', 'Show decision patterns')
+  .option('--prompt <text>', 'Generate prompt-based query using the current user input')
+  .option('-f, --format <type>', 'Output format: text | json | hook-text', 'text')
   .action((query, options) => queryCommand(query, options));
 
 program
@@ -160,7 +161,6 @@ program.addCommand(pushCommand);
 program.addCommand(pushQueueCommand);
 program.addCommand(remindersCommand);
 program.addCommand(carryOverCommand);
-program.addCommand(recallCommand);
 program.addCommand(reviewCommand);
 program.addCommand(suggestCommand);
 program.addCommand(firstRunCommand);

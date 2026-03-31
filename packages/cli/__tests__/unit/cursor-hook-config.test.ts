@@ -49,9 +49,9 @@ describe('Cursor hook wiring', () => {
     );
   });
 
-  it('uses corivo recall --format hook-text in the prompt recall script', () => {
+  it('uses corivo query --format hook-text in the prompt recall script', () => {
     const script = readFileSync(promptRecallScriptPath, 'utf8');
-    expect(script).toContain('corivo recall --prompt "$PROMPT" --format hook-text');
+    expect(script).toContain('corivo query --prompt "$PROMPT" --format hook-text');
   });
 
   it('uses corivo review --format hook-text in the stop review script', () => {

@@ -25,7 +25,7 @@
           {
             "type": "command",
             "command": "bash \"$(git rev-parse --show-toplevel)/packages/plugins/hosts/codex/hooks/scripts/user-prompt-submit.sh\"",
-            "statusMessage": "Checking Corivo recall",
+            "statusMessage": "Checking Corivo query",
             "timeout": 10
           }
         ]

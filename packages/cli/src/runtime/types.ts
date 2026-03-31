@@ -41,7 +41,7 @@ export type HostLifecycleEvent = (typeof HOST_LIFECYCLE_EVENTS)[number];
 export interface HostAdapterLifecyclePayload {
   capability: HostAdapterCapability;
   event: HostLifecycleEvent;
-  runtimeCommand: 'carry-over' | 'recall' | 'review';
+  runtimeCommand: 'carry-over' | 'query' | 'review';
   outputFormat: 'text' | 'json' | 'hook-text';
 }
 

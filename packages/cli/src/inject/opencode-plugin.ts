@@ -95,7 +95,7 @@ export async function isOpencodeInstalled(homeDir?: string): Promise<HostDoctorR
   const checks = [
     {
       label: 'corivo.ts',
-      ok: content.includes("runCorivo('recall'"),
+      ok: content.includes("runCorivo('query'"),
       detail: paths.pluginPath,
     },
   ];

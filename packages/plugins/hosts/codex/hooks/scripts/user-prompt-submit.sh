@@ -73,7 +73,7 @@ if (top.length === 0) {
 }
 
 const lines = top.map((block) => `• ${block.content} [${block.annotation}]`);
-process.stdout.write(`[corivo recall]\nPrompt: ${prompt}\n` + lines.join('\n'));
+process.stdout.write(`[corivo query]\nPrompt: ${prompt}\n` + lines.join('\n'));
 EOF
   )"
 fi

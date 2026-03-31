@@ -7,7 +7,7 @@ import type { RuntimeOutputFormat } from './render.js';
 
 const EVENT_TO_COMMAND: Record<HostLifecycleEvent, HostAdapterLifecyclePayload['runtimeCommand']> = {
   'session-start': 'carry-over',
-  'prompt-submit': 'recall',
+  'prompt-submit': 'query',
   'response-done': 'review',
 };
 

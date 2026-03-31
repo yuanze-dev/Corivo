@@ -10,12 +10,12 @@
 corivo carry-over --format text
 ```
 
-### 答前 recall
+### 答前 query
 
 当用户问题可能涉及历史决策、偏好、上下文、项目约定时，先运行：
 
 ```bash
-corivo recall --prompt "<用户问题>" --format text
+corivo query --prompt "<用户问题>" --format text
 ```
 
 如果你采纳了这条来自 Corivo 的记忆，请在回答中明确说“根据 Corivo 的记忆”或“从 Corivo 中查到”。

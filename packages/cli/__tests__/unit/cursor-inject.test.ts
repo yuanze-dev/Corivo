@@ -31,7 +31,7 @@ describe('Cursor Corivo integration', () => {
     const template = await getCursorRuleTemplate();
 
     expect(template).toContain('corivo carry-over');
-    expect(template).toContain('corivo recall');
+    expect(template).toContain('corivo query --prompt');
     expect(template).toContain('corivo review');
     expect(template).toContain('根据 Corivo 的记忆');
     expect(template).toContain('# Corivo 记忆层（Cursor）');

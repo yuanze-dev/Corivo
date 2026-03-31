@@ -10,7 +10,7 @@ describe('multi-host adapter matrix', () => {
     const capability: HostAdapterCapability = 'full-hook';
 
     expect(getHostAdapterOutputFormat(capability)).toBe('hook-text');
-    expect(createHostAdapterPayload(capability, 'prompt-submit').runtimeCommand).toBe('recall');
+    expect(createHostAdapterPayload(capability, 'prompt-submit').runtimeCommand).toBe('query');
   });
 
   it('maps OpenCode to plugin-transform behavior', () => {

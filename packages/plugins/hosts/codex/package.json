@@ -1,7 +1,7 @@
 {
   "name": "@corivo/codex",
   "version": "0.11.0",
-  "description": "Corivo Codex plugin package with marketplace manifest, skills, commands, and hook samples",
+  "description": "Corivo Codex host integration bundle assets (manifest, skills, commands, hooks)",
   "type": "module",
   "keywords": [
     "codex",

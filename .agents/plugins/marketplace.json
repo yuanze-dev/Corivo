@@ -8,7 +8,7 @@
       "name": "corivo",
       "source": {
         "source": "local",
-        "path": "./packages/plugins/codex"
+        "path": "./packages/plugins/hosts/codex"
       },
       "policy": {
         "installation": "AVAILABLE",

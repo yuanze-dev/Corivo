@@ -1,15 +1,17 @@
 {
   "name": "@corivo/opencode",
   "version": "0.1.0",
-  "description": "Corivo OpenCode active memory adapter",
+  "description": "Corivo OpenCode executable runtime plugin",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "assets"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "npm run sync:asset && tsc",
+    "sync:asset": "node ./scripts/sync-asset.mjs",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [

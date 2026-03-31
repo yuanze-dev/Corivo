@@ -1,7 +1,7 @@
 {
   "name": "@corivo/claude-code",
   "version": "0.11.0",
-  "description": "Corivo Claude Code Plugin - 记忆存储与智能推送",
+  "description": "Corivo Claude Code host integration bundle assets",
   "keywords": [
     "claude-code",
     "memory",

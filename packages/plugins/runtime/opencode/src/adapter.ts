@@ -129,6 +129,7 @@ export function createOpencodeCorivoHooks(
         }
       }
 
+      state.carryOver = undefined;
       state.recall = undefined;
       state.review = undefined;
     },

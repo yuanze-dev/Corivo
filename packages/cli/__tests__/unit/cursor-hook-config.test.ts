@@ -13,13 +13,13 @@ type CursorHooksConfig = {
   hooks: Record<string, HookGroup[]>;
 };
 
-const hooksConfigPath = new URL('../../../plugins/cursor/hooks/hooks.json', import.meta.url);
+const hooksConfigPath = new URL('../../../plugins/hosts/cursor/hooks/hooks.json', import.meta.url);
 const promptRecallScriptPath = new URL(
-  '../../../plugins/cursor/hooks/scripts/prompt-recall.sh',
+  '../../../plugins/hosts/cursor/hooks/scripts/prompt-recall.sh',
   import.meta.url
 );
 const stopReviewScriptPath = new URL(
-  '../../../plugins/cursor/hooks/scripts/stop-review.sh',
+  '../../../plugins/hosts/cursor/hooks/scripts/stop-review.sh',
   import.meta.url
 );
 

@@ -82,25 +82,25 @@ importers:
         specifier: ^5.5.4
         version: 5.9.3
 
-  packages/plugins/claude-code: {}
+  packages/plugins/hosts/claude-code: {}
 
-  packages/plugins/codex: {}
+  packages/plugins/hosts/codex: {}
 
-  packages/plugins/cursor: {}
+  packages/plugins/hosts/cursor: {}
 
-  packages/plugins/openclaw:
+  packages/plugins/runtime/openclaw:
     devDependencies:
       '@types/node':
         specifier: ^20.19.37
         version: 20.19.37
       corivo:
         specifier: workspace:*
-        version: link:../../cli
+        version: link:../../../cli
       typescript:
         specifier: ^5.5.4
         version: 5.9.3
 
-  packages/plugins/opencode:
+  packages/plugins/runtime/opencode:
     dependencies:
       '@opencode-ai/plugin':
         specifier: '*'

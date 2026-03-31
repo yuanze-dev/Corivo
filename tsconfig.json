@@ -3,7 +3,6 @@
   "references": [
     { "path": "./packages/shared" },
     { "path": "./packages/cli" },
-    { "path": "./packages/plugins/claude-code" },
     { "path": "./packages/solver" }
   ]
 }

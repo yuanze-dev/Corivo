@@ -254,32 +254,3 @@ function buildDispatchScript(existingNotify: string[] | null): string {
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
-<<<<<<< HEAD
-
-const REVIEW_SCRIPT_TEXT = `
-#!/usr/bin/env bash
-set -euo pipefail
-
-INPUT=""
-
-if [ ! -t 0 ]; then
-  INPUT="$(cat)"
-fi
-
-if ! command -v corivo &>/dev/null; then
-  exit 0
-fi
-
-SUMMARY=$(printf '%s' "$INPUT" | jq -r '.transcript_summary // .summary // empty' 2>/dev/null || echo "")
-
-if [ -n "$SUMMARY" ]; then
-  OUTPUT=$(corivo review --last-message "$SUMMARY" --format hook-text 2>/dev/null || true)
-  if [ -n "$OUTPUT" ]; then
-    printf '%s\n' "$OUTPUT"
-  fi
-fi
-
-exit 0
-`.trimStart();
-=======
->>>>>>> 6222872 (refactor: load host installer assets from package bundles)

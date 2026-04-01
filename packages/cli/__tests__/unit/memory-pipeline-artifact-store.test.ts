@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mkdir, mkdtemp, symlink } from 'node:fs/promises';
+import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { ArtifactStore } from '../../src/memory-pipeline/artifacts/artifact-store.js';
@@ -94,6 +94,37 @@ describe('ArtifactStore', () => {
     } finally {
       nowSpy.mockRestore();
     }
+  });
+
+  it('rejects reading a missing artifact body', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
+    const store = new ArtifactStore(root);
+
+    await expect(store.readArtifact('missing-artifact')).rejects.toThrow(
+      'artifact not found: missing-artifact',
+    );
+  });
+
+  it('rejects listing when a stored descriptor path escapes root', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
+    const store = new ArtifactStore(root);
+    const descriptorDir = path.join(root, 'artifacts', 'descriptors');
+    await mkdir(descriptorDir, { recursive: true });
+
+    await writeFile(
+      path.join(descriptorDir, 'summary-batch-unsafe.json'),
+      JSON.stringify({
+        id: 'summary-batch-unsafe',
+        kind: 'summary-batch',
+        version: 1,
+        path: '../escape/outside.json',
+        source: 'stage-a',
+        createdAt: Date.now(),
+      }),
+      'utf8',
+    );
+
+    await expect(store.listArtifacts()).rejects.toThrow('path escapes root directory');
   });
 
   it('normalizes runId segments to stay inside root', async () => {

@@ -75,9 +75,7 @@ export class ArtifactStore implements MemoryPipelineArtifactStore {
       path.join(DESCRIPTOR_DIR, `${id}.json`),
     );
     try {
-      return JSON.parse(
-        await readFile(path.join(this.rootDir, relativeDir, fileName), 'utf8'),
-      ) as ArtifactDescriptor;
+      return await this.readAndValidateDescriptorFile(path.join(this.rootDir, relativeDir, fileName));
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return undefined;
@@ -111,9 +109,7 @@ export class ArtifactStore implements MemoryPipelineArtifactStore {
     const descriptors = await Promise.all(
       files
         .filter((file) => file.endsWith('.json'))
-        .map(async (file) =>
-          JSON.parse(await readFile(path.join(descriptorDir, file), 'utf8')) as ArtifactDescriptor,
-        ),
+        .map((file) => this.readAndValidateDescriptorFile(path.join(descriptorDir, file))),
     );
 
     return descriptors
@@ -173,6 +169,13 @@ export class ArtifactStore implements MemoryPipelineArtifactStore {
     if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
       throw new Error('invalid descriptor id');
     }
+  }
+
+  private async readAndValidateDescriptorFile(filePath: string): Promise<ArtifactDescriptor> {
+    const descriptor = JSON.parse(await readFile(filePath, 'utf8')) as ArtifactDescriptor;
+    this.validateDescriptorId(descriptor.id);
+    await this.validateDescriptorPath(descriptor);
+    return descriptor;
   }
 
   private async validateDescriptorPath(descriptor: ArtifactDescriptor): Promise<void> {

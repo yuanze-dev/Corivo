@@ -105,6 +105,24 @@ describe('ArtifactStore', () => {
     );
   });
 
+  it('rejects reading when descriptor exists but artifact body file is missing', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
+    const store = new ArtifactStore(root);
+    const artifactDir = path.join(root, 'runs', 'run-body-missing', 'stages');
+    await mkdir(artifactDir, { recursive: true });
+
+    await store.persistDescriptor({
+      id: 'summary-batch-missing-body',
+      kind: 'summary-batch',
+      version: 1,
+      path: path.join('runs', 'run-body-missing', 'stages', 'summary-batch-missing-body.json'),
+      source: 'stage-a',
+      createdAt: Date.now(),
+    });
+
+    await expect(store.readArtifact('summary-batch-missing-body')).rejects.toThrow();
+  });
+
   it('rejects listing when a stored descriptor path escapes root', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
     const store = new ArtifactStore(root);

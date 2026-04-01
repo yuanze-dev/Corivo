@@ -16,6 +16,7 @@ export interface MemoryPipelineRunnerOptions {
   runRoot: string;
   logger?: MemoryPipelineContext['logger'];
   runIdGenerator?: () => string;
+  manifestWriter?: (manifestPath: string, manifest: RunManifest) => Promise<void>;
 }
 
 export interface MemoryPipelineRunResult {
@@ -43,14 +44,15 @@ export class MemoryPipelineRunner {
 
     const stageResults: PipelineStageResult[] = [];
     manifest.stages = stageResults;
-    await writeRunManifest(manifestPath, manifest);
+    const manifestWriter = this.options.manifestWriter ?? writeRunManifest;
 
     try {
+      await manifestWriter(manifestPath, manifest);
       for (const stage of pipeline.stages) {
         const result = await this.executeStage(stage, runId, trigger);
         stageResults.push(result);
         manifest.status = result.status === 'failed' ? 'failed' : 'running';
-        await writeRunManifest(manifestPath, manifest);
+        await manifestWriter(manifestPath, manifest);
 
         if (result.status === 'failed') {
           return this.buildResult(runId, pipeline.id, 'failed', stageResults);
@@ -58,7 +60,7 @@ export class MemoryPipelineRunner {
       }
 
       manifest.status = 'success';
-      await writeRunManifest(manifestPath, manifest);
+      await manifestWriter(manifestPath, manifest);
       return this.buildResult(runId, pipeline.id, 'success', stageResults);
     } finally {
       await this.options.lock.release();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtemp, readFile, unlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, unlink, writeFile, link } from 'node:fs/promises';
 import type { FileHandle } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,7 +10,7 @@ import type {
   PipelineStageStatus,
 } from '../../src/memory-pipeline/types.js';
 import { readRunManifest } from '../../src/memory-pipeline/state/run-manifest.js';
-import { FileRunLock, LOCK_RELEASE_SENTINEL } from '../../src/memory-pipeline/state/run-lock.js';
+import { FileRunLock } from '../../src/memory-pipeline/state/run-lock.js';
 import { MemoryPipelineRunner } from '../../src/memory-pipeline/runner.js';
 const createArtifactStore = (): MemoryPipelineArtifactStore => ({
   async writeArtifact(input) {
@@ -28,6 +28,18 @@ const createArtifactStore = (): MemoryPipelineArtifactStore => ({
     return undefined;
   },
 });
+
+function parseLockContent(raw: string) {
+  const trimmed = raw.trim();
+  const separator = trimmed.indexOf(':');
+  if (separator === -1) {
+    return { token: trimmed, runId: '' };
+  }
+  return {
+    token: trimmed.slice(0, separator),
+    runId: trimmed.slice(separator + 1),
+  };
+}
 
 describe('MemoryPipelineRunner', () => {
   it('runs stages sequentially and records their results', async () => {
@@ -192,17 +204,28 @@ describe('MemoryPipelineRunner', () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
     const lockPath = path.join(root, 'run.lock');
 
-    class FailingWriteLock extends FileRunLock {
+    class InspectableLock extends FileRunLock {
+      public lastOwnerPath?: string;
+
+      protected createOwnerFilePath(runId: string): string {
+        const ownerPath = super.createOwnerFilePath(runId);
+        this.lastOwnerPath = ownerPath;
+        return ownerPath;
+      }
+
       protected async writeLockContent(handle: FileHandle, runId: string): Promise<void> {
         throw new Error('write failure');
       }
     }
 
-    const lock = new FailingWriteLock(lockPath);
+    const lock = new InspectableLock(lockPath);
 
     await expect(lock.acquire('run-fail')).rejects.toThrow('write failure');
 
     await expect(readFile(lockPath, 'utf8')).rejects.toThrow();
+    if (lock.lastOwnerPath) {
+      await expect(readFile(lock.lastOwnerPath, 'utf8')).rejects.toThrow();
+    }
   });
 
   it('keeps a replaced lock file when releasing after losing ownership', async () => {
@@ -212,11 +235,11 @@ describe('MemoryPipelineRunner', () => {
 
     await lock.acquire('run-original');
     await unlink(lockPath);
-    await writeFile(lockPath, 'run-other', 'utf8');
+    await writeFile(lockPath, 'manualtoken:run-other', 'utf8');
 
     await lock.release();
 
-    expect((await readFile(lockPath, 'utf8')).trim()).toBe('run-other');
+    expect(parseLockContent(await readFile(lockPath, 'utf8')).runId).toBe('run-other');
     await unlink(lockPath);
   });
 
@@ -228,15 +251,289 @@ describe('MemoryPipelineRunner', () => {
     await lockA.acquire('run-one');
     await lockA.release();
 
-    expect(await readFile(lockPath, 'utf8')).toBe(LOCK_RELEASE_SENTINEL);
+    await expect(readFile(lockPath, 'utf8')).rejects.toThrow();
 
     const lockB = new FileRunLock(lockPath);
     await lockB.acquire('run-two');
-    expect(await readFile(lockPath, 'utf8')).toBe('run-two');
+    expect(parseLockContent(await readFile(lockPath, 'utf8')).runId).toBe('run-two');
 
     await lockB.release();
-    expect(await readFile(lockPath, 'utf8')).toBe(LOCK_RELEASE_SENTINEL);
+    await expect(readFile(lockPath, 'utf8')).rejects.toThrow();
+  });
+
+  it('propagates lock unlink failures and retains owner metadata', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
+    const lockPath = path.join(root, 'run.lock');
+
+    class FailingDeleteLock extends FileRunLock {
+      calls = 0;
+
+      protected async cleanupRetiredPath(retiredPath: string): Promise<void> {
+        this.calls += 1;
+        if (this.calls === 1) {
+          throw new Error('unlink failed');
+        }
+        await super.cleanupRetiredPath(retiredPath);
+      }
+    }
+
+    const lock = new FailingDeleteLock(lockPath);
+    await lock.acquire('run-broken');
+
+    await expect(lock.release()).rejects.toThrow('unlink failed');
+
+    const files = await readdir(root);
+    expect(files).not.toContain('run.lock');
+    expect(files.some((name) => name.startsWith('.corivo-lock-retired-'))).toBe(true);
+
+    await expect(lock.release()).resolves.toBeUndefined();
+    const finalFiles = await readdir(root);
+    expect(finalFiles).not.toContain('run.lock');
+    expect(finalFiles.some((name) => name.startsWith('.corivo-lock-'))).toBe(false);
+  });
+
+  it('does not unlink a lock when the owner path is missing and a new owner exists', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
+    const lockPath = path.join(root, 'run.lock');
+
+    class InstrumentedLock extends FileRunLock {
+      public lastOwner?: string;
+
+      protected createOwnerFilePath(runId: string): string {
+        const ownerPath = super.createOwnerFilePath(runId);
+        this.lastOwner = ownerPath;
+        return ownerPath;
+      }
+    }
+
+    const lockA = new InstrumentedLock(lockPath);
+    await lockA.acquire('run-a');
+    const ownerA = lockA.lastOwner;
+    await unlink(ownerA!);
+
     await unlink(lockPath);
+    const ownerB = path.join(root, `.corivo-lock-b-${Date.now()}`);
+    const ownerBToken = `owner-b-${Date.now()}`;
+    await writeFile(ownerB, `${ownerBToken}:run-b`, 'utf8');
+    await link(ownerB, lockPath);
+
+    await expect(lockA.release()).resolves.toBeUndefined();
+    expect(parseLockContent(await readFile(lockPath, 'utf8')).runId).toBe('run-b');
+
+    await unlink(lockPath);
+    await unlink(ownerB);
+
+    await lockA.acquire('run-after');
+    await lockA.release();
+  });
+
+  it('cleans stale lock when owner file is missing but run.lock still belongs to this run', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
+    const lockPath = path.join(root, 'run.lock');
+
+    class InstrumentedLock extends FileRunLock {
+      public lastOwnerPath?: string;
+
+      protected createOwnerFilePath(runId: string): string {
+        const ownerPath = super.createOwnerFilePath(runId);
+        this.lastOwnerPath = ownerPath;
+        return ownerPath;
+      }
+    }
+
+    const lock = new InstrumentedLock(lockPath);
+    await lock.acquire('run-stale');
+    await unlink(lock.lastOwnerPath!);
+
+    await expect(lock.release()).resolves.toBeUndefined();
+    await expect(readFile(lockPath, 'utf8')).rejects.toThrow();
+
+    const lockB = new FileRunLock(lockPath);
+    await lockB.acquire('run-new');
+    await lockB.release();
+  });
+
+  it('renames run.lock before cleaning so new owner survives the release window', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
+    const lockPath = path.join(root, 'run.lock');
+
+    class RacingLock extends FileRunLock {
+      protected async cleanupRetiredPath(retiredPath: string): Promise<void> {
+        await writeFile(lockPath, `${Date.now()}-newtoken:run-newowner`, 'utf8');
+        await super.cleanupRetiredPath(retiredPath);
+      }
+    }
+
+    const lock = new RacingLock(lockPath);
+    await lock.acquire('run-race');
+    await lock.release();
+
+    const parsed = parseLockContent(await readFile(lockPath, 'utf8'));
+    expect(parsed.runId).toBe('run-newowner');
+    await unlink(lockPath);
+  });
+
+  it('throws when owner stat fails and retains lock', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
+    const lockPath = path.join(root, 'run.lock');
+
+    class StatFailLock extends FileRunLock {
+      owner?: string;
+      throwOnce = true;
+
+      protected createOwnerFilePath(runId: string): string {
+        this.owner = super.createOwnerFilePath(runId);
+        return this.owner;
+      }
+
+      protected async getStats(target: string) {
+        if (this.throwOnce && target === this.owner) {
+          this.throwOnce = false;
+          const error = new Error('stat fail');
+          (error as NodeJS.ErrnoException).code = 'EACCES';
+          throw error;
+        }
+        return super.getStats(target);
+      }
+    }
+
+    const lock = new StatFailLock(lockPath);
+    await lock.acquire('run-stat');
+
+    await expect(lock.release()).rejects.toThrow('stat fail');
+    const files = await readdir(root);
+    expect(files).toContain('run.lock');
+    expect(files.some((name) => name.startsWith('.corivo-lock-'))).toBe(true);
+
+    await expect(lock.release()).resolves.toBeUndefined();
+    await expect(readFile(lockPath, 'utf8')).rejects.toThrow();
+  });
+
+  it('propagates manifest write failure after a stage and releases lock', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
+    const lockPath = path.join(root, 'run.lock');
+    const lock = new FileRunLock(lockPath);
+    const stageCalls: string[] = [];
+
+    let call = 0;
+    const manifestWriter = async () => {
+      call += 1;
+      if (call === 2) {
+        throw new Error('post-stage failure');
+      }
+    };
+
+    const runner = new MemoryPipelineRunner({
+      artifactStore: createArtifactStore(),
+      lock,
+      runRoot: root,
+      manifestWriter,
+    });
+
+    const pipeline = {
+      id: 'init-memory-pipeline',
+      stages: [createStage('stage', async () => {
+        stageCalls.push('stage');
+        return createResult('stage', 'success');
+      })],
+    };
+
+    await expect(runner.run(pipeline, { type: 'manual', runAt: Date.now() })).rejects.toThrow('post-stage failure');
+    expect(stageCalls).toEqual(['stage']);
+
+    const lock2 = new FileRunLock(lockPath);
+    const runner2 = new MemoryPipelineRunner({
+      artifactStore: createArtifactStore(),
+      lock: lock2,
+      runRoot: root,
+    });
+
+    await expect(runner2.run(pipeline, { type: 'manual', runAt: Date.now() })).resolves.toMatchObject({ status: 'success' });
+  });
+
+  it('propagates final manifest write failure after all stages', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
+    const lockPath = path.join(root, 'run.lock');
+    const lock = new FileRunLock(lockPath);
+    const stageCalls: string[] = [];
+
+    let call = 0;
+    const manifestWriter = async () => {
+      call += 1;
+      if (call === 3) {
+        throw new Error('final failure');
+      }
+    };
+
+    const runner = new MemoryPipelineRunner({
+      artifactStore: createArtifactStore(),
+      lock,
+      runRoot: root,
+      manifestWriter,
+    });
+
+    const pipeline = {
+      id: 'init-memory-pipeline',
+      stages: [createStage('succeed', async () => {
+        stageCalls.push('succeed');
+        return createResult('succeed', 'success');
+      })],
+    };
+
+    await expect(runner.run(pipeline, { type: 'manual', runAt: Date.now() })).rejects.toThrow('final failure');
+    expect(stageCalls).toEqual(['succeed']);
+  });
+
+  it('releases the lock when the initial manifest write fails', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
+    const lockPath = path.join(root, 'run.lock');
+
+    class TrackingLock extends FileRunLock {
+      releaseCalls = 0;
+
+      async release(): Promise<void> {
+        this.releaseCalls += 1;
+        return super.release();
+      }
+    }
+
+    const lock = new TrackingLock(lockPath);
+    const stageCalls: string[] = [];
+    const pipeline = {
+      id: 'init-memory-pipeline',
+      stages: [
+        createStage('only', async () => {
+          stageCalls.push('only');
+          return createResult('only', 'success');
+        }),
+      ],
+    };
+
+    const runner = new MemoryPipelineRunner({
+      artifactStore: createArtifactStore(),
+      lock,
+      runRoot: root,
+      manifestWriter: async () => {
+        throw new Error('manifest failure');
+      },
+    });
+
+    await expect(runner.run(pipeline, { type: 'manual', runAt: Date.now() })).rejects.toThrow(
+      /manifest failure/,
+    );
+    expect(stageCalls).toEqual([]);
+    expect(lock.releaseCalls).toBe(1);
+
+    const lock2 = new FileRunLock(lockPath);
+    const runner2 = new MemoryPipelineRunner({
+      artifactStore: createArtifactStore(),
+      lock: lock2,
+      runRoot: root,
+    });
+
+    const result = await runner2.run(pipeline, { type: 'manual', runAt: Date.now() });
+    expect(result.status).toBe('success');
+    expect(stageCalls).toEqual(['only']);
   });
 
 });

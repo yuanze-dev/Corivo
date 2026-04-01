@@ -28,6 +28,15 @@ export interface ArtifactDescriptor {
   metadata?: Record<string, unknown>;
 }
 
+export interface ArtifactWriteInput {
+  runId?: string;
+  kind: string;
+  source: string;
+  body: string;
+  upstreamIds?: string[];
+  metadata?: Record<string, unknown>;
+}
+
 export type PipelineStageStatus = 'success' | 'partial' | 'failed' | 'skipped';
 
 export interface PipelineStageResult {
@@ -41,6 +50,7 @@ export interface PipelineStageResult {
 }
 
 export interface MemoryPipelineArtifactStore {
+  writeArtifact(input: ArtifactWriteInput): Promise<ArtifactDescriptor>;
   persistDescriptor(descriptor: ArtifactDescriptor): Promise<void>;
   getDescriptor(id: string): Promise<ArtifactDescriptor | undefined>;
 }

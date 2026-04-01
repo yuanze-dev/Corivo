@@ -218,6 +218,39 @@ check_codex_process() {
   fi
 }
 
+first_line_or_empty() {
+  local value="${1:-}"
+  if [ -z "$value" ]; then
+    echo ""
+    return
+  fi
+  printf '%s' "$value" | head -n 1
+}
+
+host_inject_failed_reason() {
+  local host="$1"
+  local command_desc="$2"
+  local output="${3:-}"
+  local host_label=""
+  local output_line=""
+  host_label="$(host_display_name "$host")"
+  output_line="$(first_line_or_empty "$output")"
+
+  if [ "${INSTALL_LANG:-en}" = "zh" ]; then
+    if [ -n "$output_line" ]; then
+      printf '安装 %s 失败（%s）：%s\n' "$host_label" "$command_desc" "$output_line"
+    else
+      printf '安装 %s 失败（%s）。\n' "$host_label" "$command_desc"
+    fi
+  else
+    if [ -n "$output_line" ]; then
+      printf 'Failed to install %s (%s): %s\n' "$host_label" "$command_desc" "$output_line"
+    else
+      printf 'Failed to install %s (%s).\n' "$host_label" "$command_desc"
+    fi
+  fi
+}
+
 install_detected_hosts() {
   local attention=0
 
@@ -226,11 +259,12 @@ install_detected_hosts() {
 
   if printf '%s\n' "${DETECTED_HOSTS[@]}" | grep -qx 'claude-code'; then
     log_step "$(msg install_claude_host)"
-    if corivo inject --global --claude-code >/dev/null 2>&1; then
+    local claude_output=""
+    if claude_output="$(corivo inject --global --claude-code 2>&1)"; then
       check_claude_process
       record_host_result "claude-code" "ready"
     else
-      record_host_result "claude-code" "blocked" "$(msg host_install_failed)"
+      record_host_result "claude-code" "blocked" "$(host_inject_failed_reason "claude-code" "corivo inject --global --claude-code" "$claude_output")"
       attention=1
     fi
   else
@@ -239,11 +273,12 @@ install_detected_hosts() {
 
   if printf '%s\n' "${DETECTED_HOSTS[@]}" | grep -qx 'codex'; then
     log_step "$(msg install_codex_host)"
-    if corivo inject --global --codex >/dev/null 2>&1; then
+    local codex_output=""
+    if codex_output="$(corivo inject --global --codex 2>&1)"; then
       check_codex_process
       record_host_result "codex" "ready" "$(msg codex_ready_hint)"
     else
-      record_host_result "codex" "blocked" "$(msg host_install_failed)"
+      record_host_result "codex" "blocked" "$(host_inject_failed_reason "codex" "corivo inject --global --codex" "$codex_output")"
       attention=1
     fi
   else
@@ -252,7 +287,8 @@ install_detected_hosts() {
 
   if printf '%s\n' "${DETECTED_HOSTS[@]}" | grep -qx 'cursor'; then
     log_step "$(msg install_cursor_host)"
-    if corivo inject --global --cursor >/dev/null 2>&1; then
+    local cursor_output=""
+    if cursor_output="$(corivo inject --global --cursor 2>&1)"; then
       local cursor_status=""
       cursor_status="$(cursor agent status 2>/dev/null || true)"
       if printf '%s' "$cursor_status" | grep -q 'Not logged in'; then
@@ -262,7 +298,7 @@ install_detected_hosts() {
         record_host_result "cursor" "ready"
       fi
     else
-      record_host_result "cursor" "blocked" "$(msg host_install_failed)"
+      record_host_result "cursor" "blocked" "$(host_inject_failed_reason "cursor" "corivo inject --global --cursor" "$cursor_output")"
       attention=1
     fi
   else
@@ -271,7 +307,8 @@ install_detected_hosts() {
 
   if printf '%s\n' "${DETECTED_HOSTS[@]}" | grep -qx 'opencode'; then
     log_step "$(msg install_opencode_host)"
-    if corivo inject --global --opencode >/dev/null 2>&1; then
+    local opencode_output=""
+    if opencode_output="$(corivo inject --global --opencode 2>&1)"; then
       if opencode models >/dev/null 2>&1; then
         record_host_result "opencode" "ready"
       else
@@ -279,7 +316,7 @@ install_detected_hosts() {
         attention=1
       fi
     else
-      record_host_result "opencode" "blocked" "$(msg host_install_failed)"
+      record_host_result "opencode" "blocked" "$(host_inject_failed_reason "opencode" "corivo inject --global --opencode" "$opencode_output")"
       attention=1
     fi
   else

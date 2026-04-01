@@ -240,7 +240,7 @@ detail layer 用于存储完整程度更高、允许追加的长期记录。
 建议位置：
 
 ```text
-~/.corivo/memory/artifacts/detail/
+~/.corivo/memory-pipeline/artifacts/detail/
 ```
 
 ### Index Layer
@@ -256,7 +256,7 @@ index layer 用于存储面向检索的轻量投影。
 建议位置：
 
 ```text
-~/.corivo/memory/artifacts/index/
+~/.corivo/memory-pipeline/artifacts/index/
 ```
 
 ### Run Artifacts
@@ -266,7 +266,7 @@ index layer 用于存储面向检索的轻量投影。
 建议位置：
 
 ```text
-~/.corivo/memory/runs/<run-id>/
+~/.corivo/memory-pipeline/runs/<run-id>/
 ```
 
 可包含：
@@ -604,7 +604,7 @@ export interface MemoryPipelineDefinition {
 建议目录：
 
 ```text
-~/.corivo/memory/
+~/.corivo/memory-pipeline/
   artifacts/
     detail/
     index/

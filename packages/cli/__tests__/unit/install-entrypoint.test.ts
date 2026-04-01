@@ -119,8 +119,11 @@ describe('install.sh entrypoint', () => {
       [installScriptPath, '--lang', 'en'],
       {
         cwd: path.dirname(installScriptPath),
-        env: baseEnv({ CORIVO_LOG: tempEnv.corivoLogPath }),
-        input: `1\n${choice}\n`,
+        env: baseEnv({
+          CORIVO_LOG: tempEnv.corivoLogPath,
+          CORIVO_INSTALL_FORCE_INTERACTIVE: '1',
+        }),
+        input: `${choice}\n`,
         encoding: 'utf8',
       },
     );

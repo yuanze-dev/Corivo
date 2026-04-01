@@ -341,7 +341,7 @@ prompt_local_warmup_consent() {
   printf '2) %s\n' "$(msg warmup_skip)"
   printf '> '
 
-  if [ ! -t 0 ]; then
+  if [ "${CORIVO_INSTALL_FORCE_INTERACTIVE:-}" != "1" ] && [ ! -t 0 ]; then
     return 1
   fi
 

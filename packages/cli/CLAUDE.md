@@ -16,10 +16,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # 构建
-npm run build          # tsup → dist/
+npm run build          # tsdown → dist/
 
 # 开发（监听模式）
-npm run dev            # tsup --watch
+npm run dev            # tsdown --watch
 
 # 打包独立二进制（macOS arm64/x64 + Linux x64）
 npm run package

@@ -42,8 +42,8 @@ Corivo 是一个融入用户已有工作流的赛博**伙伴**。它不是一个
 ```bash
 # packages/cli
 cd packages/cli
-npm run build          # tsup
-npm run dev            # tsup --watch
+npm run build          # tsdown
+npm run dev            # tsdown --watch
 npm run test           # vitest --run
 
 # packages/solver

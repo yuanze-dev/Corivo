@@ -92,7 +92,10 @@ describe('install.sh entrypoint', () => {
       [installScriptPath, '--lang', 'en'],
       {
         cwd: path.dirname(installScriptPath),
-        env: baseEnv({ CORIVO_LOG: tempEnv.corivoLogPath }),
+        env: baseEnv({
+          CORIVO_LOG: tempEnv.corivoLogPath,
+          CORIVO_INSTALL_FORCE_INTERACTIVE: '1',
+        }),
         input: '1\n',
         encoding: 'utf8',
       },
@@ -111,6 +114,10 @@ describe('install.sh entrypoint', () => {
     expect(output).toContain('Corivo can get ready faster by learning from your recent local context');
     expect(output).toContain('Continue');
     expect(output).toContain('Skip for now');
+    expect(output).toContain('Warm-up complete.');
+    expect(output).toContain('Corivo picked up initial context from this device.');
+    expect(output).toContain('Try this next:');
+    expect(output).toContain('Before we continue, tell me the project context, recent decisions, and working preferences you already know about me from this machine.');
   });
 
   it('diverges when the user continues or skips the warm-up consent', async () => {

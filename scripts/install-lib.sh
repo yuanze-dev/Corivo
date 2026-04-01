@@ -11,6 +11,8 @@ STAGE_RESULTS=()
 STAGE_SEQUENCE=(prepare connect start warmup)
 DIAGNOSTIC_ENTRIES=()
 DIAGNOSTIC_PATH=""
+WARMUP_STATUS=""
+WARMUP_SUMMARY=""
 
 parse_install_args() {
   while [ "$#" -gt 0 ]; do
@@ -223,6 +225,16 @@ msg() {
     en:warmup_skip_hint) echo "You can always warm up later." ;;
     zh:corivo_ready) echo "Corivo 已准备好与你一起工作。" ;;
     en:corivo_ready) echo "Corivo is ready to work with you." ;;
+    zh:warmup_complete) echo "预热已完成。" ;;
+    en:warmup_complete) echo "Warm-up complete." ;;
+    zh:warmup_failed) echo "预热未能完成，但 Corivo 仍然可以开始工作。" ;;
+    en:warmup_failed) echo "Warm-up could not finish, but Corivo can still start working." ;;
+    zh:warmup_items_found) echo "Corivo 已从这台设备读取到初始上下文。" ;;
+    en:warmup_items_found) echo "Corivo picked up initial context from this device." ;;
+    zh:cta_label) echo "接下来试试这句：" ;;
+    en:cta_label) echo "Try this next:" ;;
+    zh:cta_prompt) echo "在我们继续之前，请告诉我你已经从这台设备上了解到了哪些项目背景、最近决策和我的工作偏好。" ;;
+    en:cta_prompt) echo "Before we continue, tell me the project context, recent decisions, and working preferences you already know about me from this machine." ;;
     zh:install_claude_skills) echo "安装 Claude Code skills..." ;;
     en:install_claude_skills) echo "Installing Claude Code skills..." ;;
     zh:install_claude_hooks) echo "安装 Claude Code hook 脚本..." ;;
@@ -311,6 +323,11 @@ render_recovery_message() {
 
   printf '\n[%s] %s: %s\n' "corivo" "$(msg diagnostic_summary)" "$DIAGNOSTIC_PATH"
   printf '%s\n' "$(msg ai_handoff)"
+}
+
+render_activation_cta() {
+  printf '\n%s\n' "$(msg cta_label)"
+  printf '"%s"\n' "$(msg cta_prompt)"
 }
 
 set_stage_result() {

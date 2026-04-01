@@ -380,12 +380,32 @@ install_detected_hosts() {
 }
 
 run_local_warmup_flow() {
+  local warmup_output=""
   if prompt_local_warmup_consent; then
-    return 0
+    if warmup_output="$(corivo cold-scan 2>&1)"; then
+      WARMUP_STATUS="completed"
+      WARMUP_SUMMARY="$(msg warmup_items_found)"
+      printf '%s\n' "$(msg warmup_complete)"
+      printf '%s\n' "$WARMUP_SUMMARY"
+      return 0
+    fi
+
+    WARMUP_STATUS="failed"
+    WARMUP_SUMMARY="$(msg warmup_failed)"
+    printf '%s\n' "$WARMUP_SUMMARY"
+    record_failure_context \
+      "warmup.cold_scan" \
+      "$(msg stage_warmup)" \
+      "corivo cold-scan" \
+      "$warmup_output" \
+      "Rerun the installer or run corivo cold-scan after Corivo is ready."
+    return 1
   fi
 
+  WARMUP_STATUS="skipped"
+  WARMUP_SUMMARY="$(msg warmup_skip_hint)"
   printf '%s\n' "$(msg warmup_skipped)"
-  printf '%s\n' "$(msg warmup_skip_hint)"
+  printf '%s\n' "$WARMUP_SUMMARY"
   return 0
 }
 
@@ -403,6 +423,7 @@ main() {
   local prepare_attention=0
   local connect_attention=0
   local start_attention=0
+  local warmup_attention=0
 
   begin_stage "prepare"
   check_node
@@ -437,13 +458,20 @@ main() {
   fi
 
   begin_stage "warmup"
-  run_local_warmup_flow
-  finish_stage "warmup"
+  if ! run_local_warmup_flow; then
+    warmup_attention=1
+  fi
+  if [ "$warmup_attention" -eq 1 ]; then
+    mark_stage_attention "warmup"
+  else
+    finish_stage "warmup"
+  fi
 
   write_diagnostic_summary
   render_host_summary
   render_recovery_message
   printf '\n%s\n' "$(msg corivo_ready)"
+  render_activation_cta
 }
 
 trap 'log_error "安装过程中出现错误"; exit 1' ERR

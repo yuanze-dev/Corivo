@@ -19,6 +19,7 @@ describe('install.sh entrypoint', () => {
     ...process.env,
     HOME: tempEnv.tempHome,
     PATH: `${tempEnv.binDir}:/usr/bin:/bin:/usr/sbin:/sbin`,
+    CORIVO_INSTALL_NO_ANIMATION: '1',
     ...overrides,
   });
 
@@ -97,6 +98,10 @@ describe('install.sh entrypoint', () => {
       },
     );
 
+    expect(output).toContain('Corivo is getting your machine ready.');
+    expect(output).toContain(
+      'I’ll prepare this machine, connect the AI tools you already use, and start Corivo with a local warm-up.',
+    );
     expect(output).toContain('Preparing your machine');
     expect(output).toContain('Connecting your AI tools');
     expect(output).toContain('Starting Corivo');

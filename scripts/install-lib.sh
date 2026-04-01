@@ -91,16 +91,7 @@ prompt_install_language() {
 
 resolve_install_lang() {
   local default_lang=""
-
-  if [ -n "${REQUESTED_LANG:-}" ]; then
-    default_lang="$(normalize_lang "$REQUESTED_LANG")"
-  fi
-
-  if [ -z "$default_lang" ]; then
-    default_lang="$(detect_locale_lang)"
-  fi
-
-  default_lang="${default_lang:-en}"
+  default_lang="$(resolve_default_lang)"
 
   if [ -t 0 ]; then
     prompt_install_language "$default_lang"
@@ -110,12 +101,32 @@ resolve_install_lang() {
   fi
 }
 
+resolve_default_lang() {
+  local default_lang=""
+
+  if [ -n "${REQUESTED_LANG:-}" ]; then
+    default_lang="$(normalize_lang "$REQUESTED_LANG")"
+  fi
+
+  if [ -z "$default_lang" ]; then
+    default_lang="$(detect_locale_lang)"
+  fi
+
+  echo "${default_lang:-en}"
+}
+
 msg() {
   local key="$1"
 
   case "${INSTALL_LANG:-zh}:$key" in
     zh:banner_title) echo "Corivo 安装向导" ;;
     en:banner_title) echo "Corivo Installer" ;;
+    zh:arrival_companion) echo "Corivo 记忆伙伴正在就绪。" ;;
+    en:arrival_companion) echo "Your Corivo companion is on the way." ;;
+    zh:arrival_welcome) echo "Corivo 正在准备这台设备。" ;;
+    en:arrival_welcome) echo "Corivo is getting your machine ready." ;;
+    zh:arrival_promise) echo "我会准备这台设备，连接你已在使用的 AI 工具，并通过本地预热启动 Corivo。" ;;
+    en:arrival_promise) echo "I’ll prepare this machine, connect the AI tools you already use, and start Corivo with a local warm-up." ;;
     zh:stage_prepare) echo "准备这台设备" ;;
     en:stage_prepare) echo "Preparing your machine" ;;
     zh:stage_connect) echo "连接你的 AI 工具" ;;
@@ -200,6 +211,12 @@ msg() {
     en:warmup_continue) echo "Continue" ;;
     zh:warmup_skip) echo "暂时跳过" ;;
     en:warmup_skip) echo "Skip for now" ;;
+    zh:warmup_skipped) echo "已跳过预热" ;;
+    en:warmup_skipped) echo "Warm-up skipped" ;;
+    zh:warmup_skip_hint) echo "你随时可以在以后进行预热。" ;;
+    en:warmup_skip_hint) echo "You can always warm up later." ;;
+    zh:corivo_ready) echo "Corivo 已准备好与你一起工作。" ;;
+    en:corivo_ready) echo "Corivo is ready to work with you." ;;
     zh:install_claude_skills) echo "安装 Claude Code skills..." ;;
     en:install_claude_skills) echo "Installing Claude Code skills..." ;;
     zh:install_claude_hooks) echo "安装 Claude Code hook 脚本..." ;;
@@ -310,7 +327,7 @@ render_stage_board() {
   for stage in "${STAGE_SEQUENCE[@]}"; do
     local label
     label="$(msg "stage_${stage}")"
-    printf '- %s: %s\n' "$label" "$(stage_status_text "$stage")"
+    printf -- '- %s: %s\n' "$label" "$(stage_status_text "$stage")"
   done
   echo ""
 }

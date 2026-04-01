@@ -40,6 +40,38 @@ log_error() { echo -e "${RED}✖${NC} $1"; }
 log_step()  { echo -e "${BLUE}⏳${NC} $1"; }
 log_corivo(){ echo -e "${CYAN}[corivo]${NC} $1"; }
 
+should_animate() {
+  if [ "${CORIVO_INSTALL_NO_ANIMATION:-}" = "1" ]; then
+    return 1
+  fi
+
+  if [ ! -t 1 ]; then
+    return 1
+  fi
+
+  return 0
+}
+
+render_arrival_moment() {
+  echo ""
+  echo -e "${CYAN}══════════════════════════════════════════${NC}"
+  printf "${CYAN}     %s                      ${NC}\n" "$(msg banner_title)"
+  echo -e "${CYAN}══════════════════════════════════════════${NC}"
+  echo ""
+  printf '%s\n' "$(msg arrival_companion)"
+  printf '%s\n' "$(msg arrival_welcome)"
+
+  if should_animate; then
+    printf '%s' '.'
+    sleep 0.2
+    printf '%s' '.'
+    sleep 0.2
+    printf '%s\n' '.'
+  fi
+
+  echo ""
+}
+
 # ── 配置 ───────────────────────────────────────────────────────────────────
 CORIVO_CONFIG_DIR="$HOME/.corivo"
 CORIVO_INSTALL_CLI_SOURCE="${CORIVO_INSTALL_CLI_SOURCE:-corivo}"
@@ -105,27 +137,38 @@ install_build_deps() {
     if command -v sudo &>/dev/null; then
       SUDO="sudo"
     else
-    log_warn "需要 root 权限安装构建依赖，但未找到 sudo"
-  fi
+      log_warn "需要 root 权限安装构建依赖，但未找到 sudo"
+    fi
   fi
 
   if command -v apt-get &>/dev/null; then
-    $SUDO apt-get update -qq
-    $SUDO apt-get install -y -qq python3 make g++ > /dev/null
+    if $SUDO apt-get update -qq && $SUDO apt-get install -y -qq python3 make g++ > /dev/null; then
+      true
+    fi
   elif command -v yum &>/dev/null; then
-    $SUDO yum install -y -q python3 make gcc-c++ > /dev/null
+    if $SUDO yum install -y -q python3 make gcc-c++ > /dev/null; then
+      true
+    fi
   elif command -v apk &>/dev/null; then
-    $SUDO apk add --quiet python3 make g++ > /dev/null
+    if $SUDO apk add --quiet python3 make g++ > /dev/null; then
+      true
+    fi
   elif command -v brew &>/dev/null; then
-    command -v python3 &>/dev/null || brew install python3 > /dev/null
-  else
-    log_warn "$(msg build_deps_manual)"
-    log_warn "Debian/Ubuntu: apt-get install python3 make g++"
-    log_warn "Alpine:        apk add python3 make g++"
-    log_warn "CentOS/RHEL:   yum install python3 make gcc-c++"
+    if ! command -v python3 &>/dev/null; then
+      brew install python3 > /dev/null || true
+    fi
   fi
 
-  log_info "$(msg build_deps_ready)"
+  if command -v python3 &>/dev/null && command -v gcc &>/dev/null; then
+    log_info "$(msg build_deps_ready)"
+    return
+  fi
+
+  log_warn "$(msg build_deps_manual)"
+  log_warn "Debian/Ubuntu: apt-get install python3 make g++"
+  log_warn "Alpine:        apk add python3 make g++"
+  log_warn "CentOS/RHEL:   yum install python3 make gcc-c++"
+  return 1
 }
 
 # ── 3. 安装 Corivo CLI ────────────────────────────────────────────────────
@@ -175,21 +218,8 @@ check_codex_process() {
   fi
 }
 
-# ── 主流程 ─────────────────────────────────────────────────────────────────
-main() {
-  parse_install_args "$@"
-  resolve_install_lang
-
-  echo ""
-  echo -e "${CYAN}══════════════════════════════════════════${NC}"
-  printf "${CYAN}     %s                      ${NC}\n" "$(msg banner_title)"
-  echo -e "${CYAN}══════════════════════════════════════════${NC}"
-  echo ""
-
-  check_node
-  install_build_deps
-  install_corivo_cli
-  init_corivo
+install_detected_hosts() {
+  local attention=0
 
   log_step "$(msg detect_hosts)"
   detect_hosts
@@ -201,6 +231,7 @@ main() {
       record_host_result "claude-code" "ready"
     else
       record_host_result "claude-code" "blocked" "$(msg host_install_failed)"
+      attention=1
     fi
   else
     record_host_result "claude-code" "skipped"
@@ -213,6 +244,7 @@ main() {
       record_host_result "codex" "ready" "$(msg codex_ready_hint)"
     else
       record_host_result "codex" "blocked" "$(msg host_install_failed)"
+      attention=1
     fi
   else
     record_host_result "codex" "skipped"
@@ -225,11 +257,13 @@ main() {
       cursor_status="$(cursor agent status 2>/dev/null || true)"
       if printf '%s' "$cursor_status" | grep -q 'Not logged in'; then
         record_host_result "cursor" "blocked" "$(msg cursor_login_required)" "cursor agent login"
+        attention=1
       else
         record_host_result "cursor" "ready"
       fi
     else
       record_host_result "cursor" "blocked" "$(msg host_install_failed)"
+      attention=1
     fi
   else
     record_host_result "cursor" "skipped"
@@ -242,15 +276,84 @@ main() {
         record_host_result "opencode" "ready"
       else
         record_host_result "opencode" "blocked" "$(msg opencode_provider_warning)"
+        attention=1
       fi
     else
       record_host_result "opencode" "blocked" "$(msg host_install_failed)"
+      attention=1
     fi
   else
     record_host_result "opencode" "skipped"
   fi
 
+  if [ "$attention" -eq 1 ]; then
+    return 1
+  fi
+  return 0
+}
+
+run_local_warmup_flow() {
+  if prompt_local_warmup_consent; then
+    return 0
+  fi
+
+  printf '%s\n' "$(msg warmup_skipped)"
+  printf '%s\n' "$(msg warmup_skip_hint)"
+  return 0
+}
+
+# ── 主流程 ─────────────────────────────────────────────────────────────────
+main() {
+  parse_install_args "$@"
+  local default_lang=""
+  default_lang="$(resolve_default_lang)"
+  INSTALL_LANG="$default_lang"
+  render_arrival_moment
+  resolve_install_lang
+  printf '%s\n\n' "$(msg arrival_promise)"
+
+  local prepare_attention=0
+  local connect_attention=0
+  local start_attention=0
+
+  begin_stage "prepare"
+  check_node
+  if ! install_build_deps; then
+    prepare_attention=1
+  fi
+  install_corivo_cli
+  if [ "$prepare_attention" -eq 1 ]; then
+    mark_stage_attention "prepare"
+  else
+    finish_stage "prepare"
+  fi
+
+  begin_stage "connect"
+  if ! install_detected_hosts; then
+    connect_attention=1
+  fi
+  if [ "$connect_attention" -eq 1 ]; then
+    mark_stage_attention "connect"
+  else
+    finish_stage "connect"
+  fi
+
+  begin_stage "start"
+  if ! init_corivo; then
+    start_attention=1
+  fi
+  if [ "$start_attention" -eq 1 ]; then
+    mark_stage_attention "start"
+  else
+    finish_stage "start"
+  fi
+
+  begin_stage "warmup"
+  run_local_warmup_flow
+  finish_stage "warmup"
+
   render_host_summary
+  printf '\n%s\n' "$(msg corivo_ready)"
 }
 
 trap 'log_error "安装过程中出现错误"; exit 1' ERR

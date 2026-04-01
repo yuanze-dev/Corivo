@@ -29,6 +29,7 @@ import {
   createScheduledMemoryPipeline,
 } from '../../src/memory-pipeline/index.js';
 import type { RawSessionJobSource } from '../../src/memory-pipeline/sources/raw-session-job-source.js';
+import { DatabaseSessionRecordSource } from '../../src/memory-pipeline/sources/session-record-source.js';
 import type { StaleBlockSource } from '../../src/memory-pipeline/stages/collect-stale-blocks.js';
 import {
   RAW_SESSION_JOBS_STATE_KEY,
@@ -282,31 +283,68 @@ describe('memory pipeline extension points', () => {
   });
 
   it('runs collect claude sessions stage with the provided source', async () => {
-    const workItems = [
-      { id: 'session-1', kind: 'session', sourceRef: 'test-source' },
-    ];
-    const sessionSource: ClaudeSessionSource = {
-      collect: vi.fn(async () => workItems),
-    };
+    const sessionSource: ClaudeSessionSource = new DatabaseSessionRecordSource({
+      repository: {
+        querySessionRecords: vi.fn(async () => [
+          {
+            id: 'session-1',
+            kind: 'claude-session',
+            sourceRef: 'claude://session-1',
+            updatedAt: 42,
+            messages: [
+              {
+                id: 'message-1',
+                role: 'user',
+                content: 'Summarize this chat.',
+                createdAt: 41,
+              },
+            ],
+          },
+        ]),
+      },
+      mode: 'full',
+    });
     const store = new RecordingArtifactStore();
     const stage = new CollectClaudeSessionsStage(sessionSource);
     const context = createContext(store, 'run-collect');
 
     const result = await stage.run(context);
 
-    expect(sessionSource.collect).toHaveBeenCalled();
     const [write] = store.writes;
     expect(write).toMatchObject({
       runId: 'run-collect',
       kind: 'work-item',
       source: stage.id,
-      body: JSON.stringify(workItems),
+      body: JSON.stringify([
+        {
+          id: 'session-1',
+          kind: 'session',
+          sourceRef: 'claude://session-1',
+          freshnessToken: '42',
+          metadata: {
+            session: {
+              id: 'session-1',
+              kind: 'claude-session',
+              sourceRef: 'claude://session-1',
+              updatedAt: 42,
+              messages: [
+                {
+                  id: 'message-1',
+                  role: 'user',
+                  content: 'Summarize this chat.',
+                  createdAt: 41,
+                },
+              ],
+            },
+          },
+        },
+      ]),
     });
     expect(result).toMatchObject({
       stageId: stage.id,
       status: 'success',
-      inputCount: workItems.length,
-      outputCount: workItems.length,
+      inputCount: 1,
+      outputCount: 1,
     });
     expect(result.artifactIds).toEqual([store.descriptors[0].id]);
   });

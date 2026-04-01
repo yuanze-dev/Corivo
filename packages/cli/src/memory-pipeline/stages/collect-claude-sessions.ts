@@ -1,7 +1,4 @@
-import {
-  ClaudeSessionSource,
-  type ClaudeSessionWorkItem,
-} from '../sources/claude-session-source.js';
+import type { ClaudeSessionSource } from '../sources/claude-session-source.js';
 import type {
   MemoryPipelineContext,
   MemoryPipelineStage,
@@ -20,7 +17,7 @@ export class CollectClaudeSessionsStage implements MemoryPipelineStage {
   }
 
   async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {
-    const workItems: ClaudeSessionWorkItem[] = await this.source.collect();
+    const workItems = await this.source.collect();
     const descriptor = await context.artifactStore.writeArtifact({
       runId: context.runId,
       kind: 'work-item',

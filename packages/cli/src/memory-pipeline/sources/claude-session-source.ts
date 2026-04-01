@@ -1,11 +1,27 @@
-import type { WorkItem } from '../types.js';
+import {
+  DatabaseSessionRecordSource,
+  type SessionRecordRepository,
+  type SessionRecordSourceMode,
+  type SessionRecordWorkItem,
+} from './session-record-source.js';
 
-export type ClaudeSessionWorkItem = WorkItem & {
-  kind: 'session';
-};
+export type ClaudeSessionWorkItem = SessionRecordWorkItem;
 
 export interface ClaudeSessionSource {
   collect(): Promise<ClaudeSessionWorkItem[]>;
+}
+
+export interface DatabaseClaudeSessionSourceConfig {
+  repository: SessionRecordRepository;
+  mode?: SessionRecordSourceMode;
+}
+
+export class DatabaseClaudeSessionSource
+  extends DatabaseSessionRecordSource
+  implements ClaudeSessionSource {
+  constructor(config: DatabaseClaudeSessionSourceConfig) {
+    super(config);
+  }
 }
 
 export class StubClaudeSessionSource implements ClaudeSessionSource {

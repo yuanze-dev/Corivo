@@ -17,7 +17,6 @@ import { ConfigError } from '../../errors/index.js';
 import { readPassword } from '../utils/password.js';
 
 interface VerifyIdentityOptions {
-  password?: string;
   verbose?: boolean;
 }
 
@@ -82,7 +81,7 @@ export async function verifyIdentityCommand(options: VerifyIdentityOptions = {})
 
     // If a password is set
     if (config.encrypted_db_key) {
-      const password = options.password || await readPassword('Enter master password: ');
+      const password = await readPassword('Enter master password: ');
 
       // Verify password
       const salt = Buffer.from(config.salt, 'base64');

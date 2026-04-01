@@ -40,6 +40,11 @@ describe('E2E: CLI Basic Workflow', () => {
     expect(result).toMatch(/\d+\.\d+\.\d+/);
   });
 
+  it('should not expose legacy password flags in verify-identity help', () => {
+    const result = execSync(`node ${CLI} verify-identity --help`, { encoding: 'utf-8' });
+    expect(result).not.toContain('--password');
+  });
+
   it('should run doctor command (no config)', () => {
     const result = execSync(`node ${CLI} doctor`, {
       encoding: 'utf-8',

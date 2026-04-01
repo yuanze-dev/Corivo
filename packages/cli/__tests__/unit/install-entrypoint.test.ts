@@ -142,4 +142,50 @@ describe('install.sh entrypoint', () => {
     expect(skipOutput).toContain('Warm-up skipped');
     expect(skipOutput).toContain('You can always warm up later');
   });
+
+  it('keeps the recovery flow reachable when prepare work needs manual build dependencies', async () => {
+    await fs.rm(path.join(tempEnv.binDir, 'python3'));
+    await fs.rm(path.join(tempEnv.binDir, 'gcc'));
+
+    const diagnosticPath = path.join(tempEnv.tempHome, '.corivo', 'install-diagnostic.txt');
+    const output = execFileSync(
+      '/bin/bash',
+      [installScriptPath, '--lang', 'en'],
+      {
+        cwd: path.dirname(installScriptPath),
+        env: baseEnv({
+          PATH: tempEnv.binDir,
+          CORIVO_LOG: tempEnv.corivoLogPath,
+          CORIVO_TEST_NPM_INSTALL_FAIL: '1',
+        }),
+        encoding: 'utf8',
+      },
+    );
+
+    expect(output).toContain('Diagnostic summary:');
+    expect(output).not.toContain('Installing the Corivo CLI...');
+    await expect(fs.readFile(diagnosticPath, 'utf8')).resolves.toContain('STEP_ID=prepare.build_deps');
+  });
+
+  it('does not claim Corivo is ready when startup fails', async () => {
+    await fs.rm(path.join(tempEnv.tempHome, '.corivo', 'corivo.db'));
+
+    const output = execFileSync(
+      '/bin/bash',
+      [installScriptPath, '--lang', 'en'],
+      {
+        cwd: path.dirname(installScriptPath),
+        env: baseEnv({
+          CORIVO_LOG: tempEnv.corivoLogPath,
+          CORIVO_TEST_CORIVO_INIT_FAIL: '1',
+        }),
+        encoding: 'utf8',
+      },
+    );
+
+    expect(output).toContain('Starting Corivo: Needs attention');
+    expect(output).toContain('Diagnostic summary:');
+    expect(output).not.toContain('Corivo is ready to work with you.');
+    expect(output).not.toContain('Try this next:');
+  });
 });

@@ -157,10 +157,14 @@ msg() {
     en:install_cli) echo "Installing the Corivo CLI..." ;;
     zh:cli_ready) echo "Corivo CLI 已安装" ;;
     en:cli_ready) echo "Corivo CLI installed" ;;
+    zh:cli_install_failed) echo "Corivo CLI 安装未完成，需要先处理后再继续。" ;;
+    en:cli_install_failed) echo "Corivo CLI could not be installed yet. Fix that first, then continue." ;;
     zh:init_corivo) echo "初始化 Corivo..." ;;
     en:init_corivo) echo "Initializing Corivo..." ;;
     zh:corivo_inited) echo "Corivo 已初始化，跳过" ;;
     en:corivo_inited) echo "Corivo is already initialized, skipping" ;;
+    zh:corivo_not_ready) echo "Corivo 还不能开始工作，请先处理上面的注意事项。" ;;
+    en:corivo_not_ready) echo "Corivo still needs attention before it can start working." ;;
     zh:detect_hosts) echo "扫描本机 Agent..." ;;
     en:detect_hosts) echo "Detecting local agents..." ;;
     zh:found_hosts) echo "发现本机宿主" ;;
@@ -328,6 +332,10 @@ render_recovery_message() {
 render_activation_cta() {
   printf '\n%s\n' "$(msg cta_label)"
   printf '"%s"\n' "$(msg cta_prompt)"
+}
+
+installer_can_activate() {
+  [ "$(get_stage_result prepare)" = "done" ] && [ "$(get_stage_result start)" = "done" ]
 }
 
 set_stage_result() {

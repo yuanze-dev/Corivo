@@ -180,7 +180,17 @@ install_build_deps() {
 # ── 3. 安装 Corivo CLI ────────────────────────────────────────────────────
 install_corivo_cli() {
   log_step "$(msg install_cli)"
-  npm install -g "$CORIVO_INSTALL_CLI_SOURCE"
+  local install_output=""
+  if ! install_output="$(npm install -g "$CORIVO_INSTALL_CLI_SOURCE" 2>&1)"; then
+    log_warn "$(msg cli_install_failed)"
+    record_failure_context \
+      "prepare.install_cli" \
+      "$(msg stage_prepare)" \
+      "npm install -g $CORIVO_INSTALL_CLI_SOURCE" \
+      "$install_output" \
+      "Fix the Corivo CLI installation issue, then rerun the installer."
+    return 1
+  fi
   # npm 有时不设置执行权限，手动补上
   CORIVO_BIN="$(npm root -g)/../bin/corivo"
   [ -f "$CORIVO_BIN" ] && chmod +x "$CORIVO_BIN" 2>/dev/null || true
@@ -194,7 +204,16 @@ init_corivo() {
     return
   fi
   log_step "$(msg init_corivo)"
-  corivo init
+  local init_output=""
+  if ! init_output="$(corivo init 2>&1)"; then
+    record_failure_context \
+      "start.init" \
+      "$(msg stage_start)" \
+      "corivo init" \
+      "$init_output" \
+      "Fix the Corivo startup issue, then rerun the installer."
+    return 1
+  fi
   # corivo init 内部会自动调用 corivo start 启动心跳守护进程
 }
 
@@ -429,8 +448,9 @@ main() {
   check_node
   if ! install_build_deps; then
     prepare_attention=1
+  elif ! install_corivo_cli; then
+    prepare_attention=1
   fi
-  install_corivo_cli
   if [ "$prepare_attention" -eq 1 ]; then
     mark_stage_attention "prepare"
   else
@@ -470,8 +490,12 @@ main() {
   write_diagnostic_summary
   render_host_summary
   render_recovery_message
-  printf '\n%s\n' "$(msg corivo_ready)"
-  render_activation_cta
+  if installer_can_activate; then
+    printf '\n%s\n' "$(msg corivo_ready)"
+    render_activation_cta
+  else
+    printf '\n%s\n' "$(msg corivo_not_ready)"
+  fi
 }
 
 trap 'log_error "安装过程中出现错误"; exit 1' ERR

@@ -11,6 +11,18 @@ async function writeFileWithMode(filePath: string, content: string) {
   await fs.chmod(filePath, 0o755);
 }
 
+async function linkSystemCommand(binDir: string, commandName: string) {
+  for (const candidate of [`/bin/${commandName}`, `/usr/bin/${commandName}`]) {
+    try {
+      await fs.access(candidate);
+      await fs.symlink(candidate, path.join(binDir, commandName));
+      return;
+    } catch {
+      // Try the next candidate path.
+    }
+  }
+}
+
 export async function createInstallTestEnv() {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-install-test-'));
   const tempHome = path.join(tempDir, 'home');
@@ -32,6 +44,10 @@ export async function createInstallTestEnv() {
       '#!/usr/bin/env bash',
       'set -e',
       'if [ "${1:-}" = "install" ] && [ "${2:-}" = "-g" ]; then',
+      '  if [ "${CORIVO_TEST_NPM_INSTALL_FAIL:-}" = "1" ]; then',
+      '    echo "npm install failed" >&2',
+      '    exit 1',
+      '  fi',
       '  exit 0',
       'fi',
       'if [ "${1:-}" = "root" ] && [ "${2:-}" = "-g" ]; then',
@@ -81,10 +97,35 @@ export async function createInstallTestEnv() {
       '  echo "0.0.0-test"',
       '  exit 0',
       'fi',
+      'if [ "${1:-}" = "init" ] && [ "${CORIVO_TEST_CORIVO_INIT_FAIL:-}" = "1" ]; then',
+      '  echo "corivo init failed" >&2',
+      '  exit 1',
+      'fi',
+      'if [ "${1:-}" = "cold-scan" ] && [ "${CORIVO_TEST_CORIVO_COLD_SCAN_FAIL:-}" = "1" ]; then',
+      '  echo "corivo cold-scan failed" >&2',
+      '  exit 1',
+      'fi',
       'exit 0',
       '',
     ].join('\n'),
   );
+
+  for (const commandName of [
+    'bash',
+    'chmod',
+    'cut',
+    'date',
+    'dirname',
+    'find',
+    'grep',
+    'head',
+    'id',
+    'mkdir',
+    'sed',
+    'tr',
+  ]) {
+    await linkSystemCommand(binDir, commandName);
+  }
 
   return {
     tempDir,

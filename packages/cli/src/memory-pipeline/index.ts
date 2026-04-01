@@ -4,3 +4,6 @@ export * from './state/run-manifest.js';
 export * from './runner.js';
 export * from './registry.js';
 export * from './state/run-lock.js';
+export * from './processors/model-processor.js';
+export * from './sources/claude-session-source.js';
+export * from './sources/stale-block-source.js';

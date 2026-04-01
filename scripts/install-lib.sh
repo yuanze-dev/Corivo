@@ -6,6 +6,13 @@ INSTALL_LANG=""
 REQUESTED_LANG=""
 DETECTED_HOSTS=()
 HOST_RESULTS=()
+CURRENT_STAGE=""
+STAGE_RESULTS=()
+STAGE_SEQUENCE=(prepare connect start warmup)
+DIAGNOSTIC_ENTRIES=()
+DIAGNOSTIC_PATH=""
+WARMUP_STATUS=""
+WARMUP_SUMMARY=""
 
 parse_install_args() {
   while [ "$#" -gt 0 ]; do
@@ -25,49 +32,91 @@ parse_install_args() {
   done
 }
 
-prompt_install_language() {
-  if [ ! -t 0 ]; then
-    return
-  fi
-
-  printf 'Choose language / 选择语言:\n'
-  printf '1) 中文\n'
-  printf '2) English\n'
-  printf '> '
-
-  local answer=""
-  IFS= read -r answer || true
-  case "$answer" in
-    2|en|EN|English|english)
-      INSTALL_LANG="en"
-      ;;
-    *)
-      INSTALL_LANG="zh"
-      ;;
+normalize_lang() {
+  case "${1:-}" in
+    zh|zh-CN|zh_CN|zh-Hans|zh-Hans-CN) echo "zh" ;;
+    en|en-US|en_US|en-GB|en_GB) echo "en" ;;
+    *) echo "" ;;
   esac
 }
 
+detect_locale_lang() {
+  local locale="${LC_ALL:-${LANG:-}}"
+  case "$locale" in
+    zh*|*zh_CN*|*zh-Hans*|*zh-Hant*) echo "zh" ;;
+    en*|*en_US*|*en_GB*) echo "en" ;;
+    *) echo "" ;;
+  esac
+}
+
+confirm_install_language() {
+  case "${INSTALL_LANG:-en}" in
+    zh) printf '语言已确认：中文\n' ;;
+    *) printf 'Language confirmed: English\n' ;;
+  esac
+}
+
+prompt_install_language() {
+  local default_lang="${1:-en}"
+  local answer=""
+
+  if [ "$default_lang" = "zh" ]; then
+    printf '选择语言 / Choose your language:\n'
+    printf '1) 中文 (默认)\n'
+    printf '2) English\n'
+  else
+    printf 'Choose your language:\n'
+    printf '1) English (default)\n'
+    printf '2) 中文\n'
+  fi
+  printf '> '
+
+  if [ -t 0 ]; then
+    IFS= read -r answer || true
+  fi
+  answer="$(printf '%s' "$answer" | tr '[:upper:]' '[:lower:]')"
+
+  if [ "$default_lang" = "zh" ]; then
+    case "$answer" in
+      2|en|english) INSTALL_LANG="en" ;;
+      1|zh|chinese|中文|"") INSTALL_LANG="$default_lang" ;;
+      *) INSTALL_LANG="$default_lang" ;;
+    esac
+  else
+    case "$answer" in
+      2|zh|chinese|中文) INSTALL_LANG="zh" ;;
+      1|en|english|"") INSTALL_LANG="$default_lang" ;;
+      *) INSTALL_LANG="$default_lang" ;;
+    esac
+  fi
+
+  confirm_install_language
+}
+
 resolve_install_lang() {
+  local default_lang=""
+  default_lang="$(resolve_default_lang)"
+
+  if [ -t 0 ]; then
+    prompt_install_language "$default_lang"
+    INSTALL_LANG="${INSTALL_LANG:-$default_lang}"
+  else
+    INSTALL_LANG="$default_lang"
+  fi
+}
+
+resolve_default_lang() {
+  local default_lang=""
+
   if [ -n "${REQUESTED_LANG:-}" ]; then
-    case "$REQUESTED_LANG" in
-      zh|zh-CN|zh_CN) INSTALL_LANG="zh" ;;
-      en|en-US|en_US) INSTALL_LANG="en" ;;
-    esac
+    default_lang="$(normalize_lang "$REQUESTED_LANG")"
   fi
 
-  if [ -z "$INSTALL_LANG" ]; then
-    local locale="${LC_ALL:-${LANG:-}}"
-    case "$locale" in
-      zh*|*zh_CN*|*zh-Hans*) INSTALL_LANG="zh" ;;
-      en*|*en_US*|*en_GB*) INSTALL_LANG="en" ;;
-    esac
+  if [ -z "$default_lang" ]; then
+    default_lang="$(detect_locale_lang)"
   fi
 
-  if [ -z "$INSTALL_LANG" ]; then
-    prompt_install_language
-  fi
-
-  INSTALL_LANG="${INSTALL_LANG:-zh}"
+  echo "${default_lang:-en}"
 }
 
 msg() {
@@ -76,6 +125,20 @@ msg() {
   case "${INSTALL_LANG:-zh}:$key" in
     zh:banner_title) echo "Corivo 安装向导" ;;
     en:banner_title) echo "Corivo Installer" ;;
+    zh:arrival_companion) echo "Corivo 记忆伙伴正在就绪。" ;;
+    en:arrival_companion) echo "Your Corivo companion is on the way." ;;
+    zh:arrival_welcome) echo "Corivo 正在准备这台设备。" ;;
+    en:arrival_welcome) echo "Corivo is getting your machine ready." ;;
+    zh:arrival_promise) echo "我会准备这台设备，连接你已在使用的 AI 工具，并通过本地预热启动 Corivo。" ;;
+    en:arrival_promise) echo "I’ll prepare this machine, connect the AI tools you already use, and start Corivo with a local warm-up." ;;
+    zh:stage_prepare) echo "准备这台设备" ;;
+    en:stage_prepare) echo "Preparing your machine" ;;
+    zh:stage_connect) echo "连接你的 AI 工具" ;;
+    en:stage_connect) echo "Connecting your AI tools" ;;
+    zh:stage_start) echo "启动 Corivo" ;;
+    en:stage_start) echo "Starting Corivo" ;;
+    zh:stage_warmup) echo "使用本地上下文预热" ;;
+    en:stage_warmup) echo "Warming up with local context" ;;
     zh:install_node) echo "通过 nvm 安装 Node.js 22..." ;;
     en:install_node) echo "Installing Node.js 22 via nvm..." ;;
     zh:node_missing) echo "未检测到 Node.js，正在自动安装..." ;;
@@ -94,10 +157,14 @@ msg() {
     en:install_cli) echo "Installing the Corivo CLI..." ;;
     zh:cli_ready) echo "Corivo CLI 已安装" ;;
     en:cli_ready) echo "Corivo CLI installed" ;;
+    zh:cli_install_failed) echo "Corivo CLI 安装未完成，需要先处理后再继续。" ;;
+    en:cli_install_failed) echo "Corivo CLI could not be installed yet. Fix that first, then continue." ;;
     zh:init_corivo) echo "初始化 Corivo..." ;;
     en:init_corivo) echo "Initializing Corivo..." ;;
     zh:corivo_inited) echo "Corivo 已初始化，跳过" ;;
     en:corivo_inited) echo "Corivo is already initialized, skipping" ;;
+    zh:corivo_not_ready) echo "Corivo 还不能开始工作，请先处理上面的注意事项。" ;;
+    en:corivo_not_ready) echo "Corivo still needs attention before it can start working." ;;
     zh:detect_hosts) echo "扫描本机 Agent..." ;;
     en:detect_hosts) echo "Detecting local agents..." ;;
     zh:found_hosts) echo "发现本机宿主" ;;
@@ -112,6 +179,14 @@ msg() {
     en:host_cursor) echo "Cursor" ;;
     zh:host_opencode) echo "OpenCode" ;;
     en:host_opencode) echo "OpenCode" ;;
+    zh:status_in_progress) echo "进行中" ;;
+    en:status_in_progress) echo "In progress" ;;
+    zh:status_done) echo "完成" ;;
+    en:status_done) echo "Done" ;;
+    zh:status_attention) echo "需要关注" ;;
+    en:status_attention) echo "Needs attention" ;;
+    zh:status_pending) echo "待开始" ;;
+    en:status_pending) echo "Pending" ;;
     zh:status_ready) echo "已就绪" ;;
     en:status_ready) echo "ready" ;;
     zh:status_blocked) echo "已安装，但仍需处理" ;;
@@ -122,6 +197,10 @@ msg() {
     en:summary_title) echo "Installation summary" ;;
     zh:summary_next) echo "下一步" ;;
     en:summary_next) echo "Next steps" ;;
+    zh:diagnostic_summary) echo "诊断摘要" ;;
+    en:diagnostic_summary) echo "Diagnostic summary" ;;
+    zh:ai_handoff) echo "如果你需要帮助，请把这份诊断摘要粘贴给 AI 助手。" ;;
+    en:ai_handoff) echo "If you want help, paste this diagnostic summary into your AI assistant." ;;
     zh:cursor_login_required) echo "Cursor Agent 需要先登录" ;;
     en:cursor_login_required) echo "Cursor Agent requires login" ;;
     zh:opencode_provider_warning) echo "OpenCode 插件已安装，但建议检查默认 provider 配置" ;;
@@ -134,6 +213,32 @@ msg() {
     en:restart_claude) echo "Claude Code is running. Restart it so the new configuration can take effect" ;;
     zh:restart_codex) echo "检测到 Codex 正在运行，请重启后让新配置生效" ;;
     en:restart_codex) echo "Codex is running. Restart it so the new configuration can take effect" ;;
+    zh:warmup_intro) echo "Corivo 可以通过最近的本地上下文更快进入状态。" ;;
+    en:warmup_intro) echo "Corivo can get ready faster by learning from your recent local context." ;;
+    zh:warmup_value) echo "这会帮助它从一开始就记住你的工作方式、近期决策和项目背景。" ;;
+    en:warmup_value) echo "This helps it remember your working style, recent decisions, and project context from the start." ;;
+    zh:warmup_safety) echo "这些内容只留在本机，用于在这台设备上设置 Corivo。" ;;
+    en:warmup_safety) echo "This stays on your device and is used only to set up Corivo on this machine." ;;
+    zh:warmup_continue) echo "继续" ;;
+    en:warmup_continue) echo "Continue" ;;
+    zh:warmup_skip) echo "暂时跳过" ;;
+    en:warmup_skip) echo "Skip for now" ;;
+    zh:warmup_skipped) echo "已跳过预热" ;;
+    en:warmup_skipped) echo "Warm-up skipped" ;;
+    zh:warmup_skip_hint) echo "你随时可以在以后进行预热。" ;;
+    en:warmup_skip_hint) echo "You can always warm up later." ;;
+    zh:corivo_ready) echo "Corivo 已准备好与你一起工作。" ;;
+    en:corivo_ready) echo "Corivo is ready to work with you." ;;
+    zh:warmup_complete) echo "预热已完成。" ;;
+    en:warmup_complete) echo "Warm-up complete." ;;
+    zh:warmup_failed) echo "预热未能完成，但 Corivo 仍然可以开始工作。" ;;
+    en:warmup_failed) echo "Warm-up could not finish, but Corivo can still start working." ;;
+    zh:warmup_items_found) echo "Corivo 已从这台设备读取到初始上下文。" ;;
+    en:warmup_items_found) echo "Corivo picked up initial context from this device." ;;
+    zh:cta_label) echo "接下来试试这句：" ;;
+    en:cta_label) echo "Try this next:" ;;
+    zh:cta_prompt) echo "在我们继续之前，请告诉我你已经从这台设备上了解到了哪些项目背景、最近决策和我的工作偏好。" ;;
+    en:cta_prompt) echo "Before we continue, tell me the project context, recent decisions, and working preferences you already know about me from this machine." ;;
     zh:install_claude_skills) echo "安装 Claude Code skills..." ;;
     en:install_claude_skills) echo "Installing Claude Code skills..." ;;
     zh:install_claude_hooks) echo "安装 Claude Code hook 脚本..." ;;
@@ -153,6 +258,186 @@ msg() {
     *)
       echo "$key"
       ;;
+  esac
+}
+
+get_message() {
+  local key="$1"
+  local lang="${2:-${INSTALL_LANG:-}}"
+  local previous_lang="${INSTALL_LANG:-}"
+  if [ -n "$lang" ]; then
+    INSTALL_LANG="$lang"
+  fi
+  msg "$key"
+  INSTALL_LANG="$previous_lang"
+}
+
+escape_diagnostic_value() {
+  local value="${1:-}"
+  value="${value//$'\r'/ }"
+  value="${value//$'\n'/\\n}"
+  printf '%s' "$value"
+}
+
+init_diagnostics() {
+  DIAGNOSTIC_PATH="$HOME/.corivo/install-diagnostic.txt"
+  DIAGNOSTIC_ENTRIES=()
+}
+
+record_failure_context() {
+  local step_id="$1"
+  local step_name="$2"
+  local action="$3"
+  local raw_error="${4:-}"
+  local next_action="${5:-}"
+  local environment=""
+
+  environment="OS=${OSTYPE:-unknown};SHELL=${SHELL:-unknown};LANG=${LANG:-unknown};LC_ALL=${LC_ALL:-}"
+  DIAGNOSTIC_ENTRIES+=(
+    "STEP_ID=$(escape_diagnostic_value "$step_id")"
+    "STEP_NAME=$(escape_diagnostic_value "$step_name")"
+    "ACTION=$(escape_diagnostic_value "$action")"
+    "RAW_ERROR=$(escape_diagnostic_value "$raw_error")"
+    "NEXT_ACTION=$(escape_diagnostic_value "$next_action")"
+    "ENVIRONMENT=$(escape_diagnostic_value "$environment")"
+    "HOSTS=$(escape_diagnostic_value "$(printf '%s,' "${DETECTED_HOSTS[@]:-}" | sed 's/,$//')")"
+    "---"
+  )
+}
+
+write_diagnostic_summary() {
+  if [ "${#DIAGNOSTIC_ENTRIES[@]}" -eq 0 ]; then
+    return
+  fi
+
+  mkdir -p "$(dirname "$DIAGNOSTIC_PATH")"
+  : > "$DIAGNOSTIC_PATH"
+
+  {
+    printf 'CORIVO_INSTALL_DIAGNOSTIC=1\n'
+    printf 'GENERATED_AT=%s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo unknown)"
+    printf '%s\n' "${DIAGNOSTIC_ENTRIES[@]}"
+  } >> "$DIAGNOSTIC_PATH"
+}
+
+render_recovery_message() {
+  if [ "${#DIAGNOSTIC_ENTRIES[@]}" -eq 0 ]; then
+    return
+  fi
+
+  printf '\n[%s] %s: %s\n' "corivo" "$(msg diagnostic_summary)" "$DIAGNOSTIC_PATH"
+  printf '%s\n' "$(msg ai_handoff)"
+}
+
+render_activation_cta() {
+  printf '\n%s\n' "$(msg cta_label)"
+  printf '"%s"\n' "$(msg cta_prompt)"
+}
+
+installer_can_activate() {
+  [ "$(get_stage_result prepare)" = "done" ] && [ "$(get_stage_result start)" = "done" ]
+}
+
+set_stage_result() {
+  local stage="$1"
+  local status="$2"
+  local updated=0
+  local index=0
+
+  for index in "${!STAGE_RESULTS[@]}"; do
+    local entry="${STAGE_RESULTS[$index]}"
+    local entry_stage="${entry%%|*}"
+    if [ "$entry_stage" = "$stage" ]; then
+      STAGE_RESULTS[$index]="${stage}|${status}"
+      updated=1
+      break
+    fi
+  done
+
+  if [ "$updated" -eq 0 ]; then
+    STAGE_RESULTS+=("${stage}|${status}")
+  fi
+}
+
+get_stage_result() {
+  local stage="$1"
+  local entry=""
+  for entry in "${STAGE_RESULTS[@]}"; do
+    local entry_stage="${entry%%|*}"
+    if [ "$entry_stage" = "$stage" ]; then
+      echo "${entry#*|}"
+      return
+    fi
+  done
+  echo ""
+}
+
+stage_status_text() {
+  local stage="$1"
+  local status
+  status="$(get_stage_result "$stage")"
+  case "$status" in
+    in_progress) msg status_in_progress ;;
+    done) msg status_done ;;
+    attention) msg status_attention ;;
+    *) msg status_pending ;;
+  esac
+}
+
+begin_stage() {
+  local stage="$1"
+  CURRENT_STAGE="$stage"
+  set_stage_result "$stage" "in_progress"
+  render_stage_board
+}
+
+finish_stage() {
+  local stage="${1:-$CURRENT_STAGE}"
+  if [ -z "$stage" ]; then
+    return
+  fi
+  set_stage_result "$stage" "done"
+  render_stage_board
+}
+
+mark_stage_attention() {
+  local stage="${1:-$CURRENT_STAGE}"
+  if [ -z "$stage" ]; then
+    return
+  fi
+  set_stage_result "$stage" "attention"
+  render_stage_board
+}
+
+render_stage_board() {
+  echo ""
+  local stage=""
+  for stage in "${STAGE_SEQUENCE[@]}"; do
+    local label
+    label="$(msg "stage_${stage}")"
+    printf -- '- %s: %s\n' "$label" "$(stage_status_text "$stage")"
+  done
+  echo ""
+}
+
+prompt_local_warmup_consent() {
+  printf '%s\n' "$(msg warmup_intro)"
+  printf '%s\n' "$(msg warmup_value)"
+  printf '%s\n' "$(msg warmup_safety)"
+  echo ""
+  printf '1) %s\n' "$(msg warmup_continue)"
+  printf '2) %s\n' "$(msg warmup_skip)"
+  printf '> '
+
+  if [ "${CORIVO_INSTALL_FORCE_INTERACTIVE:-}" != "1" ] && [ ! -t 0 ]; then
+    return 1
+  fi
+
+  local answer=""
+  IFS= read -r answer || true
+  case "$answer" in
+    1|"") return 0 ;;
+    *) return 1 ;;
   esac
 }
 

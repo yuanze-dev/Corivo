@@ -105,11 +105,15 @@ curl -fsSL https://i.corivo.ai/install.sh | bash
 
 This installer:
 
-- installs Node.js if it is missing
-- installs the `corivo` CLI
-- runs `corivo init`
+- prepares the local runtime Corivo needs
+- installs the `corivo` CLI and initializes the local database
 - detects Claude Code, Codex, Cursor, and OpenCode on your machine
-- installs the matching Corivo host adapters automatically
+- connects every supported host it finds automatically
+- walks through four visible stages: preparing your machine, connecting your AI tools, starting Corivo, and warming up with local context
+- can run an optional local warm-up so Corivo starts with recent context from this device
+- writes a diagnostic summary to `~/.corivo/install-diagnostic.txt` whenever the installer needs your attention
+- tells you when you can paste that diagnostic summary into an AI assistant for help
+- ends with a ready-to-copy prompt so you can immediately try Corivo in your agent
 
 ### Claude Code
 

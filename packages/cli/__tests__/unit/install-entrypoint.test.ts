@@ -1,108 +1,26 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
-const repoRoot = fileURLToPath(new URL('../../../../', import.meta.url));
-const installScriptPath = path.join(repoRoot, 'scripts', 'install.sh');
+import { createInstallTestEnv, installScriptPath } from './installTestUtils';
 
 describe('install.sh entrypoint', () => {
-  let tempDir: string;
-  let tempHome: string;
-  let binDir: string;
-  let corivoLogPath: string;
+  let tempEnv: Awaited<ReturnType<typeof createInstallTestEnv>>;
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-install-entrypoint-'));
-    tempHome = path.join(tempDir, 'home');
-    binDir = path.join(tempDir, 'bin');
-    corivoLogPath = path.join(tempDir, 'corivo.log');
-
-    await fs.mkdir(tempHome, { recursive: true });
-    await fs.mkdir(path.join(tempHome, '.cursor'), { recursive: true });
-    await fs.mkdir(path.join(tempHome, '.corivo'), { recursive: true });
-    await fs.writeFile(path.join(tempHome, '.corivo', 'corivo.db'), '', 'utf8');
-    await fs.mkdir(binDir, { recursive: true });
-
-    await fs.writeFile(
-      path.join(binDir, 'node'),
-      '#!/usr/bin/env bash\necho "v22.0.0"\n',
-      'utf8',
-    );
-    await fs.writeFile(
-      path.join(binDir, 'npm'),
-      [
-        '#!/usr/bin/env bash',
-        'set -e',
-        'if [ "${1:-}" = "install" ] && [ "${2:-}" = "-g" ]; then',
-        '  exit 0',
-        'fi',
-        'if [ "${1:-}" = "root" ] && [ "${2:-}" = "-g" ]; then',
-        '  printf "%s\\n" "$HOME/.npm-global/lib/node_modules"',
-        '  exit 0',
-        'fi',
-        'exit 0',
-        '',
-      ].join('\n'),
-      'utf8',
-    );
-    await fs.writeFile(path.join(binDir, 'python3'), '#!/usr/bin/env bash\nexit 0\n', 'utf8');
-    await fs.writeFile(path.join(binDir, 'gcc'), '#!/usr/bin/env bash\nexit 0\n', 'utf8');
-    await fs.writeFile(path.join(binDir, 'pgrep'), '#!/usr/bin/env bash\nexit 1\n', 'utf8');
-    await fs.writeFile(path.join(binDir, 'codex'), '#!/usr/bin/env bash\nexit 0\n', 'utf8');
-    await fs.writeFile(
-      path.join(binDir, 'cursor'),
-      [
-        '#!/usr/bin/env bash',
-        'if [ "${1:-}" = "agent" ] && [ "${2:-}" = "status" ]; then',
-        '  echo "Not logged in"',
-        '  exit 0',
-        'fi',
-        'exit 0',
-        '',
-      ].join('\n'),
-      'utf8',
-    );
-    await fs.writeFile(
-      path.join(binDir, 'opencode'),
-      [
-        '#!/usr/bin/env bash',
-        'if [ "${1:-}" = "models" ]; then',
-        '  exit 1',
-        'fi',
-        'exit 0',
-        '',
-      ].join('\n'),
-      'utf8',
-    );
-    await fs.writeFile(
-      path.join(binDir, 'corivo'),
-      [
-        '#!/usr/bin/env bash',
-        'set -e',
-        'if [ -n "${CORIVO_LOG:-}" ]; then',
-        '  printf "%s\\n" "$*" >> "$CORIVO_LOG"',
-        'fi',
-        'if [ "${1:-}" = "--version" ]; then',
-        '  echo "0.0.0-test"',
-        '  exit 0',
-        'fi',
-        'exit 0',
-        '',
-      ].join('\n'),
-      'utf8',
-    );
-
-    const bins = ['node', 'npm', 'python3', 'gcc', 'pgrep', 'codex', 'cursor', 'opencode', 'corivo'];
-    await Promise.all(bins.map((name) => fs.chmod(path.join(binDir, name), 0o755)));
+    tempEnv = await createInstallTestEnv();
   });
 
   afterEach(async () => {
-    if (tempDir) {
-      await fs.rm(tempDir, { recursive: true, force: true });
-    }
+    await tempEnv.cleanup();
+  });
+
+  const baseEnv = (overrides: Record<string, string> = {}) => ({
+    ...process.env,
+    HOME: tempEnv.tempHome,
+    PATH: `${tempEnv.binDir}:/usr/bin:/bin:/usr/sbin:/sbin`,
+    CORIVO_INSTALL_NO_ANIMATION: '1',
+    ...overrides,
   });
 
   it('does not keep host-specific installer helper functions', async () => {
@@ -147,17 +65,12 @@ describe('install.sh entrypoint', () => {
       'bash',
       [installScriptPath, '--lang', 'en'],
       {
-        cwd: repoRoot,
-        env: {
-          ...process.env,
-          HOME: tempHome,
-          PATH: `${binDir}:/usr/bin:/bin:/usr/sbin:/sbin`,
-          CORIVO_LOG: corivoLogPath,
-        },
+        cwd: path.dirname(installScriptPath),
+        env: baseEnv({ CORIVO_LOG: tempEnv.corivoLogPath }),
         encoding: 'utf8',
       },
     );
-    const corivoLog = await fs.readFile(corivoLogPath, 'utf8');
+    const corivoLog = await fs.readFile(tempEnv.corivoLogPath, 'utf8');
 
     expect(output).toContain('[corivo] Installation summary');
     expect(output).toContain('- Codex: ready');
@@ -171,5 +84,108 @@ describe('install.sh entrypoint', () => {
     expect(corivoLog).toContain('inject --global --cursor');
     expect(corivoLog).toContain('inject --global --opencode');
     expect(corivoLog).not.toContain('inject --global --claude-code');
+  });
+
+  it('promises the guided journey with the stage flow, warm-up consent, and activation ending', async () => {
+    const output = execFileSync(
+      'bash',
+      [installScriptPath, '--lang', 'en'],
+      {
+        cwd: path.dirname(installScriptPath),
+        env: baseEnv({
+          CORIVO_LOG: tempEnv.corivoLogPath,
+          CORIVO_INSTALL_FORCE_INTERACTIVE: '1',
+        }),
+        input: '1\n',
+        encoding: 'utf8',
+      },
+    );
+
+    expect(output).toContain('Corivo is getting your machine ready.');
+    expect(output).toContain(
+      'I’ll prepare this machine, connect the AI tools you already use, and start Corivo with a local warm-up.',
+    );
+    expect(output).toContain('Preparing your machine');
+    expect(output).toContain('Connecting your AI tools');
+    expect(output).toContain('Starting Corivo');
+    expect(output).toContain('Warming up with local context');
+    expect(output).toContain('This stays on your device');
+    expect(output).toContain('Corivo is ready to work with you.');
+    expect(output).toContain('Corivo can get ready faster by learning from your recent local context');
+    expect(output).toContain('Continue');
+    expect(output).toContain('Skip for now');
+    expect(output).toContain('Warm-up complete.');
+    expect(output).toContain('Corivo picked up initial context from this device.');
+    expect(output).toContain('Try this next:');
+    expect(output).toContain('Before we continue, tell me the project context, recent decisions, and working preferences you already know about me from this machine.');
+  });
+
+  it('diverges when the user continues or skips the warm-up consent', async () => {
+    const runWithChoice = (choice: number) => execFileSync(
+      'bash',
+      [installScriptPath, '--lang', 'en'],
+      {
+        cwd: path.dirname(installScriptPath),
+        env: baseEnv({
+          CORIVO_LOG: tempEnv.corivoLogPath,
+          CORIVO_INSTALL_FORCE_INTERACTIVE: '1',
+        }),
+        input: `${choice}\n`,
+        encoding: 'utf8',
+      },
+    );
+
+    const continueOutput = runWithChoice(1);
+    const skipOutput = runWithChoice(2);
+
+    expect(continueOutput).toContain('Warming up with local context');
+    expect(skipOutput).toContain('Warm-up skipped');
+    expect(skipOutput).toContain('You can always warm up later');
+  });
+
+  it('keeps the recovery flow reachable when prepare work needs manual build dependencies', async () => {
+    await fs.rm(path.join(tempEnv.binDir, 'python3'));
+    await fs.rm(path.join(tempEnv.binDir, 'gcc'));
+
+    const diagnosticPath = path.join(tempEnv.tempHome, '.corivo', 'install-diagnostic.txt');
+    const output = execFileSync(
+      '/bin/bash',
+      [installScriptPath, '--lang', 'en'],
+      {
+        cwd: path.dirname(installScriptPath),
+        env: baseEnv({
+          PATH: tempEnv.binDir,
+          CORIVO_LOG: tempEnv.corivoLogPath,
+          CORIVO_TEST_NPM_INSTALL_FAIL: '1',
+        }),
+        encoding: 'utf8',
+      },
+    );
+
+    expect(output).toContain('Diagnostic summary:');
+    expect(output).not.toContain('Installing the Corivo CLI...');
+    await expect(fs.readFile(diagnosticPath, 'utf8')).resolves.toContain('STEP_ID=prepare.build_deps');
+  });
+
+  it('does not claim Corivo is ready when startup fails', async () => {
+    await fs.rm(path.join(tempEnv.tempHome, '.corivo', 'corivo.db'));
+
+    const output = execFileSync(
+      '/bin/bash',
+      [installScriptPath, '--lang', 'en'],
+      {
+        cwd: path.dirname(installScriptPath),
+        env: baseEnv({
+          CORIVO_LOG: tempEnv.corivoLogPath,
+          CORIVO_TEST_CORIVO_INIT_FAIL: '1',
+        }),
+        encoding: 'utf8',
+      },
+    );
+
+    expect(output).toContain('Starting Corivo: Needs attention');
+    expect(output).toContain('Diagnostic summary:');
+    expect(output).not.toContain('Corivo is ready to work with you.');
+    expect(output).not.toContain('Try this next:');
   });
 });

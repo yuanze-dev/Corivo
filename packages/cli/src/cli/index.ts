@@ -8,7 +8,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 // Read version number
 const __filename = fileURLToPath(import.meta.url);
@@ -45,6 +45,7 @@ import { daemonCommand } from './commands/daemon.js';
 import { updateCommand } from './commands/update.js';
 import { createSyncCommand } from './commands/sync.js';
 import { listCommand } from './commands/list.js';
+import { getMemoryCommand } from './commands/memory.js';
 
 const program = new Command();
 
@@ -150,11 +151,11 @@ program
 program
   .command('verify-identity')
   .description('Cross-device identity verification (fingerprints + password)')
-  .option('-p, --password <password>', 'Master password')
   .option('-v, --verbose', 'Show detailed information')
   .action((options) => verifyIdentityCommand(options));
 
 program.addCommand(listCommand);
+program.addCommand(getMemoryCommand());
 program.addCommand(hostCommand);
 program.addCommand(coldScanCommand);
 program.addCommand(pushCommand);
@@ -179,10 +180,18 @@ program.configureOutput({
   },
 });
 
-// Parse parameters
-program.parseAsync().catch((error) => {
-  if (error instanceof Error) {
-    console.error(chalk.red(`Error: ${error.message}`));
-    process.exit(1);
-  }
-});
+const cliEntrypoint = join(__dirname, '../../bin/corivo.js');
+const parsedArgvOne = process.argv[1] ? resolve(process.argv[1]) : undefined;
+const shouldParseCli = parsedArgvOne === __filename || parsedArgvOne === cliEntrypoint;
+
+export { program };
+
+if (shouldParseCli) {
+  // Parse parameters
+  program.parseAsync().catch((error) => {
+    if (error instanceof Error) {
+      console.error(chalk.red(`Error: ${error.message}`));
+      process.exit(1);
+    }
+  });
+}

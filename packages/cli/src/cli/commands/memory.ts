@@ -35,6 +35,7 @@ export interface MemoryPipelineExecutionDependencies {
   createStaleBlockSource: (db: CorivoDatabase) => StaleBlockSource;
   openDatabase: (dbPath: string) => CorivoDatabase;
   closeDatabase: (db: CorivoDatabase, dbPath: string) => void;
+  createTrigger: (mode: MemoryPipelineMode) => PipelineTrigger;
 }
 
 const defaultExecutionDependencies: MemoryPipelineExecutionDependencies = {
@@ -81,6 +82,11 @@ const defaultExecutionDependencies: MemoryPipelineExecutionDependencies = {
   closeDatabase: () => {
     /* No-op; the CorivoDatabase lifecycle is managed at the process level */
   },
+  createTrigger: (mode) => ({
+    type: mode === 'full' ? 'init' : 'manual',
+    runAt: Date.now(),
+    requestedBy: 'cli',
+  }),
 };
 
 export async function runMemoryPipeline(
@@ -100,12 +106,6 @@ export async function runMemoryPipeline(
     runRoot,
   });
 
-  const trigger: PipelineTrigger = {
-    type: mode === 'full' ? 'init' : 'manual',
-    runAt: Date.now(),
-    requestedBy: 'cli',
-  };
-
   let openedDatabase: CorivoDatabase | undefined;
   let openedDatabasePath: string | undefined;
 
@@ -124,7 +124,7 @@ export async function runMemoryPipeline(
             return dependencies.createScheduledPipeline({ staleBlockSource: staleSource });
           })();
 
-    return await runner.run(pipeline, trigger);
+    return await runner.run(pipeline, dependencies.createTrigger(mode));
   } finally {
     if (openedDatabase && openedDatabasePath) {
       dependencies.closeDatabase(openedDatabase, openedDatabasePath);

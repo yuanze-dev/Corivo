@@ -87,6 +87,7 @@ export class Heartbeat {
   private lastTriggerDecision = 0;
   private memoryPipelineCycles = DEFAULT_MEMORY_PIPELINE_CYCLES;
   private memoryPipelineRunning = false;
+  private memoryPipelinePromise: Promise<void> | null = null;
   private healthFilePath: string;
 
   constructor(config?: HeartbeatConfig) {
@@ -230,7 +231,7 @@ export class Heartbeat {
         }
 
         if (this.shouldTriggerMemoryPipeline()) {
-          await this.triggerScheduledMemoryPipeline();
+          this.triggerScheduledMemoryPipeline();
         }
       } catch (error) {
         if (error instanceof DatabaseError) {
@@ -299,6 +300,10 @@ export class Heartbeat {
     if (this.timeoutRef) {
       clearTimeout(this.timeoutRef);
       this.timeoutRef = null;
+    }
+
+    if (this.memoryPipelinePromise) {
+      await this.memoryPipelinePromise;
     }
 
     // Stop all active plugins
@@ -865,6 +870,9 @@ export class Heartbeat {
   }
 
   private shouldTriggerMemoryPipeline(): boolean {
+    if (!this.running) {
+      return false;
+    }
     if (!Number.isFinite(this.memoryPipelineCycles) || this.memoryPipelineCycles <= 0) {
       return false;
     }
@@ -878,25 +886,35 @@ export class Heartbeat {
     return this.cycleCount % this.memoryPipelineCycles === 0;
   }
 
-  private async triggerScheduledMemoryPipeline(): Promise<void> {
+  private triggerScheduledMemoryPipeline(): void {
     if (this.memoryPipelineRunning) {
       return;
     }
 
+    const configDir = process.env.CORIVO_CONFIG_DIR || getConfigDir();
+    const dbPath = process.env.CORIVO_DB_PATH || this.config?.dbPath;
+    if (!dbPath) {
+      this.logger.error('[心跳] scheduled memory pipeline 跳过: 缺少数据库路径');
+      return;
+    }
+
     this.memoryPipelineRunning = true;
-    try {
-      await runMemoryPipeline('incremental', {
-        createTrigger: () => ({
+    this.memoryPipelinePromise = runMemoryPipeline('incremental', {
+      resolveConfigDir: () => configDir,
+      resolveDatabasePath: () => dbPath,
+      createTrigger: () => ({
           type: 'scheduled',
           runAt: Date.now(),
           requestedBy: 'heartbeat',
         }),
+    })
+      .catch((error) => {
+        this.logger.error('[心跳] scheduled memory pipeline 触发失败:', error);
+      })
+      .finally(() => {
+        this.memoryPipelineRunning = false;
+        this.memoryPipelinePromise = null;
       });
-    } catch (error) {
-      this.logger.error('[心跳] scheduled memory pipeline 触发失败:', error);
-    } finally {
-      this.memoryPipelineRunning = false;
-    }
   }
 }
 

@@ -9,6 +9,8 @@ HOST_RESULTS=()
 CURRENT_STAGE=""
 STAGE_RESULTS=()
 STAGE_SEQUENCE=(prepare connect start warmup)
+DIAGNOSTIC_ENTRIES=()
+DIAGNOSTIC_PATH=""
 
 parse_install_args() {
   while [ "$#" -gt 0 ]; do
@@ -189,6 +191,10 @@ msg() {
     en:summary_title) echo "Installation summary" ;;
     zh:summary_next) echo "下一步" ;;
     en:summary_next) echo "Next steps" ;;
+    zh:diagnostic_summary) echo "诊断摘要" ;;
+    en:diagnostic_summary) echo "Diagnostic summary" ;;
+    zh:ai_handoff) echo "如果你需要帮助，请把这份诊断摘要粘贴给 AI 助手。" ;;
+    en:ai_handoff) echo "If you want help, paste this diagnostic summary into your AI assistant." ;;
     zh:cursor_login_required) echo "Cursor Agent 需要先登录" ;;
     en:cursor_login_required) echo "Cursor Agent requires login" ;;
     zh:opencode_provider_warning) echo "OpenCode 插件已安装，但建议检查默认 provider 配置" ;;
@@ -248,6 +254,63 @@ get_message() {
   fi
   msg "$key"
   INSTALL_LANG="$previous_lang"
+}
+
+escape_diagnostic_value() {
+  local value="${1:-}"
+  value="${value//$'\r'/ }"
+  value="${value//$'\n'/\\n}"
+  printf '%s' "$value"
+}
+
+init_diagnostics() {
+  DIAGNOSTIC_PATH="$HOME/.corivo/install-diagnostic.txt"
+  DIAGNOSTIC_ENTRIES=()
+}
+
+record_failure_context() {
+  local step_id="$1"
+  local step_name="$2"
+  local action="$3"
+  local raw_error="${4:-}"
+  local next_action="${5:-}"
+  local environment=""
+
+  environment="OS=${OSTYPE:-unknown};SHELL=${SHELL:-unknown};LANG=${LANG:-unknown};LC_ALL=${LC_ALL:-}"
+  DIAGNOSTIC_ENTRIES+=(
+    "STEP_ID=$(escape_diagnostic_value "$step_id")"
+    "STEP_NAME=$(escape_diagnostic_value "$step_name")"
+    "ACTION=$(escape_diagnostic_value "$action")"
+    "RAW_ERROR=$(escape_diagnostic_value "$raw_error")"
+    "NEXT_ACTION=$(escape_diagnostic_value "$next_action")"
+    "ENVIRONMENT=$(escape_diagnostic_value "$environment")"
+    "HOSTS=$(escape_diagnostic_value "$(printf '%s,' "${DETECTED_HOSTS[@]:-}" | sed 's/,$//')")"
+    "---"
+  )
+}
+
+write_diagnostic_summary() {
+  if [ "${#DIAGNOSTIC_ENTRIES[@]}" -eq 0 ]; then
+    return
+  fi
+
+  mkdir -p "$(dirname "$DIAGNOSTIC_PATH")"
+  : > "$DIAGNOSTIC_PATH"
+
+  {
+    printf 'CORIVO_INSTALL_DIAGNOSTIC=1\n'
+    printf 'GENERATED_AT=%s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo unknown)"
+    printf '%s\n' "${DIAGNOSTIC_ENTRIES[@]}"
+  } >> "$DIAGNOSTIC_PATH"
+}
+
+render_recovery_message() {
+  if [ "${#DIAGNOSTIC_ENTRIES[@]}" -eq 0 ]; then
+    return
+  fi
+
+  printf '\n[%s] %s: %s\n' "corivo" "$(msg diagnostic_summary)" "$DIAGNOSTIC_PATH"
+  printf '%s\n' "$(msg ai_handoff)"
 }
 
 set_stage_result() {

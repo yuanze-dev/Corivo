@@ -168,6 +168,12 @@ install_build_deps() {
   log_warn "Debian/Ubuntu: apt-get install python3 make g++"
   log_warn "Alpine:        apk add python3 make g++"
   log_warn "CentOS/RHEL:   yum install python3 make gcc-c++"
+  record_failure_context \
+    "prepare.build_deps" \
+    "$(msg stage_prepare)" \
+    "install build dependencies" \
+    "$(msg build_deps_manual)" \
+    "Install python3 and gcc manually, then rerun the installer."
   return 1
 }
 
@@ -264,7 +270,15 @@ install_detected_hosts() {
       check_claude_process
       record_host_result "claude-code" "ready"
     else
-      record_host_result "claude-code" "blocked" "$(host_inject_failed_reason "claude-code" "corivo inject --global --claude-code" "$claude_output")"
+      local claude_reason=""
+      claude_reason="$(host_inject_failed_reason "claude-code" "corivo inject --global --claude-code" "$claude_output")"
+      record_host_result "claude-code" "blocked" "$claude_reason"
+      record_failure_context \
+        "connect.claude-code.inject" \
+        "$(msg stage_connect)" \
+        "corivo inject --global --claude-code" \
+        "$claude_output" \
+        "$claude_reason"
       attention=1
     fi
   else
@@ -278,7 +292,15 @@ install_detected_hosts() {
       check_codex_process
       record_host_result "codex" "ready" "$(msg codex_ready_hint)"
     else
-      record_host_result "codex" "blocked" "$(host_inject_failed_reason "codex" "corivo inject --global --codex" "$codex_output")"
+      local codex_reason=""
+      codex_reason="$(host_inject_failed_reason "codex" "corivo inject --global --codex" "$codex_output")"
+      record_host_result "codex" "blocked" "$codex_reason"
+      record_failure_context \
+        "connect.codex.inject" \
+        "$(msg stage_connect)" \
+        "corivo inject --global --codex" \
+        "$codex_output" \
+        "$codex_reason"
       attention=1
     fi
   else
@@ -293,12 +315,26 @@ install_detected_hosts() {
       cursor_status="$(cursor agent status 2>/dev/null || true)"
       if printf '%s' "$cursor_status" | grep -q 'Not logged in'; then
         record_host_result "cursor" "blocked" "$(msg cursor_login_required)" "cursor agent login"
+        record_failure_context \
+          "connect.cursor.login" \
+          "$(msg stage_connect)" \
+          "cursor agent status" \
+          "$(msg cursor_login_required)" \
+          "Run cursor agent login, then rerun the installer."
         attention=1
       else
         record_host_result "cursor" "ready"
       fi
     else
-      record_host_result "cursor" "blocked" "$(host_inject_failed_reason "cursor" "corivo inject --global --cursor" "$cursor_output")"
+      local cursor_reason=""
+      cursor_reason="$(host_inject_failed_reason "cursor" "corivo inject --global --cursor" "$cursor_output")"
+      record_host_result "cursor" "blocked" "$cursor_reason"
+      record_failure_context \
+        "connect.cursor.inject" \
+        "$(msg stage_connect)" \
+        "corivo inject --global --cursor" \
+        "$cursor_output" \
+        "$cursor_reason"
       attention=1
     fi
   else
@@ -313,10 +349,24 @@ install_detected_hosts() {
         record_host_result "opencode" "ready"
       else
         record_host_result "opencode" "blocked" "$(msg opencode_provider_warning)"
+        record_failure_context \
+          "connect.opencode.provider" \
+          "$(msg stage_connect)" \
+          "opencode models" \
+          "$(msg opencode_provider_warning)" \
+          "Verify your OpenCode provider configuration, then rerun the installer."
         attention=1
       fi
     else
-      record_host_result "opencode" "blocked" "$(host_inject_failed_reason "opencode" "corivo inject --global --opencode" "$opencode_output")"
+      local opencode_reason=""
+      opencode_reason="$(host_inject_failed_reason "opencode" "corivo inject --global --opencode" "$opencode_output")"
+      record_host_result "opencode" "blocked" "$opencode_reason"
+      record_failure_context \
+        "connect.opencode.inject" \
+        "$(msg stage_connect)" \
+        "corivo inject --global --opencode" \
+        "$opencode_output" \
+        "$opencode_reason"
       attention=1
     fi
   else
@@ -342,6 +392,7 @@ run_local_warmup_flow() {
 # ── 主流程 ─────────────────────────────────────────────────────────────────
 main() {
   parse_install_args "$@"
+  init_diagnostics
   local default_lang=""
   default_lang="$(resolve_default_lang)"
   INSTALL_LANG="$default_lang"
@@ -389,7 +440,9 @@ main() {
   run_local_warmup_flow
   finish_stage "warmup"
 
+  write_diagnostic_summary
   render_host_summary
+  render_recovery_message
   printf '\n%s\n' "$(msg corivo_ready)"
 }
 

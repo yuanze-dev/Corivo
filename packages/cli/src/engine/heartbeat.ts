@@ -908,6 +908,7 @@ export class Heartbeat {
           requestedBy: 'heartbeat',
         }),
     })
+      .then(() => {})
       .catch((error) => {
         this.logger.error('[心跳] scheduled memory pipeline 触发失败:', error);
       })

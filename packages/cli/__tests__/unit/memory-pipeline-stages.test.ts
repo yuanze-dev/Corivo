@@ -14,6 +14,8 @@ import {
   CollectStaleBlocksStage,
   ConsolidateSessionSummariesStage,
   DatabaseStaleBlockSource,
+  ExtractionBackedModelProcessor,
+  ModelProcessor,
   NoopModelProcessor,
   RebuildMemoryIndexStage,
   RefreshMemoryIndexStage,
@@ -96,6 +98,82 @@ describe('memory pipeline extension points', () => {
     const processor = new NoopModelProcessor();
     const result = await processor.process(['hello']);
     expect(result.outputs).toEqual(['hello']);
+  });
+
+  it('maps extraction success into processor outputs', async () => {
+    const mockExtract = vi.fn().mockResolvedValue({
+      provider: 'claude',
+      status: 'success',
+      result: 'summary',
+    });
+
+    const processor = new ExtractionBackedModelProcessor({
+      provider: 'claude',
+      extract: mockExtract,
+    });
+
+    const result = await processor.process(['hello']);
+
+    expect(mockExtract).toHaveBeenCalled();
+    expect(result.outputs).toEqual(['summary']);
+    expect(result.metadata).toMatchObject({ provider: 'claude', status: 'success' });
+  });
+
+  it('maps extraction error and timeout metadata without outputs', async () => {
+    const errorExtract = vi.fn().mockResolvedValue({
+      provider: 'claude',
+      status: 'error',
+      result: null,
+      error: 'provider down',
+    });
+    const timeoutExtract = vi.fn().mockResolvedValue({
+      provider: 'claude',
+      status: 'timeout',
+      result: null,
+      error: 'timed out',
+    });
+
+    const errorProcessor = new ExtractionBackedModelProcessor({
+      provider: 'claude',
+      extract: errorExtract,
+    });
+    const timeoutProcessor = new ExtractionBackedModelProcessor({
+      provider: 'claude',
+      extract: timeoutExtract,
+    });
+
+    await expect(errorProcessor.process(['hello'])).resolves.toMatchObject({
+      outputs: [],
+      metadata: {
+        provider: 'claude',
+        status: 'error',
+        error: 'provider down',
+      },
+    });
+    await expect(timeoutProcessor.process(['hello'])).resolves.toMatchObject({
+      outputs: [],
+      metadata: {
+        provider: 'claude',
+        status: 'timeout',
+        error: 'timed out',
+      },
+    });
+  });
+
+  it('maps thrown extractor failures into processor error metadata', async () => {
+    const processor = new ExtractionBackedModelProcessor({
+      provider: 'claude',
+      extract: vi.fn().mockRejectedValue(new Error('boom')),
+    });
+
+    await expect(processor.process(['hello'])).resolves.toMatchObject({
+      outputs: [],
+      metadata: {
+        provider: 'claude',
+        status: 'error',
+        error: 'boom',
+      },
+    });
   });
 
   it('maps stale block rows into block work items and forwards filters', async () => {
@@ -282,11 +360,22 @@ describe('memory pipeline extension points', () => {
 
   it('runs summarize session batch stage and emits a contextual summary', async () => {
     const store = new RecordingArtifactStore();
-    const stage = new SummarizeSessionBatchStage();
+    const sessionContents = ['session-1', 'session-2'];
+    const processor: ModelProcessor = {
+      process: vi.fn(async (inputs: string[]) => ({
+        outputs: inputs.map((text) => `summary: ${text}`),
+        metadata: { provider: 'claude', status: 'success' },
+      })),
+    };
+    const stage = new SummarizeSessionBatchStage({
+      processor,
+      sessionContents,
+    });
     const context = createContext(store, 'run-summary-session');
 
     const result = await stage.run(context);
 
+    expect(processor.process).toHaveBeenCalledWith(sessionContents);
     expect(result.stageId).toBe(stage.id);
     const [write] = store.writes;
     expect(write).toMatchObject({
@@ -297,12 +386,46 @@ describe('memory pipeline extension points', () => {
     expect(JSON.parse(write.body)).toEqual({
       runId: 'run-summary-session',
       stage: stage.id,
-      items: [],
+      items: sessionContents,
+      summaries: ['summary: session-1', 'summary: session-2'],
+      metadata: { provider: 'claude', status: 'success' },
     });
     expect(result).toMatchObject({
       status: 'success',
-      inputCount: 0,
-      outputCount: 1,
+      inputCount: sessionContents.length,
+      outputCount: 2,
+    });
+    expect(result.artifactIds).toEqual([store.descriptors[0].id]);
+  });
+
+  it('marks summarize session batch as failed when processor returns no outputs', async () => {
+    const store = new RecordingArtifactStore();
+    const processor: ModelProcessor = {
+      process: vi.fn(async () => ({
+        outputs: [],
+        metadata: { provider: 'claude', status: 'timeout', error: 'timed out' },
+      })),
+    };
+    const stage = new SummarizeSessionBatchStage({
+      processor,
+      sessionContents: ['session-timeout'],
+    });
+
+    const result = await stage.run(createContext(store, 'run-summary-session-fail'));
+    expect(JSON.parse(store.writes[0].body)).toEqual({
+      runId: 'run-summary-session-fail',
+      stage: stage.id,
+      items: ['session-timeout'],
+      summaries: [],
+      metadata: { provider: 'claude', status: 'timeout', error: 'timed out' },
+    });
+
+    expect(result).toMatchObject({
+      stageId: stage.id,
+      status: 'failed',
+      inputCount: 1,
+      outputCount: 0,
+      error: 'timed out',
     });
     expect(result.artifactIds).toEqual([store.descriptors[0].id]);
   });
@@ -329,24 +452,69 @@ describe('memory pipeline extension points', () => {
     expect(result.artifactIds).toEqual([store.descriptors[0].id]);
   });
 
-  it('runs summarize block batch stage', async () => {
+  it('runs summarize block batch stage and writes block summaries', async () => {
     const store = new RecordingArtifactStore();
-    const stage = new SummarizeBlockBatchStage();
+    const blockContents = ['block-A'];
+    const processor: ModelProcessor = {
+      process: vi.fn(async () => ({
+        outputs: ['block summary'],
+        metadata: { provider: 'codex', status: 'success' },
+      })),
+    };
+    const stage = new SummarizeBlockBatchStage({
+      processor,
+      blockContents,
+    });
     const context = createContext(store, 'run-summary-block');
 
     const result = await stage.run(context);
 
+    expect(processor.process).toHaveBeenCalledWith(blockContents);
     expect(store.writes[0].kind).toBe('summary');
     expect(JSON.parse(store.writes[0].body)).toEqual({
       runId: 'run-summary-block',
       stage: stage.id,
-      blocks: [],
+      blocks: blockContents,
+      summaries: ['block summary'],
+      metadata: { provider: 'codex', status: 'success' },
     });
     expect(result).toMatchObject({
       stageId: stage.id,
       status: 'success',
-      inputCount: 0,
+      inputCount: blockContents.length,
       outputCount: 1,
+    });
+    expect(result.artifactIds).toEqual([store.descriptors[0].id]);
+  });
+
+  it('marks summarize block batch as failed when processor errors', async () => {
+    const store = new RecordingArtifactStore();
+    const processor: ModelProcessor = {
+      process: vi.fn(async () => ({
+        outputs: [],
+        metadata: { provider: 'codex', status: 'error', error: 'provider failed' },
+      })),
+    };
+    const stage = new SummarizeBlockBatchStage({
+      processor,
+      blockContents: ['block-timeout'],
+    });
+
+    const result = await stage.run(createContext(store, 'run-summary-block-fail'));
+    expect(JSON.parse(store.writes[0].body)).toEqual({
+      runId: 'run-summary-block-fail',
+      stage: stage.id,
+      blocks: ['block-timeout'],
+      summaries: [],
+      metadata: { provider: 'codex', status: 'error', error: 'provider failed' },
+    });
+
+    expect(result).toMatchObject({
+      stageId: stage.id,
+      status: 'failed',
+      inputCount: 1,
+      outputCount: 0,
+      error: 'provider failed',
     });
     expect(result.artifactIds).toEqual([store.descriptors[0].id]);
   });

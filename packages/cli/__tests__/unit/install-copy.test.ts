@@ -2,10 +2,11 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createInstallTestEnv, installScriptPath } from './installTestUtils';
+import { createInstallTestEnv, installScriptPath, repoRoot } from './installTestUtils';
 
 describe('installer copy', () => {
   let tempEnv: Awaited<ReturnType<typeof createInstallTestEnv>>;
+  const installLibPath = path.join(repoRoot, 'scripts', 'install-lib.sh');
 
   beforeEach(async () => {
     tempEnv = await createInstallTestEnv();
@@ -22,7 +23,17 @@ describe('installer copy', () => {
     ...overrides,
   });
 
-  it('asks for language once and defaults unmatched locales to English', () => {
+  const getMessage = (key: string, lang: string) => execFileSync(
+    '/bin/bash',
+    ['-lc', `source "${installLibPath}"; get_message "${key}" "${lang}"`],
+    {
+      cwd: path.dirname(installScriptPath),
+      env: baseEnv(),
+      encoding: 'utf8',
+    },
+  ).trim();
+
+  it('defaults unmatched locales to English without prompting in non-interactive mode', () => {
     const output = execFileSync(
       '/bin/bash',
       [installScriptPath],
@@ -35,9 +46,15 @@ describe('installer copy', () => {
     );
 
     const promptMatches = output.match(/Choose your language/g) ?? [];
-    expect(promptMatches).toHaveLength(1);
-    expect(output).toContain('English (default)');
-    expect(output).toContain('Language confirmed: English');
+    expect(promptMatches).toHaveLength(0);
+    expect(output).toContain('Corivo Installer');
+  });
+
+  it('exposes staged copy and warm-up safety messaging', () => {
+    expect(getMessage('stage_prepare', 'en')).toBe('Preparing your machine');
+    expect(getMessage('stage_warmup', 'en')).toBe('Warming up with local context');
+    expect(getMessage('status_attention', 'en')).toBe('Needs attention');
+    expect(getMessage('warmup_safety', 'en')).toContain('stays on your device');
   });
 
   it('produces a structured diagnostic summary with STEP_ID and STEP_NAME metadata', async () => {
@@ -46,7 +63,7 @@ describe('installer copy', () => {
       '/bin/bash',
       [installScriptPath, '--lang', 'en'],
       {
-        cwd: installScriptPath ? tempEnv.tempDir : tempEnv.tempDir,
+        cwd: path.dirname(installScriptPath),
         env: baseEnv(),
         encoding: 'utf8',
       },

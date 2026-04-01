@@ -3,18 +3,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const installBins = [
-  'node',
-  'npm',
-  'python3',
-  'gcc',
-  'pgrep',
-  'codex',
-  'cursor',
-  'opencode',
-  'corivo',
-];
-
 export const repoRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 export const installScriptPath = path.join(repoRoot, 'scripts', 'install.sh');
 

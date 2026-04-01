@@ -52,8 +52,10 @@ describe('host doctor reusable helpers', () => {
     const beforeChecks = toCheckMap(before.checks);
     expect(beforeChecks['AGENTS.md']).toBe(false);
     expect(beforeChecks['config.toml']).toBe(false);
+    expect(beforeChecks['hooks.json hooks']).toBe(false);
     expect(beforeChecks['notify-review.sh']).toBe(false);
     expect(beforeChecks['notify-dispatch.sh']).toBe(false);
+    expect(beforeChecks['hook scripts']).toBe(false);
 
     const installResult = await installCodexHost(tempHome);
     expect(installResult.success).toBe(true);
@@ -63,8 +65,10 @@ describe('host doctor reusable helpers', () => {
     expect(afterInstall.ok).toBe(true);
     expect(installChecks['AGENTS.md']).toBe(true);
     expect(installChecks['config.toml']).toBe(true);
+    expect(installChecks['hooks.json hooks']).toBe(true);
     expect(installChecks['notify-review.sh']).toBe(true);
     expect(installChecks['notify-dispatch.sh']).toBe(true);
+    expect(installChecks['hook scripts']).toBe(true);
 
     const uninstallResult = await uninstallCodexHost(tempHome);
     expect(uninstallResult.success).toBe(true);
@@ -74,8 +78,10 @@ describe('host doctor reusable helpers', () => {
     expect(afterUninstall.ok).toBe(false);
     expect(uninstallChecks['AGENTS.md']).toBe(false);
     expect(uninstallChecks['config.toml']).toBe(false);
+    expect(uninstallChecks['hooks.json hooks']).toBe(false);
     expect(uninstallChecks['notify-review.sh']).toBe(false);
     expect(uninstallChecks['notify-dispatch.sh']).toBe(false);
+    expect(uninstallChecks['hook scripts']).toBe(false);
   });
 
   it('marks Codex doctor unhealthy when notify-dispatch.sh is missing', async () => {
@@ -87,6 +93,30 @@ describe('host doctor reusable helpers', () => {
     const doctor = await isCodexInstalled(tempHome);
     expect(doctor.ok).toBe(false);
     expect(toCheckMap(doctor.checks)['notify-dispatch.sh']).toBe(false);
+  });
+
+  it('marks Codex doctor unhealthy when a hook script is missing', async () => {
+    const installResult = await installCodexHost(tempHome);
+    expect(installResult.success).toBe(true);
+
+    await fs.rm(path.join(tempHome, '.codex', 'corivo', 'user-prompt-submit.sh'), { force: true });
+
+    const doctor = await isCodexInstalled(tempHome);
+    expect(doctor.ok).toBe(false);
+    expect(toCheckMap(doctor.checks)['hook scripts']).toBe(false);
+  });
+
+  it('marks Codex doctor unhealthy when hooks.json points at stale script paths', async () => {
+    const installResult = await installCodexHost(tempHome);
+    expect(installResult.success).toBe(true);
+
+    const hooksPath = path.join(tempHome, '.codex', 'hooks.json');
+    const hooks = await fs.readFile(hooksPath, 'utf8');
+    await fs.writeFile(hooksPath, hooks.replace(/\.codex\/corivo/g, 'plugins/corivo/hooks/scripts'), 'utf8');
+
+    const doctor = await isCodexInstalled(tempHome);
+    expect(doctor.ok).toBe(false);
+    expect(toCheckMap(doctor.checks)['hooks.json hooks']).toBe(false);
   });
 
   it('marks Codex doctor unhealthy when sandbox section exists without Corivo writable root', async () => {

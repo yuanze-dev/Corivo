@@ -9,6 +9,24 @@ const END_MARKER = '<!-- CORIVO CODEX END -->';
 const REVIEW_SCRIPT_NAME = 'notify-review.sh';
 const DISPATCH_SCRIPT_NAME = 'notify-dispatch.sh';
 const NOTIFY_BACKUP_NAME = 'notify-original.json';
+const REQUIRED_CODEX_HOOK_SCRIPTS = [
+  'session-init.sh',
+  'ingest-turn.sh',
+  'user-prompt-submit.sh',
+  'stop.sh',
+] as const;
+
+type CodexHookCommand = {
+  type: string;
+  command: string;
+  statusMessage?: string;
+  timeout: number;
+};
+
+type CodexHookGroups = Record<string, Array<{ matcher?: string; hooks?: CodexHookCommand[] }>>;
+type CodexHooksSettings = {
+  hooks?: CodexHookGroups;
+};
 
 export async function getCodexRules(): Promise<string> {
   const templateText = (await readHostTemplateText('codex', 'templates/AGENTS.codex.md')).trim();
@@ -24,6 +42,7 @@ export interface CodexPaths {
   codexDir: string;
   agentsPath: string;
   configPath: string;
+  hooksPath: string;
   adapterDir: string;
   dispatchPath: string;
   reviewPath: string;
@@ -39,6 +58,7 @@ export function getCodexPaths(homeDir: string = process.env.HOME || os.homedir()
     codexDir,
     agentsPath: path.join(codexDir, 'AGENTS.md'),
     configPath: path.join(codexDir, 'config.toml'),
+    hooksPath: path.join(codexDir, 'hooks.json'),
     adapterDir,
     dispatchPath: path.join(adapterDir, DISPATCH_SCRIPT_NAME),
     reviewPath: path.join(adapterDir, REVIEW_SCRIPT_NAME),
@@ -111,6 +131,7 @@ export async function installCodexHost(homeDir?: string): Promise<HostInstallRes
     }
 
     await copyHostAsset('codex', 'adapters/notify-review.sh', paths.reviewPath, { mode: 0o755 });
+    await installCodexHookScripts(paths.adapterDir);
 
     const dispatchContent = wrappedNotify
       ? buildDispatchScript(wrappedNotify)
@@ -122,6 +143,7 @@ export async function installCodexHost(homeDir?: string): Promise<HostInstallRes
     updatedConfig = upsertSandboxWritableRoot(updatedConfig, path.join(paths.homeDir, '.corivo'));
     await fs.mkdir(paths.codexDir, { recursive: true });
     await fs.writeFile(paths.configPath, updatedConfig, 'utf8');
+    await installCodexHooksConfig(paths.hooksPath, paths.adapterDir);
 
     const result = await injectCodexRules(paths.agentsPath);
 
@@ -146,11 +168,13 @@ export async function installCodexHost(homeDir?: string): Promise<HostInstallRes
 export async function isCodexInstalled(homeDir?: string): Promise<HostDoctorResult> {
   const paths = getCodexPaths(homeDir);
   const corivoRoot = path.join(paths.homeDir, '.corivo');
-  const [agentsContent, configContent, reviewContent, dispatchContent] = await Promise.all([
+  const [agentsContent, configContent, hooksSettings, reviewContent, dispatchContent, hookScriptsOk] = await Promise.all([
     readFileIfExists(paths.agentsPath),
     readFileIfExists(paths.configPath),
+    readCodexHooksSettings(paths.hooksPath),
     readFileIfExists(paths.reviewPath),
     readFileIfExists(paths.dispatchPath),
+    hasRequiredCodexScripts(paths.adapterDir),
   ]);
   const notify = extractNotifyCommand(configContent);
 
@@ -170,6 +194,11 @@ export async function isCodexInstalled(homeDir?: string): Promise<HostDoctorResu
       detail: paths.configPath,
     },
     {
+      label: 'hooks.json hooks',
+      ok: hasRequiredCodexHooks(hooksSettings.hooks, paths.adapterDir),
+      detail: paths.hooksPath,
+    },
+    {
       label: 'notify-review.sh',
       ok: reviewContent.includes('corivo review'),
       detail: paths.reviewPath,
@@ -178,6 +207,11 @@ export async function isCodexInstalled(homeDir?: string): Promise<HostDoctorResu
       label: 'notify-dispatch.sh',
       ok: dispatchContent.includes('notify-review.sh'),
       detail: paths.dispatchPath,
+    },
+    {
+      label: 'hook scripts',
+      ok: hookScriptsOk,
+      detail: paths.adapterDir,
     },
   ];
 
@@ -195,6 +229,10 @@ export async function uninstallCodexHost(homeDir?: string): Promise<HostInstallR
     await removeCodexRuleBlock(paths.agentsPath);
     await removeCodexNotifyConfig(paths.configPath, paths.dispatchPath, paths.notifyBackupPath);
     await removeCodexWritableRoot(paths.configPath, path.join(paths.homeDir, '.corivo'));
+    await removeCodexHooksConfig(paths.hooksPath, paths.adapterDir);
+    for (const fileName of REQUIRED_CODEX_HOOK_SCRIPTS) {
+      await fs.rm(path.join(paths.adapterDir, fileName), { force: true });
+    }
     await fs.rm(paths.dispatchPath, { force: true });
     await fs.rm(paths.reviewPath, { force: true });
     await fs.rm(paths.notifyBackupPath, { force: true });
@@ -227,6 +265,177 @@ async function readFileIfExists(filePath: string): Promise<string> {
   } catch {
     return '';
   }
+}
+
+async function installCodexHookScripts(adapterDir: string): Promise<void> {
+  for (const fileName of REQUIRED_CODEX_HOOK_SCRIPTS) {
+    await copyHostAsset('codex', `hooks/scripts/${fileName}`, path.join(adapterDir, fileName), {
+      mode: 0o755,
+    });
+  }
+}
+
+async function hasRequiredCodexScripts(adapterDir: string): Promise<boolean> {
+  const checks = await Promise.all(
+    REQUIRED_CODEX_HOOK_SCRIPTS.map(async (fileName) => {
+      try {
+        await fs.access(path.join(adapterDir, fileName));
+        return true;
+      } catch {
+        return false;
+      }
+    }),
+  );
+
+  return checks.every(Boolean);
+}
+
+async function readCodexHooksSettings(hooksPath: string): Promise<CodexHooksSettings> {
+  const content = await readFileIfExists(hooksPath);
+  if (!content) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(content);
+    return typeof parsed === 'object' && parsed !== null ? parsed as CodexHooksSettings : {};
+  } catch {
+    return {};
+  }
+}
+
+async function installCodexHooksConfig(hooksPath: string, adapterDir: string): Promise<void> {
+  const settings = await readCodexHooksSettings(hooksPath);
+  if (!settings.hooks) {
+    settings.hooks = {};
+  }
+
+  upsertCodexHook(settings.hooks, 'SessionStart', {
+    matcher: 'startup|resume',
+    hooks: [
+      {
+        type: 'command',
+        command: `bash "${path.join(adapterDir, 'session-init.sh')}"`,
+        statusMessage: 'Loading Corivo memory',
+        timeout: 5,
+      },
+    ],
+  });
+  upsertCodexHook(settings.hooks, 'UserPromptSubmit', {
+    hooks: [
+      {
+        type: 'command',
+        command: `bash "${path.join(adapterDir, 'ingest-turn.sh')}" user`,
+        statusMessage: 'Saving Corivo memory',
+        timeout: 10,
+      },
+      {
+        type: 'command',
+        command: `bash "${path.join(adapterDir, 'user-prompt-submit.sh')}"`,
+        statusMessage: 'Checking Corivo recall',
+        timeout: 10,
+      },
+    ],
+  });
+  upsertCodexHook(settings.hooks, 'Stop', {
+    hooks: [
+      {
+        type: 'command',
+        command: `bash "${path.join(adapterDir, 'ingest-turn.sh')}" assistant`,
+        statusMessage: 'Saving Corivo response',
+        timeout: 10,
+      },
+      {
+        type: 'command',
+        command: `bash "${path.join(adapterDir, 'stop.sh')}"`,
+        statusMessage: 'Reviewing Corivo follow-up',
+        timeout: 10,
+      },
+    ],
+  });
+
+  await fs.mkdir(path.dirname(hooksPath), { recursive: true });
+  await fs.writeFile(hooksPath, JSON.stringify(settings, null, 2), 'utf8');
+}
+
+function hasRequiredCodexHooks(hooks: CodexHookGroups | undefined, adapterDir: string): boolean {
+  if (!hooks) {
+    return false;
+  }
+
+  const expected = [
+    ['SessionStart', `bash "${path.join(adapterDir, 'session-init.sh')}"`],
+    ['UserPromptSubmit', `bash "${path.join(adapterDir, 'ingest-turn.sh')}" user`],
+    ['UserPromptSubmit', `bash "${path.join(adapterDir, 'user-prompt-submit.sh')}"`],
+    ['Stop', `bash "${path.join(adapterDir, 'ingest-turn.sh')}" assistant`],
+    ['Stop', `bash "${path.join(adapterDir, 'stop.sh')}"`],
+  ] as const;
+
+  return expected.every(([event, command]) =>
+    (hooks[event] ?? []).some((group) => (group.hooks ?? []).some((hook) => hook.command === command)),
+  );
+}
+
+function upsertCodexHook(
+  hooks: CodexHookGroups,
+  event: string,
+  group: { matcher?: string; hooks: CodexHookCommand[] },
+): void {
+  const existingGroups = hooks[event] ?? [];
+  const targetGroup = existingGroups.find((item) => item.matcher === group.matcher)
+    ?? existingGroups[0]
+    ?? { matcher: group.matcher, hooks: [] };
+  const existingHooks = targetGroup.hooks ?? [];
+
+  for (const hook of group.hooks) {
+    if (!existingHooks.some((item) => item.command === hook.command)) {
+      existingHooks.push(hook);
+    }
+  }
+
+  targetGroup.matcher = group.matcher;
+  targetGroup.hooks = existingHooks;
+
+  if (!existingGroups.includes(targetGroup)) {
+    existingGroups.unshift(targetGroup);
+  }
+
+  hooks[event] = existingGroups;
+}
+
+async function removeCodexHooksConfig(hooksPath: string, adapterDir: string): Promise<void> {
+  const settings = await readCodexHooksSettings(hooksPath);
+  if (!settings.hooks) {
+    return;
+  }
+
+  const commands = [
+    ['SessionStart', `bash "${path.join(adapterDir, 'session-init.sh')}"`],
+    ['UserPromptSubmit', `bash "${path.join(adapterDir, 'ingest-turn.sh')}" user`],
+    ['UserPromptSubmit', `bash "${path.join(adapterDir, 'user-prompt-submit.sh')}"`],
+    ['Stop', `bash "${path.join(adapterDir, 'ingest-turn.sh')}" assistant`],
+    ['Stop', `bash "${path.join(adapterDir, 'stop.sh')}"`],
+  ] as const;
+
+  for (const [event, command] of commands) {
+    removeCodexHook(settings.hooks, event, command);
+  }
+
+  await fs.writeFile(hooksPath, JSON.stringify(settings, null, 2), 'utf8');
+}
+
+function removeCodexHook(hooks: CodexHookGroups, event: string, command: string): void {
+  const groups = hooks[event];
+  if (!groups) {
+    return;
+  }
+
+  hooks[event] = groups
+    .map((group) => ({
+      ...group,
+      hooks: (group.hooks ?? []).filter((hook) => hook.command !== command),
+    }))
+    .filter((group) => (group.hooks?.length ?? 0) > 0);
 }
 
 async function writeNotifyBackup(backupPath: string, command: string[]): Promise<void> {

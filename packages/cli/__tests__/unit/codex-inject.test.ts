@@ -98,8 +98,18 @@ describe('Codex Corivo integration', () => {
       const updatedConfig = await fs.readFile(configPath, 'utf8');
       const dispatchPath = path.join(tempHome, '.codex', 'corivo', 'notify-dispatch.sh');
       const reviewPath = path.join(tempHome, '.codex', 'corivo', 'notify-review.sh');
+      const sessionInitPath = path.join(tempHome, '.codex', 'corivo', 'session-init.sh');
+      const ingestTurnPath = path.join(tempHome, '.codex', 'corivo', 'ingest-turn.sh');
+      const userPromptSubmitPath = path.join(tempHome, '.codex', 'corivo', 'user-prompt-submit.sh');
+      const stopPath = path.join(tempHome, '.codex', 'corivo', 'stop.sh');
+      const hooksConfigPath = path.join(tempHome, '.codex', 'hooks.json');
       const dispatchContent = await fs.readFile(dispatchPath, 'utf8');
       const reviewContent = await fs.readFile(reviewPath, 'utf8');
+      const sessionInitContent = await fs.readFile(sessionInitPath, 'utf8');
+      const ingestTurnContent = await fs.readFile(ingestTurnPath, 'utf8');
+      const userPromptSubmitContent = await fs.readFile(userPromptSubmitPath, 'utf8');
+      const stopContent = await fs.readFile(stopPath, 'utf8');
+      const hooksConfig = await fs.readFile(hooksConfigPath, 'utf8');
       const globalAgentsPath = path.join(tempHome, '.codex', 'AGENTS.md');
       const globalAgents = await fs.readFile(globalAgentsPath, 'utf8');
       const packagedTemplate = await fs.readFile(CODEX_TEMPLATE_PATH, 'utf8');
@@ -113,6 +123,14 @@ describe('Codex Corivo integration', () => {
       expect(updatedConfig.match(/writable_roots/g)).toHaveLength(1);
       expect(dispatchContent).toContain('/tmp/existing-notify.sh');
       expect(reviewContent).toBe(packagedReviewAdapter);
+      expect(sessionInitContent).toContain('hookEventName:"SessionStart"');
+      expect(ingestTurnContent).toContain('corivo save --content');
+      expect(userPromptSubmitContent).toContain('hookEventName:"UserPromptSubmit"');
+      expect(stopContent).toContain('"decision":"block"');
+      expect(hooksConfig).toContain(sessionInitPath);
+      expect(hooksConfig).toContain(ingestTurnPath);
+      expect(hooksConfig).toContain(userPromptSubmitPath);
+      expect(hooksConfig).toContain(stopPath);
       expect(globalAgents).toContain(packagedTemplate.trim());
     } finally {
       process.env.HOME = previousHome;

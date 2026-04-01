@@ -1,6 +1,11 @@
-import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { ArtifactDescriptor, ArtifactWriteInput, MemoryPipelineArtifactStore } from '../types.js';
+import {
+  ArtifactDescriptor,
+  ArtifactQuery,
+  ArtifactWriteInput,
+  MemoryPipelineArtifactStore,
+} from '../types.js';
 
 const DETAIL_DIR = path.join('artifacts', 'detail');
 const INDEX_DIR = path.join('artifacts', 'index');
@@ -81,6 +86,41 @@ export class ArtifactStore implements MemoryPipelineArtifactStore {
     }
   }
 
+  async readArtifact(id: string): Promise<string> {
+    const descriptor = await this.getDescriptor(id);
+    if (!descriptor) {
+      throw new Error(`artifact not found: ${id}`);
+    }
+
+    const { dir: relativeDir, fileName } = await this.ensureInsideRootPath(descriptor.path);
+    return readFile(path.join(this.rootDir, relativeDir, fileName), 'utf8');
+  }
+
+  async listArtifacts(query?: ArtifactQuery): Promise<ArtifactDescriptor[]> {
+    const descriptorDir = path.join(this.rootDir, DESCRIPTOR_DIR);
+    let files: string[];
+    try {
+      files = await readdir(descriptorDir);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return [];
+      }
+      throw error;
+    }
+
+    const descriptors = await Promise.all(
+      files
+        .filter((file) => file.endsWith('.json'))
+        .map(async (file) =>
+          JSON.parse(await readFile(path.join(descriptorDir, file), 'utf8')) as ArtifactDescriptor,
+        ),
+    );
+
+    return descriptors
+      .filter((descriptor) => this.matchesQuery(descriptor, query))
+      .sort((left, right) => right.createdAt - left.createdAt);
+  }
+
   private resolveDir(kind: string, runId?: string): string {
     if (kind === 'detail-record') {
       return DETAIL_DIR;
@@ -92,6 +132,30 @@ export class ArtifactStore implements MemoryPipelineArtifactStore {
 
     const normalizedRun = this.normalizeSegment(runId ?? 'default');
     return path.join('runs', normalizedRun, 'stages');
+  }
+
+  private matchesQuery(descriptor: ArtifactDescriptor, query?: ArtifactQuery): boolean {
+    if (!query) {
+      return true;
+    }
+
+    if (query.source && descriptor.source !== query.source) {
+      return false;
+    }
+
+    if (query.kind && descriptor.kind !== query.kind) {
+      return false;
+    }
+
+    if (query.runId) {
+      const normalizedRunId = this.normalizeSegment(query.runId);
+      const runPrefix = path.join('runs', normalizedRunId, 'stages') + path.sep;
+      if (!descriptor.path.startsWith(runPrefix)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   private buildId(kind: string): string {

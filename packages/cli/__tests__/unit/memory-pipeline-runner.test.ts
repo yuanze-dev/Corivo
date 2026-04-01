@@ -9,6 +9,7 @@ import type {
   PipelineStageResult,
   PipelineStageStatus,
 } from '../../src/memory-pipeline/types.js';
+import { ArtifactStore } from '../../src/memory-pipeline/artifacts/artifact-store.js';
 import { readRunManifest } from '../../src/memory-pipeline/state/run-manifest.js';
 import { FileRunLock } from '../../src/memory-pipeline/state/run-lock.js';
 import { MemoryPipelineRunner } from '../../src/memory-pipeline/runner.js';
@@ -26,6 +27,12 @@ const createArtifactStore = (): MemoryPipelineArtifactStore => ({
   async persistDescriptor() {},
   async getDescriptor() {
     return undefined;
+  },
+  async readArtifact() {
+    return '';
+  },
+  async listArtifacts() {
+    return [];
   },
 });
 
@@ -76,6 +83,56 @@ describe('MemoryPipelineRunner', () => {
     const manifest = await readRunManifest(path.join(root, 'runs', 'run-sequence', 'manifest.json'));
     expect(manifest.status).toBe('success');
     expect(manifest.stages.map((stage) => stage?.stageId)).toEqual(['a', 'b']);
+  });
+
+  it('allows later stages to read previous stage artifacts from context', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
+    const lock = new FileRunLock(path.join(root, 'run.lock'));
+    const runner = new MemoryPipelineRunner({
+      artifactStore: new ArtifactStore(root),
+      lock,
+      runRoot: root,
+      runIdGenerator: () => 'run-artifact-read',
+    });
+
+    let producedArtifactId = '';
+    let consumedBody = '';
+    let queriedIds: string[] = [];
+
+    const pipeline = {
+      id: 'init-memory-pipeline',
+      stages: [
+        createStage('produce', async (context) => {
+          const descriptor = await context.artifactStore.writeArtifact({
+            runId: context.runId,
+            kind: 'summary-batch',
+            source: 'stage-produce',
+            body: 'artifact-body',
+          });
+          producedArtifactId = descriptor.id;
+
+          return createResult('produce', 'success', { artifactIds: [descriptor.id] });
+        }),
+        createStage('consume', async (context) => {
+          consumedBody = await context.artifactStore.readArtifact(producedArtifactId);
+          queriedIds = (
+            await context.artifactStore.listArtifacts({
+              runId: context.runId,
+              source: 'stage-produce',
+              kind: 'summary-batch',
+            })
+          ).map((descriptor) => descriptor.id);
+
+          return createResult('consume', 'success');
+        }),
+      ],
+    };
+
+    const result = await runner.run(pipeline, { type: 'manual', runAt: Date.now() });
+
+    expect(result.status).toBe('success');
+    expect(consumedBody).toBe('artifact-body');
+    expect(queriedIds).toEqual([producedArtifactId]);
   });
 
   it('halts when a stage fails', async () => {

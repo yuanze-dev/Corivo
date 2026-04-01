@@ -28,6 +28,12 @@ export interface ArtifactDescriptor {
   metadata?: Record<string, unknown>;
 }
 
+export interface ArtifactQuery {
+  runId?: string;
+  source?: string;
+  kind?: string;
+}
+
 export interface ArtifactWriteInput {
   runId?: string;
   kind: string;
@@ -53,6 +59,8 @@ export interface MemoryPipelineArtifactStore {
   writeArtifact(input: ArtifactWriteInput): Promise<ArtifactDescriptor>;
   persistDescriptor(descriptor: ArtifactDescriptor): Promise<void>;
   getDescriptor(id: string): Promise<ArtifactDescriptor | undefined>;
+  readArtifact(id: string): Promise<string>;
+  listArtifacts(query?: ArtifactQuery): Promise<ArtifactDescriptor[]>;
 }
 
 export interface MemoryPipelineContext {

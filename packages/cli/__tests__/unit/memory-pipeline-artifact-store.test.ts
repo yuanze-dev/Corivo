@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, symlink } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -53,6 +53,47 @@ describe('ArtifactStore', () => {
     });
 
     expect(descriptor.path).toContain(path.join('runs', 'run-2', 'stages'));
+  });
+
+  it('reads artifact body and lists descriptors with query filters', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
+    const store = new ArtifactStore(root);
+    const nowSpy = vi.spyOn(Date, 'now');
+    let now = 1000;
+    nowSpy.mockImplementation(() => now++);
+
+    try {
+      const older = await store.writeArtifact({
+        kind: 'summary-batch',
+        source: 'stage-a',
+        runId: 'run-a',
+        body: 'older-body',
+      });
+      const newer = await store.writeArtifact({
+        kind: 'summary-batch',
+        source: 'stage-b',
+        runId: 'run-a',
+        body: 'newer-body',
+      });
+      const otherRun = await store.writeArtifact({
+        kind: 'summary-batch',
+        source: 'stage-b',
+        runId: 'run-b',
+        body: 'other-run-body',
+      });
+
+      await expect(store.readArtifact(newer.id)).resolves.toBe('newer-body');
+      await expect(store.listArtifacts({ runId: 'run-a', kind: 'summary-batch' })).resolves.toMatchObject([
+        { id: newer.id },
+        { id: older.id },
+      ]);
+      await expect(store.listArtifacts({ source: 'stage-b', kind: 'summary-batch' })).resolves.toMatchObject([
+        { id: otherRun.id },
+        { id: newer.id },
+      ]);
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   it('normalizes runId segments to stay inside root', async () => {

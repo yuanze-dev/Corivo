@@ -2,7 +2,6 @@ import path from 'node:path';
 import { getRawSessionJobs, getRawSessionJobSource } from './pipeline-state.js';
 import { writeRunManifest } from './state/run-manifest.js';
 import type {
-  MemoryPipelineArtifactStore,
   MemoryPipelineContext,
   MemoryPipelineDefinition,
   PipelineStageResult,
@@ -12,7 +11,7 @@ import type { RunManifest } from './state/run-manifest.js';
 import type { FileRunLock } from './state/run-lock.js';
 
 export interface MemoryPipelineRunnerOptions {
-  artifactStore: MemoryPipelineArtifactStore;
+  artifactStore: MemoryPipelineContext['artifactStore'];
   lock: FileRunLock;
   runRoot: string;
   logger?: MemoryPipelineContext['logger'];

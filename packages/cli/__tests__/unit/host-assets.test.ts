@@ -29,6 +29,32 @@ describe('host assets loader', () => {
     expect(text).toContain('## Corivo 记忆层（Codex）');
   });
 
+  it('resolves host assets from installed plugin packages when given a package root', async () => {
+    const packageRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-installed-host-package-root-'));
+    const installedHostRoot = path.join(packageRoot, 'node_modules', '@corivo-ai', 'codex');
+    const templatePath = path.join(installedHostRoot, 'templates', 'AGENTS.codex.md');
+    const rawAssetPath = path.join(installedHostRoot, 'assets', 'corivo-logo.svg');
+
+    try {
+      await fs.writeFile(path.join(packageRoot, 'package.json'), '{"name":"test-cli"}\n', 'utf8');
+      await fs.mkdir(path.dirname(templatePath), { recursive: true });
+      await fs.mkdir(path.dirname(rawAssetPath), { recursive: true });
+      await fs.writeFile(path.join(installedHostRoot, 'package.json'), '{"name":"@corivo-ai/codex"}\n', 'utf8');
+      await fs.writeFile(templatePath, '# packaged codex rules\n', 'utf8');
+      await fs.writeFile(rawAssetPath, '<svg />', 'utf8');
+
+      expect(await fs.realpath(resolveHostAssetRoot('codex', { packageRoot }))).toBe(await fs.realpath(installedHostRoot));
+      expect(await fs.realpath(resolveHostRawAssetPath('codex', 'assets/corivo-logo.svg', { packageRoot }))).toBe(
+        await fs.realpath(rawAssetPath),
+      );
+      await expect(readHostTemplateText('codex', 'templates/AGENTS.codex.md', { packageRoot })).resolves.toBe(
+        '# packaged codex rules\n',
+      );
+    } finally {
+      await fs.rm(packageRoot, { recursive: true, force: true });
+    }
+  });
+
   it('rejects unknown host names with a clear error', () => {
     expect(() => resolveHostAssetRoot('unknown-host')).toThrowError(
       'Unknown host "unknown-host". Supported hosts: claude-code, codex, cursor, opencode',
@@ -122,14 +148,14 @@ describe('host assets loader', () => {
 
   it('chooses bundled roots ahead of repo roots, and only falls back to repo when bundled assets are absent', async () => {
     const overrideRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-root-override-'));
-    const bundledRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-root-bundled-'));
+    const packageAssetRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-root-package-'));
     const repoRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-root-repo-'));
 
     try {
       expect(
         resolvePreferredAssetRoot({
           overrideRoot,
-          bundledRoot,
+          packageRoot: packageAssetRoot,
           repoRoot,
           scopeLabel: 'test host assets',
         }),
@@ -140,20 +166,20 @@ describe('host assets loader', () => {
 
       expect(
         resolvePreferredAssetRoot({
-          bundledRoot,
+          packageRoot: packageAssetRoot,
           repoRoot,
           scopeLabel: 'test host assets',
         }),
       ).toEqual({
-        root: bundledRoot,
-        source: 'bundled',
+        root: packageAssetRoot,
+        source: 'package',
       });
 
-      await fs.rm(bundledRoot, { recursive: true, force: true });
+      await fs.rm(packageAssetRoot, { recursive: true, force: true });
 
       expect(
         resolvePreferredAssetRoot({
-          bundledRoot,
+          packageRoot: packageAssetRoot,
           repoRoot,
           scopeLabel: 'test host assets',
         }),
@@ -163,7 +189,7 @@ describe('host assets loader', () => {
       });
     } finally {
       await fs.rm(overrideRoot, { recursive: true, force: true });
-      await fs.rm(bundledRoot, { recursive: true, force: true });
+      await fs.rm(packageAssetRoot, { recursive: true, force: true });
       await fs.rm(repoRoot, { recursive: true, force: true });
     }
   });

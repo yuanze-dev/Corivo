@@ -5,6 +5,10 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  resolveInstalledPackageRoot,
+  resolveNearestPackageRoot,
+} from './package-assets.js';
 
 const HOST_ASSET_ROOT_ENV = 'CORIVO_HOST_ASSETS_ROOT';
 const __filename = fileURLToPath(import.meta.url);
@@ -14,18 +18,22 @@ const hostDeclarations = {
   'claude-code': {
     directory: 'claude-code',
     assetSupport: 'bundled',
+    packageName: '@corivo-ai/claude-code',
   },
   codex: {
     directory: 'codex',
     assetSupport: 'bundled',
+    packageName: '@corivo-ai/codex',
   },
   cursor: {
     directory: 'cursor',
     assetSupport: 'bundled',
+    packageName: '@corivo-ai/cursor',
   },
   opencode: {
     directory: 'opencode',
     assetSupport: 'none',
+    packageName: '@corivo-ai/opencode',
   },
 } as const;
 
@@ -43,14 +51,18 @@ type CopyHostAssetOptions = {
   mode?: number;
 };
 
+type ResolveHostAssetOptions = {
+  packageRoot?: string;
+};
+
 type HostAssetRootCandidate = {
   root: string;
-  source: 'override' | 'bundled' | 'repo';
+  source: 'override' | 'package' | 'repo';
 };
 
 export function resolvePreferredAssetRoot(options: {
   overrideRoot?: string | null;
-  bundledRoot: string;
+  packageRoot?: string | null;
   repoRoot?: string | null;
   scopeLabel: string;
 }): HostAssetRootCandidate {
@@ -62,10 +74,11 @@ export function resolvePreferredAssetRoot(options: {
     };
   }
 
-  if (existsSync(options.bundledRoot)) {
+  const normalizedPackageRoot = options.packageRoot ? path.resolve(options.packageRoot) : null;
+  if (normalizedPackageRoot && existsSync(normalizedPackageRoot)) {
     return {
-      root: options.bundledRoot,
-      source: 'bundled',
+      root: normalizedPackageRoot,
+      source: 'package',
     };
   }
 
@@ -80,47 +93,51 @@ export function resolvePreferredAssetRoot(options: {
   throw new Error(
     buildMissingRootMessage(
       options.scopeLabel,
-      [options.bundledRoot, normalizedRepoRoot].filter((candidate): candidate is string => Boolean(candidate)),
+      [normalizedPackageRoot, normalizedRepoRoot].filter((candidate): candidate is string => Boolean(candidate)),
     ),
   );
 }
 
-export function resolveHostsAssetRoot(): string {
-  return resolveSelectedHostAssetRoot().root;
+export function resolveHostsAssetRoot(options: ResolveHostAssetOptions = {}): string {
+  return resolveSelectedHostAssetRoot(options).root;
 }
 
 export function getSupportedHostIds(): readonly HostId[] {
   return hostIds;
 }
 
-export function resolveHostAssetRoot(host: string): string {
+export function resolveHostAssetRoot(host: string, options: ResolveHostAssetOptions = {}): string {
   const declaredHost = assertKnownHost(host);
   const assetBackedHost = assertAssetBackedHost(declaredHost);
-  const root = resolveSelectedHostAssetRoot().root;
+  const root = resolveSelectedHostAssetRoot(options).root;
   return path.join(root, hostDeclarations[assetBackedHost].directory);
 }
 
-export function resolveHostRawAssetPath(host: string, relativePath: string): string {
-  return resolveExistingHostAssetPath(host, relativePath).assetPath;
+export function resolveHostRawAssetPath(host: string, relativePath: string, options: ResolveHostAssetOptions = {}): string {
+  return resolveExistingHostAssetPath(host, relativePath, options).assetPath;
 }
 
-export async function readHostTemplateText(host: string, relativePath: string): Promise<string> {
-  const { assetPath } = resolveExistingHostAssetPath(host, relativePath);
+export async function readHostTemplateText(
+  host: string,
+  relativePath: string,
+  options: ResolveHostAssetOptions = {},
+): Promise<string> {
+  const { assetPath } = resolveExistingHostAssetPath(host, relativePath, options);
 
   try {
     return await fs.readFile(assetPath, 'utf8');
   } catch (error) {
-    throw wrapMissingAssetError(host, relativePath, error);
+    throw wrapMissingAssetError(host, relativePath, error, options);
   }
 }
 
-export function readHostAssetSync(host: string, relativePath: string): string {
-  const { assetPath } = resolveExistingHostAssetPath(host, relativePath);
+export function readHostAssetSync(host: string, relativePath: string, options: ResolveHostAssetOptions = {}): string {
+  const { assetPath } = resolveExistingHostAssetPath(host, relativePath, options);
 
   try {
     return readFileSync(assetPath, 'utf8');
   } catch (error) {
-    throw wrapMissingAssetError(host, relativePath, error);
+    throw wrapMissingAssetError(host, relativePath, error, options);
   }
 }
 
@@ -146,17 +163,41 @@ export async function copyHostAsset(
   }
 }
 
-function resolveSelectedHostAssetRoot(packageRoot = resolvePackageRoot(__dirname)): HostAssetRootCandidate {
+function resolveSelectedHostAssetRoot(options: ResolveHostAssetOptions = {}): HostAssetRootCandidate {
+  const packageRoot = options.packageRoot ? path.resolve(options.packageRoot) : resolveNearestPackageRoot(__dirname);
+  const packageCandidate = getInstalledHostAssetRootCandidate(packageRoot);
   const repoCandidate = getRepoHostAssetRootCandidate(packageRoot);
   return resolvePreferredAssetRoot({
     overrideRoot: process.env[HOST_ASSET_ROOT_ENV],
-    bundledRoot: path.join(packageRoot, 'dist', 'host-assets', 'hosts'),
+    packageRoot: packageCandidate?.root,
     repoRoot: repoCandidate?.root,
     scopeLabel: 'Corivo host assets',
   });
 }
 
-function getRepoHostAssetRootCandidate(packageRoot = resolvePackageRoot(__dirname)): HostAssetRootCandidate | null {
+function getInstalledHostAssetRootCandidate(packageRoot: string): HostAssetRootCandidate | null {
+  for (const host of assetBackedHostIds) {
+    const explicitPackageRoot = path.join(packageRoot, 'node_modules', ...hostDeclarations[host].packageName.split('/'));
+    if (existsSync(path.join(explicitPackageRoot, 'package.json'))) {
+      return {
+        root: path.dirname(explicitPackageRoot),
+        source: 'package',
+      };
+    }
+
+    const packageAssetRoot = resolveInstalledPackageRoot(hostDeclarations[host].packageName, { packageRoot });
+    if (packageAssetRoot) {
+      return {
+        root: path.dirname(packageAssetRoot),
+        source: 'package',
+      };
+    }
+  }
+
+  return null;
+}
+
+function getRepoHostAssetRootCandidate(packageRoot: string): HostAssetRootCandidate | null {
   const repoRoot = path.join(packageRoot, '..', 'plugins', 'hosts');
   if (!existsSync(repoRoot)) {
     return null;
@@ -166,26 +207,6 @@ function getRepoHostAssetRootCandidate(packageRoot = resolvePackageRoot(__dirnam
     root: repoRoot,
     source: 'repo',
   };
-}
-
-function resolvePackageRoot(startDir: string): string {
-  let currentDir = startDir;
-
-  while (true) {
-    const packageJsonPath = path.join(currentDir, 'package.json');
-    if (existsSync(packageJsonPath)) {
-      return currentDir;
-    }
-
-    const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir) {
-      break;
-    }
-
-    currentDir = parentDir;
-  }
-
-  return path.resolve(startDir, '../..');
 }
 
 function resolveHostAssetPath(host: string, relativePath: string, root: string): string {
@@ -217,13 +238,14 @@ function resolveHostAssetPath(host: string, relativePath: string, root: string):
 function resolveExistingHostAssetPath(
   host: string,
   relativePath: string,
+  options: ResolveHostAssetOptions = {},
 ): {
   assetPath: string;
   checkedPaths: string[];
 } {
   const declaredHost = assertKnownHost(host);
   const assetBackedHost = assertAssetBackedHost(declaredHost);
-  const selectedRoot = resolveSelectedHostAssetRoot();
+  const selectedRoot = resolveSelectedHostAssetRoot(options);
   const checkedPaths = [
     resolveHostAssetPath(
       assetBackedHost,
@@ -249,7 +271,7 @@ function assertKnownHost(host: string): HostId {
 
 function assertAssetBackedHost(host: HostId): AssetBackedHostId {
   if (hostDeclarations[host].assetSupport === 'bundled') {
-    return host;
+    return host as AssetBackedHostId;
   }
 
   throw new Error(
@@ -257,14 +279,19 @@ function assertAssetBackedHost(host: HostId): AssetBackedHostId {
   );
 }
 
-function wrapMissingAssetError(host: string, relativePath: string, error: unknown): Error {
+function wrapMissingAssetError(
+  host: string,
+  relativePath: string,
+  error: unknown,
+  options: ResolveHostAssetOptions = {},
+): Error {
   if (!isMissingAssetError(error)) {
     return error instanceof Error ? error : new Error(String(error));
   }
 
   const knownHost = assertKnownHost(host);
   const assetBackedHost = assertAssetBackedHost(knownHost);
-  const selectedRoot = resolveSelectedHostAssetRoot();
+  const selectedRoot = resolveSelectedHostAssetRoot(options);
   const checkedPaths = [
     resolveHostAssetPath(
       assetBackedHost,

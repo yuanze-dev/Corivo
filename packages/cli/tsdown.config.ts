@@ -23,5 +23,4 @@ export default defineConfig({
   deps: {
     neverBundle: ['better-sqlite3'],
   },
-  onSuccess: 'node scripts/copy-host-assets.mjs',
 });

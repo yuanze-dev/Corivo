@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import { execFile } from 'node:child_process';
 
 export interface OpencodeAdapterDeps {
-  runCorivo(command: 'carry-over' | 'recall' | 'review', args: string[]): Promise<string>;
+  runCorivo(command: 'carry-over' | 'query' | 'review', args: string[]): Promise<string>;
   getLatestAssistantMessage?(sessionID: string): Promise<string | null>;
 }
 
@@ -23,7 +23,7 @@ export interface OpencodeCorivoHooks {
 
 interface SessionMemoryState {
   carryOver?: string;
-  recall?: string;
+  query?: string;
   review?: string;
   lastReviewedMessage?: string;
 }
@@ -106,15 +106,15 @@ export function createOpencodeCorivoHooks(
         return;
       }
 
-      const recall = await deps.runCorivo('recall', [
+      const query = await deps.runCorivo('query', [
         '--prompt',
         prompt,
         '--format',
         'hook-text',
       ]);
 
-      if (recall) {
-        getState(input.sessionID).recall = recall;
+      if (query) {
+        getState(input.sessionID).query = query;
       }
     },
 
@@ -129,14 +129,14 @@ export function createOpencodeCorivoHooks(
         return;
       }
 
-      for (const value of [state.carryOver, state.recall, state.review]) {
+      for (const value of [state.carryOver, state.query, state.review]) {
         if (value) {
           output.system.push(value);
         }
       }
 
       state.carryOver = undefined;
-      state.recall = undefined;
+      state.query = undefined;
       state.review = undefined;
     },
   };
@@ -145,7 +145,7 @@ export function createOpencodeCorivoHooks(
 const execFileAsync = promisify(execFile);
 
 async function runCorivo(
-  command: 'carry-over' | 'recall' | 'review',
+  command: 'carry-over' | 'query' | 'review',
   args: string[],
 ): Promise<string> {
   try {

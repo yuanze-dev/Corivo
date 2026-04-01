@@ -10,6 +10,18 @@ export function resolveInstalledPackageRoot(
   packageName: string,
   options: ResolveInstalledPackageRootOptions = {},
 ): string | null {
+  if (options.packageRoot) {
+    const explicitPackageJsonPath = path.join(
+      path.resolve(options.packageRoot),
+      'node_modules',
+      ...packageName.split('/'),
+      'package.json',
+    );
+    if (existsSync(explicitPackageJsonPath)) {
+      return path.dirname(explicitPackageJsonPath);
+    }
+  }
+
   const resolver = options.packageRoot
     ? createRequire(path.join(path.resolve(options.packageRoot), 'package.json'))
     : createRequire(import.meta.url);

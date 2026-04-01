@@ -38,6 +38,18 @@ importers:
 
   packages/cli:
     dependencies:
+      '@corivo-ai/claude-code':
+        specifier: workspace:*
+        version: link:../plugins/hosts/claude-code
+      '@corivo-ai/codex':
+        specifier: workspace:*
+        version: link:../plugins/hosts/codex
+      '@corivo-ai/cursor':
+        specifier: workspace:*
+        version: link:../plugins/hosts/cursor
+      '@corivo-ai/opencode':
+        specifier: workspace:*
+        version: link:../plugins/runtime/opencode
       better-sqlite3:
         specifier: ^12.8.0
         version: 12.8.0

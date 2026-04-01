@@ -1,6 +1,6 @@
 {
-  "name": "@corivo/openclaw",
-  "version": "0.1.0",
+  "name": "@corivo-ai/openclaw",
+  "version": "0.12.6",
   "description": "Corivo OpenClaw executable runtime plugin for realtime ingestion",
   "type": "module",
   "main": "dist/index.js",

@@ -1,10 +1,11 @@
 {
-  "name": "@corivo/cursor",
-  "version": "0.1.0",
+  "name": "@corivo-ai/cursor",
+  "version": "0.12.6",
   "description": "Corivo Cursor host integration bundle assets",
   "type": "module",
   "files": [
     "hooks",
+    "templates",
     "README.md"
   ],
   "keywords": [

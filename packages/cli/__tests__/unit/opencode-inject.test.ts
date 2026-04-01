@@ -1,5 +1,4 @@
 import fs from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,9 +16,6 @@ const PACKAGED_OPENCODE_PLUGIN_ASSET = fileURLToPath(
 describe('OpenCode Corivo integration', () => {
   let tempHome: string;
   let previousHome: string | undefined;
-  const packagedDistAsset = path.resolve(
-    '/Users/liuzhengyanshuo/workspace/yuanze/02 研发管理/15-corivo/Corivo/packages/cli/dist/host-assets/runtime/opencode/corivo.ts',
-  );
 
   beforeEach(async () => {
     tempHome = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-opencode-inject-'));
@@ -44,31 +40,6 @@ describe('OpenCode Corivo integration', () => {
     expect(content).toBe(packagedPlugin);
     expect(content).toContain('experimental.chat.system.transform');
     expect(content).toContain("runCorivo('query'");
-  });
-
-  it('prefers the bundled dist asset over the repo source asset when both exist', async () => {
-    const previousDistContent = existsSync(packagedDistAsset)
-      ? await fs.readFile(packagedDistAsset, 'utf8')
-      : null;
-    const bundledPlugin = '// bundled dist opencode plugin\nexport default async function bundledPlugin() {}\n';
-
-    try {
-      await fs.mkdir(path.dirname(packagedDistAsset), { recursive: true });
-      await fs.writeFile(packagedDistAsset, bundledPlugin, 'utf8');
-
-      const result = await injectGlobalOpencodePlugin();
-      const pluginPath = path.join(tempHome, '.config', 'opencode', 'plugins', 'corivo.ts');
-      const content = await fs.readFile(pluginPath, 'utf8');
-
-      expect(result.success).toBe(true);
-      expect(content).toBe(bundledPlugin);
-    } finally {
-      if (previousDistContent === null) {
-        await fs.rm(packagedDistAsset, { force: true });
-      } else {
-        await fs.writeFile(packagedDistAsset, previousDistContent, 'utf8');
-      }
-    }
   });
 
   it('prefers an overridden packaged OpenCode asset root when provided', async () => {
@@ -128,21 +99,51 @@ describe('OpenCode Corivo integration', () => {
     }
   });
 
-  it('fails when a bundled dist root exists but the packaged OpenCode asset is missing', async () => {
-    const packageRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-opencode-bundled-root-'));
-    const bundledRoot = path.join(packageRoot, 'dist', 'host-assets', 'runtime');
+  it('uses the installed @corivo-ai/opencode package asset when available under node_modules', async () => {
+    const packageRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-opencode-installed-package-root-'));
+    const installedAssetPath = path.join(
+      packageRoot,
+      'node_modules',
+      '@corivo-ai',
+      'opencode',
+      'assets',
+      'corivo.ts',
+    );
+
+    try {
+      await fs.writeFile(path.join(packageRoot, 'package.json'), '{"name":"test-cli"}\n', 'utf8');
+      await fs.mkdir(path.dirname(installedAssetPath), { recursive: true });
+      await fs.writeFile(
+        path.join(packageRoot, 'node_modules', '@corivo-ai', 'opencode', 'package.json'),
+        '{"name":"@corivo-ai/opencode"}\n',
+        'utf8',
+      );
+      await fs.writeFile(installedAssetPath, '// installed opencode plugin\n', 'utf8');
+
+      expect(await fs.realpath(resolvePackagedOpencodePluginAssetPath({ packageRoot }))).toBe(
+        await fs.realpath(installedAssetPath),
+      );
+    } finally {
+      await fs.rm(packageRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('fails when an installed @corivo-ai/opencode package exists but its asset is missing', async () => {
+    const packageRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-opencode-installed-root-'));
+    const installedRoot = path.join(packageRoot, 'node_modules', '@corivo-ai', 'opencode');
     const repoAssetPath = path.join(packageRoot, '..', 'plugins', 'runtime', 'opencode', 'assets', 'corivo.ts');
 
     try {
       await fs.writeFile(path.join(packageRoot, 'package.json'), '{"name":"test-cli"}\n', 'utf8');
-      await fs.mkdir(path.join(bundledRoot, 'opencode'), { recursive: true });
+      await fs.mkdir(installedRoot, { recursive: true });
+      await fs.writeFile(path.join(installedRoot, 'package.json'), '{"name":"@corivo-ai/opencode"}\n', 'utf8');
       await fs.mkdir(path.dirname(repoAssetPath), { recursive: true });
       await fs.writeFile(repoAssetPath, '// repo opencode plugin\n', 'utf8');
 
       expect(() => resolvePackagedOpencodePluginAssetPath({ packageRoot })).toThrowError(
         `Missing packaged OpenCode runtime asset. Checked paths: ${path.join(
-          bundledRoot,
-          'opencode',
+          installedRoot,
+          'assets',
           'corivo.ts',
         )}.`,
       );

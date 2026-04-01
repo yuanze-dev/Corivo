@@ -4,10 +4,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolvePreferredAssetRoot } from './host-assets.js';
+import {
+  resolveInstalledPackageRoot,
+  resolveNearestPackageRoot,
+} from './package-assets.js';
 import type { HostDoctorResult, HostInstallResult } from '../hosts/types.js';
 
 const ASSET_ROOT_OVERRIDE_ENV = 'CORIVO_HOST_ASSETS_ROOT';
-const OPENCODE_RUNTIME_BUNDLED_ROOT = path.join('dist', 'host-assets', 'runtime', 'opencode');
+const OPENCODE_RUNTIME_PACKAGE_NAME = '@corivo-ai/opencode';
 const OPENCODE_RUNTIME_REPO_ROOT = path.join('..', 'plugins', 'runtime', 'opencode', 'assets');
 const OPENCODE_RUNTIME_ASSET_FILE = 'corivo.ts';
 const __filename = fileURLToPath(import.meta.url);
@@ -69,11 +73,19 @@ export function resolvePackagedOpencodePluginAssetPath(options: {
   packageRoot?: string;
   overrideRoot?: string | null;
 } = {}): string {
-  const packageRoot = options.packageRoot ?? resolvePackageRoot(__dirname);
+  const packageRoot = options.packageRoot ?? resolveNearestPackageRoot(__dirname);
   const configuredOverrideRoot = options.overrideRoot ?? process.env[ASSET_ROOT_OVERRIDE_ENV] ?? null;
+  const explicitInstalledPackageRoot = path.join(
+    packageRoot,
+    'node_modules',
+    ...OPENCODE_RUNTIME_PACKAGE_NAME.split('/'),
+  );
+  const installedPackageRoot = existsSync(path.join(explicitInstalledPackageRoot, 'package.json'))
+    ? explicitInstalledPackageRoot
+    : resolveInstalledPackageRoot(OPENCODE_RUNTIME_PACKAGE_NAME, { packageRoot });
   const selectedRoot = resolvePreferredAssetRoot({
     overrideRoot: configuredOverrideRoot ? path.join(configuredOverrideRoot, 'runtime', 'opencode') : null,
-    bundledRoot: path.join(packageRoot, OPENCODE_RUNTIME_BUNDLED_ROOT),
+    packageRoot: installedPackageRoot ? path.join(installedPackageRoot, 'assets') : null,
     repoRoot: path.join(packageRoot, OPENCODE_RUNTIME_REPO_ROOT),
     scopeLabel: 'Corivo OpenCode runtime assets',
   });
@@ -127,26 +139,6 @@ export async function uninstallOpencodeHost(homeDir?: string): Promise<HostInsta
       error: error instanceof Error ? error.message : String(error),
     };
   }
-}
-
-function resolvePackageRoot(startDir: string): string {
-  let currentDir = startDir;
-
-  while (true) {
-    const packageJsonPath = path.join(currentDir, 'package.json');
-    if (existsSync(packageJsonPath)) {
-      return currentDir;
-    }
-
-    const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir) {
-      break;
-    }
-
-    currentDir = parentDir;
-  }
-
-  return path.resolve(startDir, '../..');
 }
 
 async function readFileIfExists(filePath: string): Promise<string> {

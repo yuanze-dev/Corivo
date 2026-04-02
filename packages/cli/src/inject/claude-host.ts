@@ -66,6 +66,7 @@ export async function installClaudeCodeHost(homeDir?: string): Promise<HostInsta
   try {
     const paths = await getClaudeCodePaths(homeDir);
 
+    await ensureMemoryWorkspace(paths.homeDir);
     await installClaudeHookScripts(paths.hooksDir);
     await installClaudeSkills(paths.skillsDir);
     await installClaudeHookConfig(paths.settingsPath, paths.hooksDir);
@@ -92,6 +93,7 @@ export async function installClaudeCodeHost(homeDir?: string): Promise<HostInsta
 export async function isClaudeCodeInstalled(homeDir?: string): Promise<HostDoctorResult> {
   const paths = await getClaudeCodePaths(homeDir);
   const settings = await readClaudeSettings(paths.settingsPath);
+  const memoryRoot = path.join(paths.homeDir, '.corivo', 'memory');
 
   const hookScriptsOk = await Promise.all(
     REQUIRED_CLAUDE_HOOK_SCRIPTS.map((fileName) => pathExists(path.join(paths.hooksDir, fileName))),
@@ -116,6 +118,16 @@ export async function isClaudeCodeInstalled(homeDir?: string): Promise<HostDocto
       ok: hasRequiredClaudeHooks(settings, paths.hooksDir),
       detail: paths.settingsPath,
     },
+    {
+      label: 'memory workspace',
+      ok: await pathExists(memoryRoot),
+      detail: memoryRoot,
+    },
+    {
+      label: 'memory index',
+      ok: await hasReadableMemoryIndex(paths.homeDir),
+      detail: path.join(memoryRoot, 'final'),
+    },
   ];
 
   return {
@@ -123,6 +135,30 @@ export async function isClaudeCodeInstalled(homeDir?: string): Promise<HostDocto
     host: 'claude-code',
     checks,
   };
+}
+
+async function ensureMemoryWorkspace(homeDir: string): Promise<void> {
+  const memoryRoot = path.join(homeDir, '.corivo', 'memory', 'final');
+  for (const scope of ['private', 'team'] as const) {
+    const scopeDir = path.join(memoryRoot, scope);
+    await fs.mkdir(scopeDir, { recursive: true });
+    const indexPath = path.join(scopeDir, 'MEMORY.md');
+    try {
+      await fs.access(indexPath);
+    } catch {
+      await fs.writeFile(indexPath, '', 'utf8');
+    }
+  }
+}
+
+async function hasReadableMemoryIndex(homeDir: string): Promise<boolean> {
+  const required = [
+    path.join(homeDir, '.corivo', 'memory', 'final', 'private', 'MEMORY.md'),
+    path.join(homeDir, '.corivo', 'memory', 'final', 'team', 'MEMORY.md'),
+  ];
+
+  const checks = await Promise.all(required.map((filePath) => pathExists(filePath)));
+  return checks.every(Boolean);
 }
 
 export async function uninstallClaudeCodeHost(homeDir?: string): Promise<HostInstallResult> {

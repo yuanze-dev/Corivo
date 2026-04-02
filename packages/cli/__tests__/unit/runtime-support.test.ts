@@ -4,6 +4,11 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ConfigError } from '../../src/errors/index.js';
 import { loadRuntimeDb } from '../../src/cli/commands/runtime-support.js';
+import {
+  getConfigDir,
+  getDefaultDatabasePath,
+  getPidFilePath,
+} from '../../src/storage/database.js';
 
 describe('loadRuntimeDb', () => {
   let tempHome: string;
@@ -28,5 +33,24 @@ describe('loadRuntimeDb', () => {
     );
 
     await expect(loadRuntimeDb({ password: false })).rejects.toBeInstanceOf(ConfigError);
+  });
+});
+
+describe('workspace paths', () => {
+  let previousHome: string | undefined;
+
+  beforeEach(() => {
+    previousHome = process.env.HOME;
+    process.env.HOME = '/tmp/corivo-home';
+  });
+
+  afterEach(() => {
+    process.env.HOME = previousHome;
+  });
+
+  it('uses ~/.corivo as the canonical config workspace', () => {
+    expect(getConfigDir()).toBe('/tmp/corivo-home/.corivo');
+    expect(getDefaultDatabasePath()).toBe('/tmp/corivo-home/.corivo/corivo.db');
+    expect(getPidFilePath()).toBe('/tmp/corivo-home/.corivo/heartbeat.pid');
   });
 });

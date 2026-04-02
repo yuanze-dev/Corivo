@@ -44,7 +44,7 @@ Corivo 当前已经具备一部分宿主安装能力，也已经有本地 DB、C
 1. 用户可以主动导入历史会话，且导入内容先进入原文 DB。
 2. 实时会话在 `UserPromptSubmit` 或等价时机，能够把新消息写入 Corivo。
 3. 原文进入后，会异步沉淀为 Markdown memory。
-4. Markdown memory 存放在用户目录下的 `.Corivo/` 工作区中，承担“索引 + 摘要详情”的角色。
+4. Markdown memory 存放在用户目录下的 `~/.corivo/` 工作区中，承担“索引 + 摘要详情”的角色。
 5. 宿主 prompt hooks 能注入 Corivo skill 与 memory index。
 6. Agent 在后续工具调用阶段，能够通过 skill 驱动 CLI 查询到相关摘要或原文。
 7. 这套闭环先在 `Claude Code` 与 `Codex` 两个宿主上跑通。
@@ -160,7 +160,7 @@ Corivo 再把原文加工为用户和 Agent 都能使用的 Memory。
 
 需要解决：
 
-- `.Corivo/` 下的目录布局
+- `~/.corivo/` 下的目录布局
 - Markdown index 与 Markdown 详情的分层结构
 - 异步处理队列与增量追加策略
 - 摘要更新、覆盖、补充和去重规则
@@ -268,7 +268,7 @@ Corivo 再把原文加工为用户和 Agent 都能使用的 Memory。
 
 完成标志：
 
-- `.Corivo/` 下形成稳定 memory 目录结构
+- `~/.corivo/` 下形成稳定 memory 目录结构
 - 有 index 文件
 - 有详情摘要文件
 - 导入与实时路径都能复用同一摘要流水线

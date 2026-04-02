@@ -123,6 +123,48 @@ curl -fsSL https://get.corivo.dev/uninstall | sh
 
 **修复**: 使用 perl 替代 sed 修复 macOS 多行删除兼容性
 
+## Phase 8: Memory Recall 闭环验收
+
+### 原文入库
+
+```bash
+corivo host import codex --all
+corivo host import claude-code --all
+```
+
+- [ ] 历史导入结果先进入 raw session/message 存储
+- [ ] realtime hook 触发后，新 prompt 原文进入 raw session/message 存储
+- [ ] history import 与 realtime ingest 都会 enqueue `extract-session` job
+
+### Markdown memory 生成
+
+```bash
+corivo memory run --full
+corivo memory run --incremental
+```
+
+- [ ] `~/.corivo/memory/final/private/MEMORY.md` 存在且可读
+- [ ] `~/.corivo/memory/final/team/MEMORY.md` 存在且可读
+- [ ] `~/.corivo/memory/final/` 下存在至少一个详情 markdown memory 文件
+- [ ] `append-detail-records` / `refresh-memory-index` / `rebuild-memory-index` 产物不再是占位空内容
+
+### Prompt hooks 与 recall
+
+- [ ] Codex `UserPromptSubmit` hook 会调用 `corivo query --prompt ... --format hook-text`
+- [ ] Claude Code `prompt-recall.sh` 会调用 `corivo query --prompt ... --format hook-text`
+- [ ] hook 脚本不再在 shell 中维护独立 recall heuristics
+- [ ] Agent 在回答中可按约定标注“根据 Corivo 的记忆”或“从 Corivo 中查到”
+
+### 查询优先级
+
+```bash
+corivo query --prompt "keep small reviewable pull requests" --format text
+```
+
+- [ ] 优先命中 `~/.corivo/memory/final/**/MEMORY.md` 与详情 markdown
+- [ ] markdown 未命中时，可回退到 raw transcript recall
+- [ ] 仅在兼容路径下回退到 legacy block recall
+
 ---
 
 ## 已知问题（不阻塞发布）

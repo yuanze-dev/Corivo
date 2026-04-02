@@ -80,7 +80,7 @@ The scheduled pipeline is now driven by raw session extraction jobs instead of d
 
 ### Artifact layout
 
-Artifacts and run metadata live under the config tree in `~/.corivo/memory-pipeline/` (this matches the spec’s vision of `~/.corivo/memory/`). The layout mirrors the artifact store’s internal directories:
+Artifacts and run metadata live under the canonical Corivo workspace root, `~/.corivo/`. The memory pipeline currently writes under `~/.corivo/memory-pipeline/`, and the projected markdown memory root sits alongside it at `~/.corivo/memory/`. The layout mirrors the artifact store’s internal directories:
 
 - `artifacts/detail/` holds append-only detail artifacts such as session summaries and block detail records.
 - `artifacts/index/` keeps lightweight index projections that can be rebuilt from the detail layer.
@@ -88,3 +88,13 @@ Artifacts and run metadata live under the config tree in `~/.corivo/memory-pipel
 - `runs/<run-id>/stages/` contains per-stage outputs plus the `manifest.json` that tracks pipeline status and cursors.
 
 Pipeline stages only interact with the artifact store, which keeps them from writing arbitrary paths themselves, so the CLI, heartbeat, and future automation can all rely on this stable structure.
+
+### Prompt-time recall priority
+
+`corivo query --prompt "<text>"` now follows the v0.11 memory recall priority:
+
+1. read generated markdown memory index/detail under `~/.corivo/memory/final/`
+2. fall back to raw session/message transcripts from SQLite when no markdown memory matches
+3. fall back to legacy block recall only as a compatibility path
+
+This keeps prompt hooks lightweight while still preferring the new markdown memory surface.

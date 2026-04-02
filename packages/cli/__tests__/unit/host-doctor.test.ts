@@ -56,6 +56,8 @@ describe('host doctor reusable helpers', () => {
     expect(beforeChecks['notify-review.sh']).toBe(false);
     expect(beforeChecks['notify-dispatch.sh']).toBe(false);
     expect(beforeChecks['hook scripts']).toBe(false);
+    expect(beforeChecks['memory workspace']).toBe(false);
+    expect(beforeChecks['memory index']).toBe(false);
 
     const installResult = await installCodexHost(tempHome);
     expect(installResult.success).toBe(true);
@@ -69,6 +71,8 @@ describe('host doctor reusable helpers', () => {
     expect(installChecks['notify-review.sh']).toBe(true);
     expect(installChecks['notify-dispatch.sh']).toBe(true);
     expect(installChecks['hook scripts']).toBe(true);
+    expect(installChecks['memory workspace']).toBe(true);
+    expect(installChecks['memory index']).toBe(true);
 
     const uninstallResult = await uninstallCodexHost(tempHome);
     expect(uninstallResult.success).toBe(true);
@@ -82,6 +86,8 @@ describe('host doctor reusable helpers', () => {
     expect(uninstallChecks['notify-review.sh']).toBe(false);
     expect(uninstallChecks['notify-dispatch.sh']).toBe(false);
     expect(uninstallChecks['hook scripts']).toBe(false);
+    expect(uninstallChecks['memory workspace']).toBe(true);
+    expect(uninstallChecks['memory index']).toBe(true);
   });
 
   it('marks Codex doctor unhealthy when notify-dispatch.sh is missing', async () => {
@@ -134,6 +140,17 @@ describe('host doctor reusable helpers', () => {
     const doctor = await isCodexInstalled(tempHome);
     expect(doctor.ok).toBe(false);
     expect(toCheckMap(doctor.checks)['config.toml']).toBe(false);
+  });
+
+  it('marks Codex doctor unhealthy when memory index files are missing', async () => {
+    const installResult = await installCodexHost(tempHome);
+    expect(installResult.success).toBe(true);
+
+    await fs.rm(path.join(tempHome, '.corivo', 'memory', 'final', 'private', 'MEMORY.md'), { force: true });
+
+    const doctor = await isCodexInstalled(tempHome);
+    expect(doctor.ok).toBe(false);
+    expect(toCheckMap(doctor.checks)['memory index']).toBe(false);
   });
 
   it('preserves pre-existing Codex notify command after uninstall', async () => {
@@ -228,6 +245,8 @@ describe('host doctor reusable helpers', () => {
     expect(beforeChecks.hooks).toBe(false);
     expect(beforeChecks.skills).toBe(false);
     expect(beforeChecks['settings.json hooks']).toBe(false);
+    expect(beforeChecks['memory workspace']).toBe(false);
+    expect(beforeChecks['memory index']).toBe(false);
 
     const installResult = await installClaudeCodeHost(tempHome);
     expect(installResult.success).toBe(true);
@@ -238,6 +257,8 @@ describe('host doctor reusable helpers', () => {
     expect(installChecks.hooks).toBe(true);
     expect(installChecks.skills).toBe(true);
     expect(installChecks['settings.json hooks']).toBe(true);
+    expect(installChecks['memory workspace']).toBe(true);
+    expect(installChecks['memory index']).toBe(true);
 
     const uninstallResult = await uninstallClaudeCodeHost(tempHome);
     expect(uninstallResult.success).toBe(true);
@@ -248,6 +269,8 @@ describe('host doctor reusable helpers', () => {
     expect(uninstallChecks.hooks).toBe(false);
     expect(uninstallChecks.skills).toBe(false);
     expect(uninstallChecks['settings.json hooks']).toBe(false);
+    expect(uninstallChecks['memory workspace']).toBe(true);
+    expect(uninstallChecks['memory index']).toBe(true);
   });
 
   it('uninstalls only Claude-owned hook files from shared hooks directory', async () => {

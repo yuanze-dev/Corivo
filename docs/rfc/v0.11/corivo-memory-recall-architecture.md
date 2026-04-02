@@ -34,7 +34,7 @@
 
 这里有一个关键前提：`Claude Code` 与 `Codex` 只是本阶段验证闭环的两个宿主承载面，不是阶段主题。文档和实现都不应把“multi-host”放在比 `Memory` 更高的位置。
 
-另一个需要显式说明的产品决策是：这份文档按当前阶段目标，默认 Markdown memory 工作区位于用户目录下的 `.Corivo/`。这与仓库当前广泛使用的 `.corivo/` 命名并不完全一致，因此实现时应把它视为本阶段需要明确落定的产品决策，而不是默认沿用现状。
+本阶段明确沿用仓库当前已经广泛使用的 `~/.corivo/` 作为 Corivo 本地工作区根目录。Markdown memory、raw storage、pipeline artifacts、hooks 日志等本地运行时产物都应收敛在这一个 workspace 下，避免 `.Corivo/` / `.corivo/` 并存造成实现与文档口径漂移。
 
 ---
 

@@ -118,6 +118,7 @@ export async function installCodexHost(homeDir?: string): Promise<HostInstallRes
 
   try {
     await fs.mkdir(paths.adapterDir, { recursive: true });
+    await ensureMemoryWorkspace(paths.homeDir);
 
     const existingConfig = await readFileIfExists(paths.configPath);
     const existingNotify = extractNotifyCommand(existingConfig);
@@ -168,6 +169,7 @@ export async function installCodexHost(homeDir?: string): Promise<HostInstallRes
 export async function isCodexInstalled(homeDir?: string): Promise<HostDoctorResult> {
   const paths = getCodexPaths(homeDir);
   const corivoRoot = path.join(paths.homeDir, '.corivo');
+  const memoryRoot = path.join(corivoRoot, 'memory');
   const [agentsContent, configContent, hooksSettings, reviewContent, dispatchContent, hookScriptsOk] = await Promise.all([
     readFileIfExists(paths.agentsPath),
     readFileIfExists(paths.configPath),
@@ -213,6 +215,16 @@ export async function isCodexInstalled(homeDir?: string): Promise<HostDoctorResu
       ok: hookScriptsOk,
       detail: paths.adapterDir,
     },
+    {
+      label: 'memory workspace',
+      ok: await pathExists(memoryRoot),
+      detail: memoryRoot,
+    },
+    {
+      label: 'memory index',
+      ok: await hasReadableMemoryIndex(corivoRoot),
+      detail: path.join(memoryRoot, 'final'),
+    },
   ];
 
   return {
@@ -220,6 +232,39 @@ export async function isCodexInstalled(homeDir?: string): Promise<HostDoctorResu
     host: 'codex',
     checks,
   };
+}
+
+async function ensureMemoryWorkspace(homeDir: string): Promise<void> {
+  const memoryRoot = path.join(homeDir, '.corivo', 'memory', 'final');
+  for (const scope of ['private', 'team'] as const) {
+    const scopeDir = path.join(memoryRoot, scope);
+    await fs.mkdir(scopeDir, { recursive: true });
+    const indexPath = path.join(scopeDir, 'MEMORY.md');
+    try {
+      await fs.access(indexPath);
+    } catch {
+      await fs.writeFile(indexPath, '', 'utf8');
+    }
+  }
+}
+
+async function hasReadableMemoryIndex(corivoRoot: string): Promise<boolean> {
+  const required = [
+    path.join(corivoRoot, 'memory', 'final', 'private', 'MEMORY.md'),
+    path.join(corivoRoot, 'memory', 'final', 'team', 'MEMORY.md'),
+  ];
+
+  const checks = await Promise.all(required.map((filePath) => pathExists(filePath)));
+  return checks.every(Boolean);
+}
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function uninstallCodexHost(homeDir?: string): Promise<HostInstallResult> {

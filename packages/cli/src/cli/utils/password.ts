@@ -101,3 +101,15 @@ export function readConfirm(prompt: string, defaultNo = true): Promise<boolean> 
     });
   });
 }
+
+export function isInteractiveTTY(): boolean {
+  return Boolean(process.stdin.isTTY && process.stdout.isTTY);
+}
+
+export function readConfirmIfTTY(prompt: string, defaultNo = true): Promise<boolean> {
+  if (!isInteractiveTTY()) {
+    return Promise.resolve(defaultNo ? false : true);
+  }
+
+  return readConfirm(prompt, defaultNo);
+}

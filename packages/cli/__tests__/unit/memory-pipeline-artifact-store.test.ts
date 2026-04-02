@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { ArtifactStore } from '../../src/memory-pipeline/artifacts/artifact-store.js';
 import { readRunManifest, writeRunManifest } from '../../src/memory-pipeline/state/run-manifest.js';
+import type { ArtifactDescriptor, MemoryPipelineArtifactStore } from '../../src/memory-pipeline/types.js';
 
 describe('ArtifactStore', () => {
   it('creates detail and index artifact directories', async () => {

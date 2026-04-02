@@ -124,7 +124,7 @@ describe('Codex Corivo integration', () => {
       expect(dispatchContent).toContain('/tmp/existing-notify.sh');
       expect(reviewContent).toBe(packagedReviewAdapter);
       expect(sessionInitContent).toContain('hookEventName:"SessionStart"');
-      expect(ingestTurnContent).toContain('corivo save --content');
+      expect(ingestTurnContent).toContain('corivo ingest-message');
       expect(userPromptSubmitContent).toContain('hookEventName:"UserPromptSubmit"');
       expect(stopContent).toContain('"decision":"block"');
       expect(hooksConfig).toContain(sessionInitPath);

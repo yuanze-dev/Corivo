@@ -10,9 +10,12 @@ import {
   AppendDetailRecordsStage,
   BlockWorkItem,
   ClaudeSessionSource,
+  CompleteRawSessionJobsStage,
   CollectClaudeSessionsStage,
+  CollectRawSessionJobsStage,
   CollectStaleBlocksStage,
   ConsolidateSessionSummariesStage,
+  DatabaseRawSessionJobSource,
   DatabaseStaleBlockSource,
   ExtractionBackedModelProcessor,
   ModelProcessor,
@@ -25,7 +28,12 @@ import {
   createInitMemoryPipeline,
   createScheduledMemoryPipeline,
 } from '../../src/memory-pipeline/index.js';
+import type { RawSessionJobSource } from '../../src/memory-pipeline/sources/raw-session-job-source.js';
 import type { StaleBlockSource } from '../../src/memory-pipeline/stages/collect-stale-blocks.js';
+import {
+  RAW_SESSION_JOBS_STATE_KEY,
+  RAW_SESSION_JOB_SOURCE_STATE_KEY,
+} from '../../src/memory-pipeline/pipeline-state.js';
 
 type BlockWithExtras = Omit<Block, 'created_at' | 'updated_at'> & {
   created_at?: number;
@@ -91,6 +99,7 @@ const createContext = (
   runId,
   trigger: { type: 'manual', runAt: Date.now() },
   artifactStore,
+  state: new Map(),
 });
 
 describe('memory pipeline extension points', () => {
@@ -245,22 +254,27 @@ describe('memory pipeline extension points', () => {
 
   it('configures scheduled pipeline with the expected stage order', () => {
     const pipeline = createScheduledMemoryPipeline({
-      staleBlockSource: new DatabaseStaleBlockSource({
-        db: { queryBlocks: async () => [] },
+      rawSessionJobSource: new DatabaseRawSessionJobSource({
+        queue: { claimNext: () => null, markSucceeded: () => {}, markFailed: () => {} } as any,
+        repository: { getTranscript: () => null } as any,
       }),
     });
     const ids = pipeline.stages.map((stage) => stage.id);
     expect(ids).toEqual([
-      'collect-stale-blocks',
+      'collect-raw-session-jobs',
       'summarize-block-batch',
       'append-detail-records',
       'refresh-memory-index',
+      'complete-raw-session-jobs',
     ]);
   });
 
-  it('enforces StaleBlockSource when building scheduled pipeline', () => {
+  it('enforces RawSessionJobSource when building scheduled pipeline', () => {
     expect(() => createScheduledMemoryPipeline({} as any)).toThrow(
-      'StaleBlockSource is required to build scheduled memory pipeline',
+      'RawSessionJobSource is required to build scheduled memory pipeline',
+    );
+    expect(() => new CollectRawSessionJobsStage(undefined as any)).toThrow(
+      'RawSessionJobSource is required',
     );
     expect(() => new CollectStaleBlocksStage(undefined as any)).toThrow(
       'StaleBlockSource is required',
@@ -356,6 +370,409 @@ describe('memory pipeline extension points', () => {
       outputCount: blocks.length,
     });
     expect(result.artifactIds).toEqual([store.descriptors[0].id]);
+  });
+
+  it('runs collect raw session jobs stage with its source dependency', async () => {
+    const jobs = [
+      {
+        id: 'job-1',
+        kind: 'session-job' as const,
+        sourceRef: 'claude-code:sess-1',
+        host: 'claude-code' as const,
+        sessionKey: 'claude-code:sess-1',
+        session: {
+          id: 'raw-session-1',
+          host: 'claude-code' as const,
+          externalSessionId: 'sess-1',
+          sessionKey: 'claude-code:sess-1',
+          sourceType: 'history-import' as const,
+          createdAt: 1,
+          updatedAt: 2,
+        },
+        transcript: [{ id: 'msg-1', role: 'user' as const, content: 'hello', ordinal: 1 }],
+        job: {
+          id: 'job-1',
+          host: 'claude-code' as const,
+          sessionKey: 'claude-code:sess-1',
+          jobType: 'extract-session' as const,
+          status: 'running' as const,
+          dedupeKey: 'extract-session:claude-code:sess-1',
+          priority: 0,
+          attemptCount: 1,
+          availableAt: 1,
+          claimedAt: 1,
+          finishedAt: null,
+          lastError: null,
+          payloadJson: null,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+    ];
+    const source: RawSessionJobSource = {
+      collect: vi.fn(async () => jobs),
+      markSucceeded: vi.fn(async () => {}),
+      markFailed: vi.fn(async () => {}),
+    };
+    const store = new RecordingArtifactStore();
+    const stage = new CollectRawSessionJobsStage(source);
+    const context = createContext(store, 'run-session-jobs');
+
+    const result = await stage.run(context);
+
+    expect(source.collect).toHaveBeenCalled();
+    expect(store.writes[0]).toMatchObject({
+      runId: 'run-session-jobs',
+      kind: 'work-item',
+      source: stage.id,
+      body: JSON.stringify(jobs),
+    });
+    expect(result).toMatchObject({
+      stageId: stage.id,
+      status: 'success',
+      inputCount: jobs.length,
+      outputCount: jobs.length,
+    });
+    expect(result.artifactIds).toEqual([store.descriptors[0].id]);
+    expect(context.state.get(RAW_SESSION_JOBS_STATE_KEY)).toEqual(jobs);
+    expect(context.state.get(RAW_SESSION_JOB_SOURCE_STATE_KEY)).toBe(source);
+  });
+
+  it('summarizes transcript-derived content from collected raw session jobs', async () => {
+    const store = new RecordingArtifactStore();
+    const processor: ModelProcessor = {
+      process: vi.fn(async (inputs: string[]) => ({
+        outputs: inputs.map((text) => `summary: ${text}`),
+        metadata: { provider: 'claude', status: 'success' },
+      })),
+    };
+    const stage = new SummarizeBlockBatchStage({ processor });
+    const context = createContext(store, 'run-session-job-summary');
+    context.state.set(RAW_SESSION_JOBS_STATE_KEY, [
+      {
+        id: 'job-1',
+        kind: 'session-job',
+        sourceRef: 'claude-code:sess-1',
+        host: 'claude-code',
+        sessionKey: 'claude-code:sess-1',
+        session: {
+          id: 'raw-session-1',
+          host: 'claude-code',
+          externalSessionId: 'sess-1',
+          sessionKey: 'claude-code:sess-1',
+          sourceType: 'history-import',
+          createdAt: 1,
+          updatedAt: 2,
+        },
+        transcript: [
+          {
+            id: 'msg-1',
+            sessionKey: 'claude-code:sess-1',
+            role: 'user',
+            content: 'remember this',
+            ordinal: 1,
+            ingestedFrom: 'host-import',
+            createdDbAt: 1,
+            updatedDbAt: 1,
+          },
+          {
+            id: 'msg-2',
+            sessionKey: 'claude-code:sess-1',
+            role: 'assistant',
+            content: 'noted',
+            ordinal: 2,
+            ingestedFrom: 'host-import',
+            createdDbAt: 2,
+            updatedDbAt: 2,
+          },
+        ],
+        job: {
+          id: 'job-1',
+          host: 'claude-code',
+          sessionKey: 'claude-code:sess-1',
+          jobType: 'extract-session',
+          status: 'running',
+          dedupeKey: 'extract-session:claude-code:sess-1',
+          priority: 0,
+          attemptCount: 1,
+          availableAt: 1,
+          claimedAt: 1,
+          finishedAt: null,
+          lastError: null,
+          payloadJson: null,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+    ]);
+
+    const result = await stage.run(context);
+
+    expect(processor.process).toHaveBeenCalledWith([
+      'user: remember this\nassistant: noted',
+    ]);
+    expect(JSON.parse(store.writes[0].body)).toEqual({
+      runId: 'run-session-job-summary',
+      stage: stage.id,
+      blocks: ['user: remember this\nassistant: noted'],
+      summaries: ['summary: user: remember this\nassistant: noted'],
+      metadata: { provider: 'claude', status: 'success' },
+    });
+    expect(result).toMatchObject({
+      stageId: stage.id,
+      status: 'success',
+      inputCount: 1,
+      outputCount: 1,
+    });
+  });
+
+  it('processes transcript-derived raw session jobs one-by-one to preserve per-job output cardinality', async () => {
+    const store = new RecordingArtifactStore();
+    const processor: ModelProcessor = {
+      process: vi.fn(async (inputs: string[]) => ({
+        outputs: [`summary: ${inputs[0]}`],
+        metadata: { provider: 'claude', status: 'success' },
+      })),
+    };
+    const stage = new SummarizeBlockBatchStage({ processor });
+    const context = createContext(store, 'run-session-job-summary-multi');
+    context.state.set(RAW_SESSION_JOBS_STATE_KEY, [
+      {
+        id: 'job-1',
+        kind: 'session-job',
+        sourceRef: 'claude-code:sess-1',
+        host: 'claude-code',
+        sessionKey: 'claude-code:sess-1',
+        session: {
+          id: 'raw-session-1',
+          host: 'claude-code',
+          externalSessionId: 'sess-1',
+          sessionKey: 'claude-code:sess-1',
+          sourceType: 'history-import',
+          createdAt: 1,
+          updatedAt: 2,
+        },
+        transcript: [
+          {
+            id: 'msg-1',
+            sessionKey: 'claude-code:sess-1',
+            role: 'user',
+            content: 'first',
+            ordinal: 1,
+            ingestedFrom: 'host-import',
+            createdDbAt: 1,
+            updatedDbAt: 1,
+          },
+        ],
+        job: {
+          id: 'job-1',
+          host: 'claude-code',
+          sessionKey: 'claude-code:sess-1',
+          jobType: 'extract-session',
+          status: 'running',
+          dedupeKey: 'extract-session:claude-code:sess-1',
+          priority: 0,
+          attemptCount: 1,
+          availableAt: 1,
+          claimedAt: 1,
+          finishedAt: null,
+          lastError: null,
+          payloadJson: null,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+      {
+        id: 'job-2',
+        kind: 'session-job',
+        sourceRef: 'claude-code:sess-2',
+        host: 'claude-code',
+        sessionKey: 'claude-code:sess-2',
+        session: {
+          id: 'raw-session-2',
+          host: 'claude-code',
+          externalSessionId: 'sess-2',
+          sessionKey: 'claude-code:sess-2',
+          sourceType: 'history-import',
+          createdAt: 1,
+          updatedAt: 2,
+        },
+        transcript: [
+          {
+            id: 'msg-2',
+            sessionKey: 'claude-code:sess-2',
+            role: 'assistant',
+            content: 'second',
+            ordinal: 1,
+            ingestedFrom: 'host-import',
+            createdDbAt: 1,
+            updatedDbAt: 1,
+          },
+        ],
+        job: {
+          id: 'job-2',
+          host: 'claude-code',
+          sessionKey: 'claude-code:sess-2',
+          jobType: 'extract-session',
+          status: 'running',
+          dedupeKey: 'extract-session:claude-code:sess-2',
+          priority: 0,
+          attemptCount: 1,
+          availableAt: 1,
+          claimedAt: 1,
+          finishedAt: null,
+          lastError: null,
+          payloadJson: null,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+    ]);
+
+    const result = await stage.run(context);
+
+    expect(processor.process).toHaveBeenNthCalledWith(1, ['user: first']);
+    expect(processor.process).toHaveBeenNthCalledWith(2, ['assistant: second']);
+    expect(JSON.parse(store.writes[0].body)).toEqual({
+      runId: 'run-session-job-summary-multi',
+      stage: stage.id,
+      blocks: ['user: first', 'assistant: second'],
+      summaries: ['summary: user: first', 'summary: assistant: second'],
+      metadata: { provider: 'claude', status: 'success' },
+    });
+    expect(result).toMatchObject({
+      stageId: stage.id,
+      status: 'success',
+      inputCount: 2,
+      outputCount: 2,
+    });
+  });
+
+  it('preserves provider error text when transcript-derived summarization fails', async () => {
+    const store = new RecordingArtifactStore();
+    const processor: ModelProcessor = {
+      process: vi.fn(async () => ({
+        outputs: [],
+        metadata: { provider: 'claude', status: 'error', error: 'model overloaded' },
+      })),
+    };
+    const stage = new SummarizeBlockBatchStage({ processor });
+    const context = createContext(store, 'run-session-job-summary-fail');
+    context.state.set(RAW_SESSION_JOBS_STATE_KEY, [
+      {
+        id: 'job-1',
+        kind: 'session-job',
+        sourceRef: 'claude-code:sess-1',
+        host: 'claude-code',
+        sessionKey: 'claude-code:sess-1',
+        session: {
+          id: 'raw-session-1',
+          host: 'claude-code',
+          externalSessionId: 'sess-1',
+          sessionKey: 'claude-code:sess-1',
+          sourceType: 'history-import',
+          createdAt: 1,
+          updatedAt: 2,
+        },
+        transcript: [
+          {
+            id: 'msg-1',
+            sessionKey: 'claude-code:sess-1',
+            role: 'user',
+            content: 'remember this',
+            ordinal: 1,
+            ingestedFrom: 'host-import',
+            createdDbAt: 1,
+            updatedDbAt: 1,
+          },
+        ],
+        job: {
+          id: 'job-1',
+          host: 'claude-code',
+          sessionKey: 'claude-code:sess-1',
+          jobType: 'extract-session',
+          status: 'running',
+          dedupeKey: 'extract-session:claude-code:sess-1',
+          priority: 0,
+          attemptCount: 1,
+          availableAt: 1,
+          claimedAt: 1,
+          finishedAt: null,
+          lastError: null,
+          payloadJson: null,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+    ]);
+
+    const result = await stage.run(context);
+
+    expect(result).toMatchObject({
+      stageId: stage.id,
+      status: 'failed',
+      inputCount: 1,
+      outputCount: 0,
+      error: 'model overloaded',
+    });
+  });
+
+  it('marks collected raw session jobs succeeded after downstream stages finish', async () => {
+    const source: RawSessionJobSource = {
+      collect: vi.fn(async () => []),
+      markSucceeded: vi.fn(async () => {}),
+      markFailed: vi.fn(async () => {}),
+    };
+    const stage = new CompleteRawSessionJobsStage();
+    const context = createContext(new RecordingArtifactStore(), 'run-complete-session-jobs');
+    context.state.set(RAW_SESSION_JOB_SOURCE_STATE_KEY, source);
+    context.state.set(RAW_SESSION_JOBS_STATE_KEY, [
+      {
+        id: 'job-1',
+        kind: 'session-job',
+        sourceRef: 'claude-code:sess-1',
+        host: 'claude-code',
+        sessionKey: 'claude-code:sess-1',
+        session: {
+          id: 'raw-session-1',
+          host: 'claude-code',
+          externalSessionId: 'sess-1',
+          sessionKey: 'claude-code:sess-1',
+          sourceType: 'history-import',
+          createdAt: 1,
+          updatedAt: 2,
+        },
+        transcript: [],
+        job: {
+          id: 'job-1',
+          host: 'claude-code',
+          sessionKey: 'claude-code:sess-1',
+          jobType: 'extract-session',
+          status: 'running',
+          dedupeKey: 'extract-session:claude-code:sess-1',
+          priority: 0,
+          attemptCount: 1,
+          availableAt: 1,
+          claimedAt: 1,
+          finishedAt: null,
+          lastError: null,
+          payloadJson: null,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+    ]);
+
+    const result = await stage.run(context);
+
+    expect(source.markSucceeded).toHaveBeenCalledWith('job-1');
+    expect(result).toMatchObject({
+      stageId: stage.id,
+      status: 'success',
+      inputCount: 1,
+      outputCount: 1,
+      artifactIds: [],
+    });
   });
 
   it('runs summarize session batch stage and emits a contextual summary', async () => {

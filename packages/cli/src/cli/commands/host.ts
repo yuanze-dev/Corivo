@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import { createHostDoctorUseCase } from '../../application/hosts/doctor-host.js';
 import { createHostInstallUseCase } from '../../application/hosts/install-host.js';
 import { createHostUninstallUseCase } from '../../application/hosts/uninstall-host.js';
+import { hostImportCommand } from './host-import.js';
 import { getAllHostAdapters } from '../../hosts/registry.js';
 import type { HostId } from '../../hosts/types.js';
 
@@ -74,3 +75,5 @@ hostCommand
 
     console.log(chalk.green(result.summary));
   });
+
+hostCommand.addCommand(hostImportCommand);

@@ -92,6 +92,63 @@ describe('memory command (CLI integration)', () => {
 });
 
 describe('memory pipeline cleanup', () => {
+  it('builds the incremental pipeline from raw-session job source', async () => {
+    const createScheduledPipeline = vi.fn(() => ({
+      id: 'scheduled-memory-pipeline' as const,
+      stages: [],
+    }));
+    const createRawSessionJobSource = vi.fn(() => ({
+      collect: async () => [],
+      markSucceeded: async () => {},
+      markFailed: async () => {},
+    }));
+
+    await runMemoryPipeline('incremental', {
+      resolveConfigDir: () => '/tmp/corivo',
+      resolveDatabasePath: () => '/tmp/corivo/corivo.db',
+      readConfig: async () => ({}),
+      createArtifactStore: () => ({
+        writeArtifact: async () => ({
+          id: 'artifact',
+          kind: 'work-item',
+          version: 1,
+          path: 'artifacts/detail/test.json',
+          source: 'test',
+          createdAt: Date.now(),
+        }),
+        persistDescriptor: async () => {},
+        getDescriptor: async () => undefined,
+      }),
+      createLock: () => ({
+        acquire: async () => {},
+        release: async () => {},
+      }),
+      createRunner: () =>
+        ({
+          run: async () => ({
+            runId: 'run',
+            pipelineId: 'scheduled-memory-pipeline',
+            status: 'success',
+            stages: [],
+          }),
+        } as MemoryPipelineRunner),
+      createInitPipeline: () => ({ id: 'init-memory-pipeline', stages: [] }),
+      createScheduledPipeline,
+      createSessionSource: () => ({ collect: async () => [] }),
+      createRawSessionJobSource,
+      openDatabase: () =>
+        ({
+          close: () => {},
+        } as CorivoDatabase),
+      closeDatabase: () => {},
+    } as any);
+
+    expect(createRawSessionJobSource).toHaveBeenCalled();
+    expect(createScheduledPipeline).toHaveBeenCalledWith(
+      expect.objectContaining({ rawSessionJobSource: expect.anything() }),
+    );
+  });
+
   it('closes the database even if incremental build fails', async () => {
     let closed = false;
 
@@ -130,7 +187,11 @@ describe('memory pipeline cleanup', () => {
           throw new Error('pipeline build failure');
         },
         createSessionSource: () => ({ collect: async () => [] }),
-        createStaleBlockSource: () => ({ collect: async () => [] }),
+        createRawSessionJobSource: () => ({
+          collect: async () => [],
+          markSucceeded: async () => {},
+          markFailed: async () => {},
+        }),
         openDatabase: () =>
           ({
             close: () => {},
@@ -138,7 +199,7 @@ describe('memory pipeline cleanup', () => {
         closeDatabase: () => {
           closed = true;
         },
-      }),
+      } as any),
     ).rejects.toThrow('pipeline build failure');
 
     expect(closed).toBe(true);

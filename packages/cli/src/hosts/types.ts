@@ -13,7 +13,8 @@ export type HostCapability =
   | 'notify'
   | 'plugin-file'
   | 'doctor'
-  | 'uninstall';
+  | 'uninstall'
+  | 'history-import';
 
 export interface HostInstallOptions {
   target?: string;
@@ -35,6 +36,26 @@ export interface HostDoctorResult {
   checks: Array<{ label: string; ok: boolean; detail: string }>;
 }
 
+export interface HostImportOptions {
+  all?: boolean;
+  since?: string;
+  limit?: number;
+  dryRun?: boolean;
+  target?: string;
+}
+
+export interface HostImportResult {
+  success: boolean;
+  host: HostId;
+  mode: 'full' | 'incremental';
+  importedSessionCount: number;
+  importedMessageCount: number;
+  nextCursor?: string;
+  summary: string;
+  unavailableReason?: string;
+  error?: string;
+}
+
 export interface HostAdapter {
   id: HostId;
   displayName: string;
@@ -42,4 +63,5 @@ export interface HostAdapter {
   install(options: HostInstallOptions): Promise<HostInstallResult>;
   doctor(options: HostInstallOptions): Promise<HostDoctorResult>;
   uninstall?(options: HostInstallOptions): Promise<HostInstallResult>;
+  importHistory?(options: HostImportOptions): Promise<HostImportResult>;
 }

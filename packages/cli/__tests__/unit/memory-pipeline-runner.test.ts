@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { mkdtemp, readFile, readdir, unlink, writeFile, link } from 'node:fs/promises';
 import type { FileHandle } from 'node:fs/promises';
 import os from 'node:os';
@@ -184,6 +184,42 @@ describe('MemoryPipelineRunner', () => {
     expect(calls).toEqual(['partial', 'skipped', 'final']);
     expect(result.stages.map((stage) => stage.status)).toEqual(['partial', 'skipped', 'success']);
     expect(result.status).toBe('success');
+  });
+
+  it('shares pipeline state across stages and marks claimed raw session jobs failed when a later stage fails', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
+    const lock = new FileRunLock(path.join(root, 'run.lock'));
+    const runner = new MemoryPipelineRunner({
+      artifactStore: createArtifactStore(),
+      lock,
+      runRoot: root,
+      runIdGenerator: () => 'run-shared-state',
+    });
+    const markFailed = vi.fn(async () => {});
+
+    const pipeline = {
+      id: 'scheduled-memory-pipeline',
+      stages: [
+        createStage('collect', async (context) => {
+          context.state.set('rawSessionJobSource', {
+            markFailed,
+          });
+          context.state.set('rawSessionJobs', [
+            { job: { id: 'job-1' } },
+          ]);
+          return createResult('collect', 'success');
+        }),
+        createStage('verify-state', async (context) => {
+          expect(context.state.get('rawSessionJobs')).toEqual([{ job: { id: 'job-1' } }]);
+          return createResult('verify-state', 'failed', { error: 'summarize failed' });
+        }),
+      ],
+    };
+
+    const result = await runner.run(pipeline as any, { type: 'manual', runAt: Date.now() });
+
+    expect(result.status).toBe('failed');
+    expect(markFailed).toHaveBeenCalledWith('job-1', 'summarize failed');
   });
 
   it('throws when the lock is already held', async () => {

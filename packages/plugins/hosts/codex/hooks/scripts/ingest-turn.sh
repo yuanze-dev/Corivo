@@ -18,7 +18,7 @@ LOG_FILE="$LOG_DIR/hooks-codex-ingest.log"
 tail -n 100 "$LOG_FILE" > "${LOG_FILE}.tmp" && mv "${LOG_FILE}.tmp" "$LOG_FILE"
 
 CONTENT=""
-ANNOTATION=""
+NORMALIZED_PAYLOAD=""
 
 extract_field() {
   local field_name="$1"
@@ -30,6 +30,73 @@ extract_field() {
         const payload = JSON.parse(input || "{}");
         const field = process.env.FIELD_NAME;
         process.stdout.write(typeof payload[field] === "string" ? payload[field] : "");
+      } catch {
+        process.stdout.write("");
+      }
+    });
+  '
+}
+
+extract_content() {
+  printf '%s' "$INPUT" | ROLE="$ROLE" node -e '
+    let input = "";
+    process.stdin.on("data", (chunk) => (input += chunk));
+    process.stdin.on("end", () => {
+      try {
+        const payload = JSON.parse(input || "{}");
+        const role = process.env.ROLE;
+        const firstString = (...values) => values.find((value) => typeof value === "string" && value.length > 0) || "";
+        const content = role === "user"
+          ? firstString(payload.prompt, payload.user_prompt, payload.message)
+          : firstString(payload.last_assistant_message, payload.assistant_message, payload.message);
+        process.stdout.write(content);
+      } catch {
+        process.stdout.write("");
+      }
+    });
+  '
+}
+
+normalize_payload() {
+  printf '%s' "$INPUT" | ROLE="$ROLE" PROJECT_IDENTITY="${PWD:-}" node -e '
+    let input = "";
+    process.stdin.on("data", (chunk) => (input += chunk));
+    process.stdin.on("end", () => {
+      try {
+        const payload = JSON.parse(input || "{}");
+        const role = process.env.ROLE;
+        const firstString = (...values) => values.find((value) => typeof value === "string" && value.length > 0) || "";
+        const content = role === "user"
+          ? firstString(payload.prompt, payload.user_prompt, payload.message)
+          : firstString(payload.last_assistant_message, payload.assistant_message, payload.message);
+        const externalSessionId = firstString(
+          payload.session_id,
+          payload.sessionId,
+          payload.conversation_id,
+          payload.conversationId,
+          payload.chat_id,
+          payload.chatId
+        );
+
+        if (!externalSessionId || !content) {
+          process.stdout.write("");
+          return;
+        }
+
+        const externalMessageId = role === "user"
+          ? firstString(payload.prompt_id, payload.message_id, payload.messageId, payload.event_id, payload.eventId)
+          : firstString(payload.last_assistant_message_id, payload.message_id, payload.messageId, payload.event_id, payload.eventId);
+
+        process.stdout.write(JSON.stringify({
+          host: "codex",
+          externalSessionId,
+          externalMessageId: externalMessageId || undefined,
+          role,
+          content,
+          projectIdentity: firstString(payload.cwd, payload.workspace, process.env.PROJECT_IDENTITY),
+          ingestedFrom: role === "user" ? "codex-user-prompt-submit" : "codex-stop",
+          ingestEventId: firstString(payload.event_id, payload.eventId) || undefined,
+        }));
       } catch {
         process.stdout.write("");
       }
@@ -58,11 +125,9 @@ should_skip_test_input() {
 }
 
 if [ "$ROLE" = "user" ]; then
-  CONTENT="$(extract_field "prompt")"
-  ANNOTATION="事实 · self · 对话"
+  CONTENT="$(extract_content)"
 elif [ "$ROLE" = "assistant" ]; then
-  CONTENT="$(extract_field "last_assistant_message")"
-  ANNOTATION="知识 · self · 回答"
+  CONTENT="$(extract_content)"
 else
   echo "Unknown role: $ROLE" >> "$LOG_FILE"
   exit 0
@@ -83,10 +148,16 @@ if ! command -v corivo >/dev/null 2>&1; then
   exit 0
 fi
 
-if corivo save --content "$CONTENT" --annotation "$ANNOTATION" --source "codex-hooks" >> "$LOG_FILE" 2>&1; then
-  echo "✓ Saved [$ROLE] turn to corivo (${#CONTENT} chars)" >> "$LOG_FILE"
+NORMALIZED_PAYLOAD="$(normalize_payload)"
+if [ -z "$NORMALIZED_PAYLOAD" ]; then
+  echo "Missing session metadata, skipping realtime ingest" >> "$LOG_FILE"
+  exit 0
+fi
+
+if printf '%s' "$NORMALIZED_PAYLOAD" | corivo ingest-message >> "$LOG_FILE" 2>&1; then
+  echo "✓ Ingested [$ROLE] turn into raw memory (${#CONTENT} chars)" >> "$LOG_FILE"
 else
-  echo "✗ Failed to save [$ROLE] turn to corivo" >> "$LOG_FILE"
+  echo "✗ Failed to ingest [$ROLE] turn into raw memory" >> "$LOG_FILE"
 fi
 
 exit 0

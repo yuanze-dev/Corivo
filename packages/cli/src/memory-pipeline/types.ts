@@ -7,7 +7,7 @@ export interface PipelineTrigger {
   scope?: Record<string, unknown>;
 }
 
-export type WorkItemKind = 'session' | 'block' | 'summary' | 'index-fragment';
+export type WorkItemKind = 'session' | 'block' | 'session-job' | 'summary' | 'index-fragment';
 
 export interface WorkItem {
   id: string;
@@ -59,6 +59,7 @@ export interface MemoryPipelineContext {
   runId: string;
   trigger: PipelineTrigger;
   artifactStore: MemoryPipelineArtifactStore;
+  state: Map<string, unknown>;
   logger?: {
     log: (...args: unknown[]) => void;
     error: (...args: unknown[]) => void;

@@ -5,12 +5,13 @@ import { createHostUninstallUseCase } from '../../src/application/hosts/uninstal
 import { hostCommand } from '../../src/cli/commands/host.js';
 
 describe('host command', () => {
-  it('registers list, install, doctor, and uninstall subcommands', () => {
+  it('registers list, install, doctor, uninstall, and import subcommands', () => {
     expect(hostCommand.commands.map((command) => command.name())).toEqual([
       'list',
       'install',
       'doctor',
       'uninstall',
+      'import',
     ]);
   });
 

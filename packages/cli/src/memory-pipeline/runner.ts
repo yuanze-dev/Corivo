@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { getRawSessionJobs, getRawSessionJobSource } from './pipeline-state.js';
 import { writeRunManifest } from './state/run-manifest.js';
 import type {
   MemoryPipelineArtifactStore,
@@ -45,16 +46,24 @@ export class MemoryPipelineRunner {
     const stageResults: PipelineStageResult[] = [];
     manifest.stages = stageResults;
     const manifestWriter = this.options.manifestWriter ?? writeRunManifest;
+    const context: MemoryPipelineContext = {
+      runId,
+      trigger,
+      artifactStore: this.options.artifactStore,
+      state: new Map(),
+      logger: this.options.logger,
+    };
 
     try {
       await manifestWriter(manifestPath, manifest);
       for (const stage of pipeline.stages) {
-        const result = await this.executeStage(stage, runId, trigger);
+        const result = await this.executeStage(stage, context);
         stageResults.push(result);
         manifest.status = result.status === 'failed' ? 'failed' : 'running';
         await manifestWriter(manifestPath, manifest);
 
         if (result.status === 'failed') {
+          await this.markClaimedJobsFailed(context.state, result.error ?? `${stage.id} failed`);
           return this.buildResult(runId, pipeline.id, 'failed', stageResults);
         }
       }
@@ -62,6 +71,9 @@ export class MemoryPipelineRunner {
       manifest.status = 'success';
       await manifestWriter(manifestPath, manifest);
       return this.buildResult(runId, pipeline.id, 'success', stageResults);
+    } catch (error) {
+      await this.markClaimedJobsFailed(context.state, this.toErrorMessage(error));
+      throw error;
     } finally {
       await this.options.lock.release();
     }
@@ -69,21 +81,32 @@ export class MemoryPipelineRunner {
 
   private async executeStage(
     stage: MemoryPipelineDefinition['stages'][number],
-    runId: string,
-    trigger: PipelineTrigger,
+    context: MemoryPipelineContext,
   ): Promise<PipelineStageResult> {
-    const context: MemoryPipelineContext = {
-      runId,
-      trigger,
-      artifactStore: this.options.artifactStore,
-      logger: this.options.logger,
-    };
-
     try {
       return await stage.run(context);
     } catch (error) {
       return this.buildFailedStageResult(stage.id, error);
     }
+  }
+
+  private async markClaimedJobsFailed(state: Map<string, unknown>, error: string): Promise<void> {
+    const source = getRawSessionJobSource(state);
+    const jobs = getRawSessionJobs(state);
+
+    if (!source || jobs.length === 0) {
+      return;
+    }
+
+    await Promise.allSettled(jobs.map((job) => source.markFailed(job.job.id, error)));
+  }
+
+  private toErrorMessage(error: unknown): string {
+    return error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+      ? error
+      : 'memory pipeline failed unexpectedly';
   }
 
   private buildFailedStageResult(stageId: string, error: unknown): PipelineStageResult {

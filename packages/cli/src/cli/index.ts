@@ -46,6 +46,7 @@ import { updateCommand } from './commands/update.js';
 import { createSyncCommand } from './commands/sync.js';
 import { listCommand } from './commands/list.js';
 import { getMemoryCommand } from './commands/memory.js';
+import { ingestMessageCommand } from './commands/ingest-message.js';
 
 const program = new Command();
 
@@ -168,6 +169,7 @@ program.addCommand(firstRunCommand);
 program.addCommand(daemonCommand);
 program.addCommand(updateCommand);
 program.addCommand(createSyncCommand());
+program.addCommand(ingestMessageCommand);
 
 // Error handling
 program.configureOutput({

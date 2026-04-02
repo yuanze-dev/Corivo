@@ -3,11 +3,13 @@ import path from 'node:path';
 import { Command } from 'commander';
 import { ConfigError } from '../../errors/index.js';
 import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
+import { MemoryProcessingJobQueue } from '@/raw-memory/job-queue';
+import { RawMemoryRepository } from '@/raw-memory/repository';
 import {
   ArtifactStore,
   createInitMemoryPipeline,
   createScheduledMemoryPipeline,
-  DatabaseStaleBlockSource,
+  DatabaseRawSessionJobSource,
   FileRunLock,
   MemoryPipelineRunner,
   StubClaudeSessionSource,
@@ -17,7 +19,7 @@ import {
   type MemoryPipelineRunnerOptions,
   type MemoryPipelineRunResult,
   type PipelineTrigger,
-  type StaleBlockSource,
+  type RawSessionJobSource,
 } from '@/memory-pipeline';
 
 export type MemoryPipelineMode = 'full' | 'incremental';
@@ -30,9 +32,11 @@ export interface MemoryPipelineExecutionDependencies {
   createLock: (runRoot: string) => FileRunLock;
   createRunner: (options: MemoryPipelineRunnerOptions) => MemoryPipelineRunner;
   createInitPipeline: (options: { sessionSource: ClaudeSessionSource }) => MemoryPipelineDefinition;
-  createScheduledPipeline: (options: { staleBlockSource: StaleBlockSource }) => MemoryPipelineDefinition;
+  createScheduledPipeline: (options: {
+    rawSessionJobSource: RawSessionJobSource;
+  }) => MemoryPipelineDefinition;
   createSessionSource: () => ClaudeSessionSource;
-  createStaleBlockSource: (db: CorivoDatabase) => StaleBlockSource;
+  createRawSessionJobSource: (db: CorivoDatabase) => RawSessionJobSource;
   openDatabase: (dbPath: string) => CorivoDatabase;
   closeDatabase: (db: CorivoDatabase, dbPath: string) => void;
   createTrigger: (mode: MemoryPipelineMode) => PipelineTrigger;
@@ -75,9 +79,14 @@ const defaultExecutionDependencies: MemoryPipelineExecutionDependencies = {
   createLock: (runRoot) => new FileRunLock(path.join(runRoot, 'run.lock')),
   createRunner: (options) => new MemoryPipelineRunner(options),
   createInitPipeline: ({ sessionSource }) => createInitMemoryPipeline({ sessionSource }),
-  createScheduledPipeline: ({ staleBlockSource }) => createScheduledMemoryPipeline({ staleBlockSource }),
+  createScheduledPipeline: ({ rawSessionJobSource }) =>
+    createScheduledMemoryPipeline({ rawSessionJobSource }),
   createSessionSource: () => new StubClaudeSessionSource(),
-  createStaleBlockSource: (db) => new DatabaseStaleBlockSource({ db }),
+  createRawSessionJobSource: (db) =>
+    new DatabaseRawSessionJobSource({
+      queue: new MemoryProcessingJobQueue(db),
+      repository: new RawMemoryRepository(db),
+    }),
   openDatabase: (dbPath) => CorivoDatabase.getInstance({ path: dbPath, enableEncryption: false }),
   closeDatabase: () => {
     /* No-op; the CorivoDatabase lifecycle is managed at the process level */
@@ -120,8 +129,8 @@ export async function runMemoryPipeline(
             const db = dependencies.openDatabase(dbPath);
             openedDatabase = db;
             openedDatabasePath = dbPath;
-            const staleSource = dependencies.createStaleBlockSource(db);
-            return dependencies.createScheduledPipeline({ staleBlockSource: staleSource });
+            const rawSessionJobSource = dependencies.createRawSessionJobSource(db);
+            return dependencies.createScheduledPipeline({ rawSessionJobSource });
           })();
 
     return await runner.run(pipeline, dependencies.createTrigger(mode));

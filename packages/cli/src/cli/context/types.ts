@@ -59,5 +59,6 @@ export interface CliContext {
 export interface CreateCliContextOptions {
   logger?: Logger;
   logLevel?: string;
+  configLogLevel?: string;
   logTarget?: LogTarget;
 }

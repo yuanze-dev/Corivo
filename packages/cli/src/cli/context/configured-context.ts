@@ -8,6 +8,6 @@ export function createConfiguredCliContext(
 ): CliContext {
   return createCliContext({
     ...options,
-    logLevel: config?.settings?.logLevel ?? options.logLevel,
+    configLogLevel: config?.settings?.logLevel,
   });
 }

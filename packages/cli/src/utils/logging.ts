@@ -20,13 +20,84 @@ export interface Logger {
   isDebugEnabled: () => boolean;
 }
 
-const DEFAULT_LOG_LEVEL: LogLevel = 'info';
+const DEFAULT_LOG_LEVEL: LogLevel = 'debug';
 
 const isLogLevel = (value: string): value is LogLevel =>
   value === 'error' || value === 'info' || value === 'debug';
 
 const resolveLogLevel = (value?: string | null): LogLevel =>
   value && isLogLevel(value) ? value : DEFAULT_LOG_LEVEL;
+
+function isTruthyEnvFlag(value?: string): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
+function readRuntimeMode(env: NodeJS.ProcessEnv): 'production' | 'development' | null {
+  const explicitLevel = env.CORIVO_LOG_LEVEL;
+  if (explicitLevel && isLogLevel(explicitLevel)) {
+    return null;
+  }
+
+  const modeCandidates = [
+    env.CORIVO_ENV,
+    env.NODE_ENV,
+    env.MODE,
+  ].filter((value): value is string => Boolean(value));
+
+  for (const candidate of modeCandidates) {
+    const normalized = candidate.trim().toLowerCase();
+    if (normalized === 'production' || normalized === 'prod') {
+      return 'production';
+    }
+    if (normalized === 'development' || normalized === 'dev') {
+      return 'development';
+    }
+  }
+
+  if (isTruthyEnvFlag(env.PROD) || isTruthyEnvFlag(env.CI)) {
+    return 'production';
+  }
+
+  if (isTruthyEnvFlag(env.DEV)) {
+    return 'development';
+  }
+
+  return null;
+}
+
+export function resolveRuntimeLogLevel(options: {
+  explicitLogLevel?: LogLevel | string | null;
+  configLogLevel?: LogLevel | string | null;
+  env?: NodeJS.ProcessEnv;
+} = {}): LogLevel {
+  if (options.explicitLogLevel && isLogLevel(options.explicitLogLevel)) {
+    return options.explicitLogLevel;
+  }
+
+  const env = options.env ?? process.env;
+  if (env.CORIVO_LOG_LEVEL && isLogLevel(env.CORIVO_LOG_LEVEL)) {
+    return env.CORIVO_LOG_LEVEL;
+  }
+
+  const runtimeMode = readRuntimeMode(env);
+  if (runtimeMode === 'production') {
+    return 'info';
+  }
+  if (runtimeMode === 'development') {
+    return 'debug';
+  }
+
+  if (options.configLogLevel && isLogLevel(options.configLogLevel)) {
+    return options.configLogLevel;
+  }
+
+  return DEFAULT_LOG_LEVEL;
+}
 
 const formatArgs = (args: unknown[]): string =>
   formatWithOptions({ colors: false, depth: 6 }, ...args);

@@ -11,6 +11,9 @@ permissions:
 jobs:
   release-notes:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: production
+      CORIVO_ENV: production
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createLogger } from '../../src/utils/logging.js';
+import { createLogger, resolveRuntimeLogLevel } from '../../src/utils/logging.js';
 
 describe('createLogger', () => {
   it('debug 级别会输出 debug 日志', () => {
@@ -33,7 +33,7 @@ describe('createLogger', () => {
     expect(logs).toEqual([]);
   });
 
-  it('自动将未知级别归一化为 info', () => {
+  it('显式未知级别会回退到本地默认 debug', () => {
     const logs: string[] = [];
     const logger = createLogger(
       {
@@ -45,7 +45,8 @@ describe('createLogger', () => {
 
     logger.debug('sync debug message');
 
-    expect(logs).toEqual([]);
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toContain('sync debug message');
   });
 
   it('success 使用标准输出通道', () => {
@@ -74,5 +75,32 @@ describe('createLogger', () => {
 
     expect(logs).toEqual([]);
     expect(errors.join('\n')).toContain('token expired');
+  });
+
+  it('production 环境优先于 config logLevel', () => {
+    expect(resolveRuntimeLogLevel({
+      configLogLevel: 'debug',
+      env: { NODE_ENV: 'production' },
+    })).toBe('info');
+  });
+
+  it('development 环境优先于 config logLevel', () => {
+    expect(resolveRuntimeLogLevel({
+      configLogLevel: 'info',
+      env: { NODE_ENV: 'development' },
+    })).toBe('debug');
+  });
+
+  it('环境变量缺失时回退到 config logLevel', () => {
+    expect(resolveRuntimeLogLevel({
+      configLogLevel: 'error',
+      env: {},
+    })).toBe('error');
+  });
+
+  it('本地默认回退到 debug', () => {
+    expect(resolveRuntimeLogLevel({
+      env: {},
+    })).toBe('debug');
   });
 });

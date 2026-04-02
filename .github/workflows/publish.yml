@@ -12,6 +12,9 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: production
+      CORIVO_ENV: production
     defaults:
       run:
         working-directory: packages/cli

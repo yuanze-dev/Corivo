@@ -14,12 +14,13 @@
   ],
   "scripts": {
     "build": "tsdown",
+    "build:prod": "NODE_ENV=production CORIVO_ENV=production tsdown",
     "dev": "tsdown --watch",
     "test": "vitest --run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build",
-    "package": "npm run build && pkg . --targets node18-macos-arm64,node18-macos-x64,node18-linux-x64 --output ../../binaries/corivo"
+    "prepublishOnly": "npm run build:prod",
+    "package": "npm run build:prod && pkg . --targets node18-macos-arm64,node18-macos-x64,node18-linux-x64 --output ../../binaries/corivo"
   },
   "pkg": {
     "assets": [

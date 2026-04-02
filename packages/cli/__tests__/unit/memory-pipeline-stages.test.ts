@@ -1272,6 +1272,218 @@ Always verify the deployment with a focused smoke test.
     });
   });
 
+  it('no-ops cleanly when there are no raw memory artifacts to merge', async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'corivo-merge-empty-'));
+    const runRoot = path.join(tempRoot, 'memory-pipeline');
+    await mkdir(runRoot, { recursive: true });
+    const store = new ArtifactStore(runRoot);
+    const processor: ModelProcessor = {
+      process: vi.fn(async () => ({
+        outputs: ['should not run'],
+        metadata: { provider: 'claude', status: 'success' },
+      })),
+    };
+    const stage = new MergeFinalMemoriesStage({ processor });
+
+    const result = await stage.run(createContext(store, 'run-merge-empty'));
+
+    expect(processor.process).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      stageId: 'merge-final-memories',
+      status: 'success',
+      inputCount: 0,
+      outputCount: 0,
+      artifactIds: [],
+    });
+    await expect(
+      store.listArtifacts({
+        runId: 'run-merge-empty',
+        kind: 'final-memory-batch',
+        source: 'merge-final-memories',
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it.each([
+    ['error', 'provider down'],
+    ['timeout', 'timed out'],
+  ])('fails cleanly when merge processor returns %s metadata', async (status, error) => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'corivo-merge-fail-'));
+    const runRoot = path.join(tempRoot, 'memory-pipeline');
+    await mkdir(runRoot, { recursive: true });
+    const store = new ArtifactStore(runRoot);
+
+    await store.writeArtifact({
+      runId: 'run-merge-fail',
+      kind: 'raw-memory-batch',
+      source: 'extract-raw-memories',
+      body: JSON.stringify({
+        sessionId: 'session-001',
+        markdown: `<!-- FILE: private/user-short-prs.md -->
+\`\`\`markdown
+---
+name: User prefers short PRs
+description: User usually wants small reviewable pull requests
+type: user
+scope: private
+source_session: session-001
+---
+
+Keep PRs narrowly scoped and easy to review.
+\`\`\`
+`,
+      }),
+    });
+
+    const processor: ModelProcessor = {
+      process: vi.fn(async () => ({
+        outputs: [],
+        metadata: { provider: 'claude', status: status as 'error' | 'timeout', error },
+      })),
+    };
+    const stage = new MergeFinalMemoriesStage({ processor });
+
+    const result = await stage.run(createContext(store, 'run-merge-fail'));
+
+    expect(result).toMatchObject({
+      stageId: 'merge-final-memories',
+      status: 'failed',
+      inputCount: 1,
+      outputCount: 0,
+      artifactIds: [],
+      error,
+    });
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'raw', 'session-001.memories.md'), 'utf8'),
+    ).resolves.toContain('source_session: session-001');
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'final', 'private', 'user-short-prs.md'), 'utf8'),
+    ).rejects.toThrow();
+  });
+
+  it('rejects duplicate final file blocks before writing any final files', async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'corivo-merge-duplicate-'));
+    const runRoot = path.join(tempRoot, 'memory-pipeline');
+    await mkdir(runRoot, { recursive: true });
+    const store = new ArtifactStore(runRoot);
+
+    await store.writeArtifact({
+      runId: 'run-merge-duplicate',
+      kind: 'raw-memory-batch',
+      source: 'extract-raw-memories',
+      body: JSON.stringify({
+        sessionId: 'session-001',
+        markdown: `<!-- FILE: private/user-short-prs.md -->
+\`\`\`markdown
+---
+name: User prefers short PRs
+description: User usually wants small reviewable pull requests
+type: user
+scope: private
+source_session: session-001
+---
+
+Keep PRs narrowly scoped and easy to review.
+\`\`\`
+`,
+      }),
+    });
+
+    const stage = new MergeFinalMemoriesStage({
+      processor: {
+        process: vi.fn(async () => ({
+          outputs: [
+            `<!-- FILE: memories/final/private/user-short-prs.md -->
+\`\`\`markdown
+---
+name: User prefers short PRs
+description: Canonical preference for small reviewable pull requests
+type: user
+scope: private
+merged_from: [session-001]
+---
+
+Prefer small, reviewable pull requests by default.
+\`\`\`
+
+<!-- FILE: memories/final/private/user-short-prs.md -->
+\`\`\`markdown
+---
+name: User prefers short PRs
+description: Duplicate canonical preference
+type: user
+scope: private
+merged_from: [session-001]
+---
+
+Duplicate content.
+\`\`\`
+`,
+          ],
+          metadata: { provider: 'claude', status: 'success' },
+        })),
+      },
+    });
+
+    await expect(stage.run(createContext(store, 'run-merge-duplicate'))).rejects.toThrow(
+      'Duplicate final memory file path: final/private/user-short-prs.md',
+    );
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'final', 'private', 'user-short-prs.md'), 'utf8'),
+    ).rejects.toThrow();
+  });
+
+  it('rejects malformed final merge output before writing any final files', async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'corivo-merge-malformed-'));
+    const runRoot = path.join(tempRoot, 'memory-pipeline');
+    await mkdir(runRoot, { recursive: true });
+    const store = new ArtifactStore(runRoot);
+
+    await store.writeArtifact({
+      runId: 'run-merge-malformed',
+      kind: 'raw-memory-batch',
+      source: 'extract-raw-memories',
+      body: JSON.stringify({
+        sessionId: 'session-001',
+        markdown: `<!-- FILE: private/user-short-prs.md -->
+\`\`\`markdown
+---
+name: User prefers short PRs
+description: User usually wants small reviewable pull requests
+type: user
+scope: private
+source_session: session-001
+---
+
+Keep PRs narrowly scoped and easy to review.
+\`\`\`
+`,
+      }),
+    });
+
+    const stage = new MergeFinalMemoriesStage({
+      processor: {
+        process: vi.fn(async () => ({
+          outputs: [
+            `<!-- FILE: memories/final/private/user-short-prs.md -->
+\`\`\`markdown
+not valid final memory content
+\`\`\`
+`,
+          ],
+          metadata: { provider: 'claude', status: 'success' },
+        })),
+      },
+    });
+
+    await expect(stage.run(createContext(store, 'run-merge-malformed'))).rejects.toThrow(
+      'Final memory document must start with frontmatter.',
+    );
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'final', 'private', 'user-short-prs.md'), 'utf8'),
+    ).rejects.toThrow();
+  });
+
   it('marks summarize session batch as failed when processor returns no outputs', async () => {
     const store = new RecordingArtifactStore();
     const processor: ModelProcessor = {

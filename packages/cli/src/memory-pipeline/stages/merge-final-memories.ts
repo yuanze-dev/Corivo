@@ -1,7 +1,7 @@
 import { buildFinalMergePrompt } from '../prompts/final-merge-prompt.js';
 import type { ModelProcessor } from '../processors/model-processor.js';
 import { ExtractionBackedModelProcessor } from '../processors/model-processor.js';
-import { parseFinalMemoryFileBlocks } from '../markdown/memory-writer.js';
+import { parseFinalMemoryFileBlocks, validateFinalMemoryFileBlocks } from '../markdown/memory-writer.js';
 import type {
   FinalMemoryBatchArtifact,
   RawMemoryBatchArtifact,
@@ -50,6 +50,16 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
       })),
     );
 
+    if (rawBatches.length === 0) {
+      return {
+        stageId: this.id,
+        status: 'success',
+        inputCount: 0,
+        outputCount: 0,
+        artifactIds: [],
+      };
+    }
+
     const rawFiles = await Promise.all(
       rawBatches.map(async ({ batch }) => {
         const relativePath = `raw/${batch.sessionId}.memories.md`;
@@ -94,7 +104,7 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
       };
     }
 
-    const files = parseFinalMemoryFileBlocks(output);
+    const files = validateFinalMemoryFileBlocks(parseFinalMemoryFileBlocks(output));
     const writtenFiles = await Promise.all(
       files.map((file) => artifactStore.writeMemoryFile(file.filePath, file.content)),
     );

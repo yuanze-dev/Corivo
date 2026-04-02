@@ -1,16 +1,6 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { ConfigError } from '@/errors';
 import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
-import { MemoryProcessingJobQueue } from '@/raw-memory/job-queue';
-import { RawMemoryRepository } from '@/raw-memory/repository';
 import {
-  ArtifactStore,
   type ClaudeSessionSource,
-  createInitMemoryPipeline,
-  createScheduledMemoryPipeline,
-  DatabaseRawSessionJobSource,
-  DatabaseRawSessionRecordSource,
   FileRunLock,
   type MemoryPipelineArtifactStore,
   type MemoryPipelineDefinition,
@@ -20,9 +10,21 @@ import {
   type PipelineTrigger,
   type RawSessionJobSource,
 } from '@/memory-pipeline';
-import { createCliContext } from '@/cli/context';
 import type { Logger } from '@/utils/logging';
 import type { ExtractionProvider } from '@/extraction/types';
+import { readMemoryPipelineConfig } from './config.js';
+import { createMemoryPipelineLogger } from './logger.js';
+import { buildInitMemoryPipeline, buildScheduledMemoryPipeline } from './pipelines.js';
+import {
+  closeMemoryPipelineDatabase,
+  createMemoryPipelineArtifactStore,
+  createMemoryPipelineLock,
+  createMemoryPipelineRunner,
+  getMemoryPipelineRunRoot,
+  openMemoryPipelineDatabase,
+} from './runtime.js';
+import { createDatabaseRawSessionJobSource, createDatabaseSessionSource } from './sources.js';
+import { createMemoryPipelineTrigger } from './trigger.js';
 
 export type MemoryPipelineMode = 'full' | 'incremental';
 export const DEFAULT_MEMORY_PROVIDER: ExtractionProvider = 'claude';
@@ -58,64 +60,18 @@ export type RunMemoryPipelineOptions = {
 const defaultExecutionDependencies: MemoryPipelineExecutionDependencies = {
   resolveConfigDir: getConfigDir,
   resolveDatabasePath: getDefaultDatabasePath,
-  createLogger: () => createCliContext().logger,
-  readConfig: async (configDir) => {
-    const configPath = path.join(configDir, 'config.json');
-    let payload: string;
-
-    try {
-      payload = await fs.readFile(configPath, 'utf-8');
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
-        throw new ConfigError('Corivo is not initialized. Please run: corivo init');
-      }
-      throw error;
-    }
-
-    let config: { encrypted_db_key?: string };
-    try {
-      config = JSON.parse(payload) as { encrypted_db_key?: string };
-    } catch (error) {
-      throw new ConfigError(
-        `Unable to parse Corivo config: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-
-    if (config.encrypted_db_key) {
-      throw new ConfigError(
-        'Detected a legacy password-based config. Corivo v0.10+ no longer supports passwords here; please run: corivo init'
-      );
-    }
-
-    return config;
-  },
-  createArtifactStore: (runRoot) => new ArtifactStore(runRoot),
-  createLock: (runRoot) => new FileRunLock(path.join(runRoot, 'run.lock')),
-  createRunner: (options) => new MemoryPipelineRunner(options),
-  createInitPipeline: ({ sessionSource }) => createInitMemoryPipeline({ sessionSource }),
-  createScheduledPipeline: ({ rawSessionJobSource }) =>
-    createScheduledMemoryPipeline({ rawSessionJobSource }),
-  createSessionSource: (db) =>
-    new DatabaseRawSessionRecordSource({
-      repository: {
-        listRawSessions: () => db.listRawSessions(),
-        getRawTranscript: (sessionKey) => db.getRawTranscript(sessionKey),
-      },
-    }) as ClaudeSessionSource,
-  createRawSessionJobSource: (db) =>
-    new DatabaseRawSessionJobSource({
-      queue: new MemoryProcessingJobQueue(db),
-      repository: new RawMemoryRepository(db),
-    }),
-  openDatabase: (dbPath) => CorivoDatabase.getInstance({ path: dbPath, enableEncryption: false }),
-  closeDatabase: () => {
-    /* No-op; the CorivoDatabase lifecycle is managed at the process level */
-  },
-  createTrigger: (mode) => ({
-    type: mode === 'full' ? 'init' : 'manual',
-    runAt: Date.now(),
-    requestedBy: 'cli',
-  }),
+  createLogger: createMemoryPipelineLogger,
+  readConfig: readMemoryPipelineConfig,
+  createArtifactStore: createMemoryPipelineArtifactStore,
+  createLock: createMemoryPipelineLock,
+  createRunner: createMemoryPipelineRunner,
+  createInitPipeline: buildInitMemoryPipeline,
+  createScheduledPipeline: buildScheduledMemoryPipeline,
+  createSessionSource: createDatabaseSessionSource,
+  createRawSessionJobSource: createDatabaseRawSessionJobSource,
+  openDatabase: openMemoryPipelineDatabase,
+  closeDatabase: closeMemoryPipelineDatabase,
+  createTrigger: createMemoryPipelineTrigger,
 };
 
 export async function runMemoryPipeline(
@@ -129,7 +85,7 @@ export async function runMemoryPipeline(
   await dependencies.readConfig(configDir);
   logger.debug(`[memory:pipeline] config loaded configDir=${configDir}`);
 
-  const runRoot = path.join(configDir, 'memory-pipeline');
+  const runRoot = getMemoryPipelineRunRoot(configDir);
   const artifactStore = dependencies.createArtifactStore(runRoot);
   const lock = dependencies.createLock(runRoot);
   const runner = dependencies.createRunner({

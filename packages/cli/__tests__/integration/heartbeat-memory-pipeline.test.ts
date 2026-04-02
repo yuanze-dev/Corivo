@@ -84,6 +84,8 @@ describe('Heartbeat memory pipeline trigger', () => {
       requestedBy: 'heartbeat',
     });
     expect(runnerSpy.mock.calls[0]?.[1]?.resolveDatabasePath?.()).toBe(dbPath);
+    expect(runnerSpy.mock.calls[0]?.[1]?.createSessionSource).toBeUndefined();
+    expect(runnerSpy.mock.calls[0]?.[1]?.openDatabase).toBeUndefined();
 
     runnerSpy.mockRestore();
     sleepSpy.mockRestore();

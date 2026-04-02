@@ -248,6 +248,12 @@ describe('memory pipeline cleanup', () => {
               };
             },
           } as MemoryPipelineRunner),
+        openDatabase: () =>
+          ({
+            querySessionRecords: () => [],
+            close: () => {},
+          } as CorivoDatabase),
+        closeDatabase: () => {},
         createSessionSource: () => ({ collect: async () => [] }),
       }),
     ).resolves.toMatchObject({
@@ -266,6 +272,95 @@ describe('memory pipeline cleanup', () => {
     ]);
   });
 
+  it('builds the full pipeline from database-backed Claude sessions in the shared execution path', async () => {
+    let capturedQuery: unknown;
+    let sessionItemsPromise: Promise<unknown[]> | undefined;
+    let closed = false;
+
+    await expect(
+      runMemoryPipeline('full', {
+        resolveConfigDir: () => '/tmp/corivo',
+        resolveDatabasePath: () => '/tmp/corivo/corivo.db',
+        readConfig: async () => ({}),
+        createArtifactStore: () => ({
+          writeArtifact: async () => ({
+            id: 'artifact',
+            kind: 'work-item',
+            version: 1,
+            path: 'artifacts/detail/test.json',
+            source: 'test',
+            createdAt: Date.now(),
+          }),
+          persistDescriptor: async () => {},
+          getDescriptor: async () => undefined,
+          readArtifact: async () => '[]',
+          listArtifacts: async () => [],
+        }),
+        createLock: () => ({
+          acquire: async () => {},
+          release: async () => {},
+        }),
+        createRunner: () =>
+          ({
+            run: async () => ({
+              runId: 'run',
+              pipelineId: 'init-memory-pipeline',
+              status: 'success',
+              stages: [],
+            }),
+          } as MemoryPipelineRunner),
+        createInitPipeline: ({ sessionSource }) => {
+          sessionItemsPromise = sessionSource.collect();
+          return { id: 'init-memory-pipeline', stages: [] };
+        },
+        openDatabase: () =>
+          ({
+            querySessionRecords: (query: unknown) => {
+              capturedQuery = query;
+              return [
+                {
+                  id: 'record-1',
+                  sessionId: 'session-1',
+                  kind: 'claude-session',
+                  host: 'claude',
+                  sourceRef: 'claude://session-1',
+                  updatedAt: 123,
+                  messages: [],
+                },
+              ];
+            },
+            close: () => {},
+          } as CorivoDatabase),
+        closeDatabase: () => {
+          closed = true;
+        },
+      }),
+    ).resolves.toMatchObject({
+      pipelineId: 'init-memory-pipeline',
+      status: 'success',
+    });
+
+    expect(capturedQuery).toEqual({
+      mode: 'full',
+      sessionKind: 'claude-session',
+    });
+    await expect(sessionItemsPromise).resolves.toEqual([
+      expect.objectContaining({
+        id: 'record-1',
+        kind: 'session',
+        sourceRef: 'claude://session-1',
+        freshnessToken: '123',
+        metadata: {
+          session: expect.objectContaining({
+            id: 'record-1',
+            sessionId: 'session-1',
+          }),
+        },
+      }),
+    ]);
+    expect(closed).toBe(true);
+  });
+
   it('writes raw and final memory files under the configured memory root in the shared execution path', async () => {
     const configDir = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-command-'));
     const runRoot = path.join(configDir, 'memory-pipeline');
@@ -273,6 +368,7 @@ describe('memory pipeline cleanup', () => {
 
     const result = await runMemoryPipeline('full', {
       resolveConfigDir: () => configDir,
+      resolveDatabasePath: () => path.join(configDir, 'corivo.db'),
       readConfig: async () => ({}),
       createArtifactStore: (incomingRunRoot) => new ArtifactStore(incomingRunRoot),
       createLock: (incomingRunRoot) => new FileRunLock(path.join(incomingRunRoot, 'run.lock')),
@@ -347,6 +443,12 @@ Prefer small, reviewable pull requests by default.
           }),
         ],
       }),
+      openDatabase: () =>
+        ({
+          querySessionRecords: () => [],
+          close: () => {},
+        } as CorivoDatabase),
+      closeDatabase: () => {},
       createSessionSource: () => ({ collect: async () => [] }),
     });
 
@@ -367,5 +469,45 @@ Prefer small, reviewable pull requests by default.
     await expect(
       readFile(path.join(configDir, 'memory', 'final', 'team', 'MEMORY.md'), 'utf8'),
     ).resolves.toBe('');
+  });
+});
+
+describe('memory command output', () => {
+  it('prints the new full-pipeline phase stage ids when they are present in the run result', async () => {
+    const executor = vi.fn(async () => ({
+      runId: 'run-output',
+      pipelineId: 'init-memory-pipeline',
+      status: 'success' as const,
+      stages: [
+        {
+          stageId: 'extract-raw-memories',
+          status: 'success' as const,
+          inputCount: 1,
+          outputCount: 1,
+          artifactIds: ['raw-1'],
+        },
+        {
+          stageId: 'merge-final-memories',
+          status: 'success' as const,
+          inputCount: 1,
+          outputCount: 1,
+          artifactIds: ['final-1'],
+        },
+      ],
+    }));
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const runCommand = createMemoryCommand({ executor }).commands.find((cmd) => cmd.name() === 'run');
+
+    if (!runCommand) {
+      throw new Error('memory run command missing');
+    }
+
+    await runCommand.parseAsync(['memory', 'run', '--full'], { from: 'user' });
+
+    const output = consoleSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('extract-raw-memories');
+    expect(output).toContain('merge-final-memories');
+
+    consoleSpy.mockRestore();
   });
 });

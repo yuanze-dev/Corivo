@@ -10,9 +10,9 @@ import {
   createInitMemoryPipeline,
   createScheduledMemoryPipeline,
   DatabaseRawSessionJobSource,
+  DatabaseClaudeSessionSource,
   FileRunLock,
   MemoryPipelineRunner,
-  StubClaudeSessionSource,
   type ClaudeSessionSource,
   type MemoryPipelineArtifactStore,
   type MemoryPipelineDefinition,
@@ -35,7 +35,7 @@ export interface MemoryPipelineExecutionDependencies {
   createScheduledPipeline: (options: {
     rawSessionJobSource: RawSessionJobSource;
   }) => MemoryPipelineDefinition;
-  createSessionSource: () => ClaudeSessionSource;
+  createSessionSource: (db: CorivoDatabase) => ClaudeSessionSource;
   createRawSessionJobSource: (db: CorivoDatabase) => RawSessionJobSource;
   openDatabase: (dbPath: string) => CorivoDatabase;
   closeDatabase: (db: CorivoDatabase, dbPath: string) => void;
@@ -81,7 +81,11 @@ const defaultExecutionDependencies: MemoryPipelineExecutionDependencies = {
   createInitPipeline: ({ sessionSource }) => createInitMemoryPipeline({ sessionSource }),
   createScheduledPipeline: ({ rawSessionJobSource }) =>
     createScheduledMemoryPipeline({ rawSessionJobSource }),
-  createSessionSource: () => new StubClaudeSessionSource(),
+  createSessionSource: (db) =>
+    new DatabaseClaudeSessionSource({
+      repository: db,
+      mode: 'full',
+    }),
   createRawSessionJobSource: (db) =>
     new DatabaseRawSessionJobSource({
       queue: new MemoryProcessingJobQueue(db),
@@ -106,32 +110,32 @@ export async function runMemoryPipeline(
   const configDir = dependencies.resolveConfigDir();
   await dependencies.readConfig(configDir);
 
-  const runRoot = path.join(configDir, 'memory-pipeline');
-  const artifactStore = dependencies.createArtifactStore(runRoot);
-  const lock = dependencies.createLock(runRoot);
+  const memoryPipelineRunRoot = path.join(configDir, 'memory-pipeline');
+  const artifactStore = dependencies.createArtifactStore(memoryPipelineRunRoot);
+  const lock = dependencies.createLock(memoryPipelineRunRoot);
   const runner = dependencies.createRunner({
     artifactStore,
     lock,
-    runRoot,
+    runRoot: memoryPipelineRunRoot,
   });
 
   let openedDatabase: CorivoDatabase | undefined;
   let openedDatabasePath: string | undefined;
 
   try {
+    const dbPath = dependencies.resolveDatabasePath();
+    const db = dependencies.openDatabase(dbPath);
+    openedDatabase = db;
+    openedDatabasePath = dbPath;
+
     const pipeline =
       mode === 'full'
         ? dependencies.createInitPipeline({
-            sessionSource: dependencies.createSessionSource(),
+            sessionSource: dependencies.createSessionSource(db),
           })
-        : (() => {
-            const dbPath = dependencies.resolveDatabasePath();
-            const db = dependencies.openDatabase(dbPath);
-            openedDatabase = db;
-            openedDatabasePath = dbPath;
-            const rawSessionJobSource = dependencies.createRawSessionJobSource(db);
-            return dependencies.createScheduledPipeline({ rawSessionJobSource });
-          })();
+        : dependencies.createScheduledPipeline({
+            rawSessionJobSource: dependencies.createRawSessionJobSource(db),
+          });
 
     return await runner.run(pipeline, dependencies.createTrigger(mode));
   } finally {
@@ -147,8 +151,11 @@ export interface MemoryCommandOptions {
 }
 
 function defaultPrinter(result: MemoryPipelineRunResult) {
+  const stageIds = result.stages.map((stage) => stage.stageId);
+  const stageSuffix =
+    stageIds.length > 0 ? ` [stages: ${stageIds.join(', ')}]` : '';
   console.log(
-    `Memory pipeline ${result.pipelineId} finished with status ${result.status} (run ${result.runId})`,
+    `Memory pipeline ${result.pipelineId} finished with status ${result.status} (run ${result.runId})${stageSuffix}`,
   );
 }
 

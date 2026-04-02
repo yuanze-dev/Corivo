@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import {
+  ExtractRawMemoriesStage,
+  MergeFinalMemoriesStage,
+} from '../../src/index.js';
 import type {
   PipelineTrigger,
   WorkItem,
@@ -6,7 +10,10 @@ import type {
   PipelineStageResult,
   MemoryPipelineDefinition,
 } from '../../src/memory-pipeline/index.js';
-import type { PipelineTrigger as PublicPipelineTrigger } from '../../src/index.js';
+import type {
+  MemoryPipelineRunResult as PublicMemoryPipelineRunResult,
+  PipelineTrigger as PublicPipelineTrigger,
+} from '../../src/index.js';
 
 describe('memory pipeline types', () => {
   it('defines supported trigger types', () => {
@@ -40,5 +47,34 @@ describe('memory pipeline types', () => {
   it('supports named pipeline definitions', () => {
     const pipeline: MemoryPipelineDefinition = { id: 'init-memory-pipeline', stages: [] };
     expect(pipeline.id).toBe('init-memory-pipeline');
+  });
+
+  it('exposes the new full-pipeline phase stage ids through the public entry point', () => {
+    const result: PublicMemoryPipelineRunResult = {
+      runId: 'run-public',
+      pipelineId: 'init-memory-pipeline',
+      status: 'success',
+      stages: [
+        {
+          stageId: new ExtractRawMemoriesStage().id,
+          status: 'success',
+          inputCount: 1,
+          outputCount: 1,
+          artifactIds: ['raw-1'],
+        },
+        {
+          stageId: new MergeFinalMemoriesStage().id,
+          status: 'success',
+          inputCount: 1,
+          outputCount: 1,
+          artifactIds: ['final-1'],
+        },
+      ],
+    };
+
+    expect(result.stages.map((stage) => stage.stageId)).toEqual([
+      'extract-raw-memories',
+      'merge-final-memories',
+    ]);
   });
 });

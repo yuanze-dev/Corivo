@@ -18,6 +18,12 @@ export class CollectClaudeSessionsStage implements MemoryPipelineStage {
 
   async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {
     const workItems = await this.source.collect();
+    for (const workItem of workItems) {
+      if (workItem.metadata?.session?.kind !== 'claude-session') {
+        throw new Error('CollectClaudeSessionsStage only accepts claude-session work items');
+      }
+    }
+
     const descriptor = await context.artifactStore.writeArtifact({
       runId: context.runId,
       kind: 'work-item',

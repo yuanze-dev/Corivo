@@ -3,6 +3,11 @@ import type { WorkItem } from '../types.js';
 
 export type SessionRecordSourceMode = 'full' | 'incremental';
 
+export interface SessionRecordQuery {
+  mode?: SessionRecordSourceMode;
+  sessionKind?: string;
+}
+
 export type SessionRecordWorkItem = WorkItem & {
   kind: 'session';
   metadata: {
@@ -12,13 +17,14 @@ export type SessionRecordWorkItem = WorkItem & {
 
 export interface SessionRecordRepository {
   querySessionRecords: (
-    mode: SessionRecordSourceMode,
+    query?: SessionRecordQuery,
   ) => Promise<SessionRecord[]> | SessionRecord[];
 }
 
 export interface DatabaseSessionRecordSourceConfig {
   repository: SessionRecordRepository;
   mode?: SessionRecordSourceMode;
+  sessionKind?: string;
 }
 
 export class DatabaseSessionRecordSource {
@@ -29,7 +35,11 @@ export class DatabaseSessionRecordSource {
   }
 
   async collect(): Promise<SessionRecordWorkItem[]> {
-    const records = await Promise.resolve(this.config.repository.querySessionRecords(this.mode));
+    const query: SessionRecordQuery = {
+      mode: this.mode,
+      ...(this.config.sessionKind ? { sessionKind: this.config.sessionKind } : {}),
+    };
+    const records = await Promise.resolve(this.config.repository.querySessionRecords(query));
 
     return records.map((session) => {
       const fallbackFreshness =

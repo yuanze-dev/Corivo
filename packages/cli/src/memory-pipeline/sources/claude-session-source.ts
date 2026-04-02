@@ -20,7 +20,10 @@ export class DatabaseClaudeSessionSource
   extends DatabaseSessionRecordSource
   implements ClaudeSessionSource {
   constructor(config: DatabaseClaudeSessionSourceConfig) {
-    super(config);
+    super({
+      ...config,
+      sessionKind: 'claude-session',
+    });
   }
 }
 

@@ -29,7 +29,7 @@ import {
   createScheduledMemoryPipeline,
 } from '../../src/memory-pipeline/index.js';
 import type { RawSessionJobSource } from '../../src/memory-pipeline/sources/raw-session-job-source.js';
-import { DatabaseSessionRecordSource } from '../../src/memory-pipeline/sources/session-record-source.js';
+import { DatabaseClaudeSessionSource } from '../../src/memory-pipeline/sources/claude-session-source.js';
 import type { StaleBlockSource } from '../../src/memory-pipeline/stages/collect-stale-blocks.js';
 import {
   RAW_SESSION_JOBS_STATE_KEY,
@@ -283,19 +283,23 @@ describe('memory pipeline extension points', () => {
   });
 
   it('runs collect claude sessions stage with the provided source', async () => {
-    const sessionSource: ClaudeSessionSource = new DatabaseSessionRecordSource({
+    const sessionSource: ClaudeSessionSource = new DatabaseClaudeSessionSource({
       repository: {
         querySessionRecords: vi.fn(async () => [
           {
             id: 'session-1',
+            sessionId: 'session-1',
             kind: 'claude-session',
+            host: 'claude',
             sourceRef: 'claude://session-1',
             updatedAt: 42,
+            startedAt: 40,
             messages: [
               {
                 id: 'message-1',
                 role: 'user',
                 content: 'Summarize this chat.',
+                sequence: 1,
                 createdAt: 41,
               },
             ],
@@ -324,14 +328,18 @@ describe('memory pipeline extension points', () => {
           metadata: {
             session: {
               id: 'session-1',
+              sessionId: 'session-1',
               kind: 'claude-session',
+              host: 'claude',
               sourceRef: 'claude://session-1',
               updatedAt: 42,
+              startedAt: 40,
               messages: [
                 {
                   id: 'message-1',
                   role: 'user',
                   content: 'Summarize this chat.',
+                  sequence: 1,
                   createdAt: 41,
                 },
               ],
@@ -347,6 +355,37 @@ describe('memory pipeline extension points', () => {
       outputCount: 1,
     });
     expect(result.artifactIds).toEqual([store.descriptors[0].id]);
+  });
+
+  it('rejects non-claude session work items before writing artifacts', async () => {
+    const sessionSource: ClaudeSessionSource = {
+      collect: vi.fn(async () => [
+        {
+          id: 'cursor-1',
+          kind: 'session',
+          sourceRef: 'cursor://session-1',
+          freshnessToken: '10',
+          metadata: {
+            session: {
+              id: 'cursor-1',
+              sessionId: 'cursor-1',
+              kind: 'cursor-session',
+              host: 'cursor',
+              sourceRef: 'cursor://session-1',
+              messages: [],
+            },
+          },
+        },
+      ]),
+    };
+    const store = new RecordingArtifactStore();
+    const stage = new CollectClaudeSessionsStage(sessionSource);
+    const context = createContext(store, 'run-reject');
+
+    await expect(stage.run(context)).rejects.toThrow(
+      'CollectClaudeSessionsStage only accepts claude-session work items',
+    );
+    expect(store.writes).toEqual([]);
   });
 
   it('enforces ClaudeSessionSource when building init pipeline', () => {

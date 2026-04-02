@@ -36,6 +36,9 @@ const Database = require('better-sqlite3');
 import { DatabaseError } from '../errors/index.js';
 import type { SessionMessage, SessionRecord } from '../memory-pipeline/contracts/session-record.js';
 import type {
+  SessionRecordQuery,
+} from '../memory-pipeline/sources/session-record-source.js';
+import type {
   Block,
   CreateBlockInput,
   UpdateBlockInput,
@@ -91,6 +94,10 @@ type SessionMessageRow = {
   sequence: number;
   created_at: number | null;
   metadata: string | null;
+};
+
+type SessionRecordFreshnessRow = SessionRecordRow & {
+  freshness_value: number | null;
 };
 
 /**
@@ -1179,8 +1186,18 @@ export class CorivoDatabase {
     }
   }
 
-  querySessionRecords(mode: 'full' | 'incremental' = 'full'): SessionRecord[] {
-    const limitClause = mode === 'incremental' ? 'LIMIT 100' : '';
+  querySessionRecords(query: SessionRecordQuery = {}): SessionRecord[] {
+    const freshnessSql = 'COALESCE(updated_at, ended_at, created_at, started_at)';
+    const conditions: string[] = [];
+    const values: unknown[] = [];
+
+    if (query.sessionKind) {
+      conditions.push('kind = ?');
+      values.push(query.sessionKind);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const orderClause = `ORDER BY ${freshnessSql} DESC, id DESC`;
     const recordStmt = this.db.prepare(`
       SELECT
         id,
@@ -1190,10 +1207,11 @@ export class CorivoDatabase {
         updated_at,
         started_at,
         ended_at,
-        metadata
+        metadata,
+        ${freshnessSql} AS freshness_value
       FROM session_records
-      ORDER BY COALESCE(updated_at, created_at, started_at, ended_at) DESC, id DESC
-      ${limitClause}
+      ${whereClause}
+      ${orderClause}
     `);
     const messageStmt = this.db.prepare(`
       SELECT
@@ -1210,7 +1228,7 @@ export class CorivoDatabase {
     `);
 
     try {
-      const rows = recordStmt.all() as SessionRecordRow[];
+      const rows = recordStmt.all(...values) as SessionRecordFreshnessRow[];
       return rows.map((row) =>
         this.rowToSessionRecord(
           row,
@@ -1922,27 +1940,47 @@ export class CorivoDatabase {
   }
 
   private rowToSessionRecord(row: SessionRecordRow, messages: SessionMessageRow[]): SessionRecord {
+    const metadata = this.parseJsonObject(row.metadata);
+
     return {
       id: row.id,
+      sessionId: row.id,
       kind: row.kind,
+      host: this.deriveSessionHost(row.kind, row.source_ref),
       sourceRef: row.source_ref,
       createdAt: row.created_at ?? undefined,
       updatedAt: row.updated_at ?? undefined,
       startedAt: row.started_at ?? undefined,
       endedAt: row.ended_at ?? undefined,
-      metadata: this.parseJsonObject(row.metadata),
       messages: messages.map((message) => this.rowToSessionMessage(message)),
+      ...(metadata ? { metadata } : {}),
     };
   }
 
   private rowToSessionMessage(row: SessionMessageRow): SessionMessage {
+    const metadata = this.parseJsonObject(row.metadata);
+
     return {
       id: row.id,
       role: row.role,
       content: row.content,
+      sequence: row.sequence,
       createdAt: row.created_at ?? undefined,
-      metadata: this.parseJsonObject(row.metadata),
+      ...(metadata ? { metadata } : {}),
     };
+  }
+
+  private deriveSessionHost(kind: string, sourceRef: string): string {
+    if (kind.endsWith('-session')) {
+      return kind.slice(0, -'-session'.length);
+    }
+
+    const protocolSeparator = sourceRef.indexOf('://');
+    if (protocolSeparator > 0) {
+      return sourceRef.slice(0, protocolSeparator);
+    }
+
+    return 'unknown';
   }
 
   private parseJsonObject(value: string | null | undefined): Record<string, unknown> | undefined {
@@ -1953,7 +1991,8 @@ export class CorivoDatabase {
     try {
       const parsed = JSON.parse(value) as unknown;
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>;
+        const record = parsed as Record<string, unknown>;
+        return Object.keys(record).length > 0 ? record : undefined;
       }
     } catch {
       return undefined;

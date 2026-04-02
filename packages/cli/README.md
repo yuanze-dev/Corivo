@@ -10,7 +10,7 @@ Core local runtime for Corivo. This package ships the `corivo` binary and contai
 
 ## What Is In This Package
 
-- CLI command surface (`save`, `query`, `status`, `sync`, `inject`, `suggest`, and more)
+- CLI command surface (`save`, `query`, `status`, `sync`, `host`, `suggest`, and more)
 - Local storage and indexing (SQLite via `better-sqlite3`)
 - Memory processing engine (annotation, vitality decay, associations, consolidation)
 - Service management entry points for background execution

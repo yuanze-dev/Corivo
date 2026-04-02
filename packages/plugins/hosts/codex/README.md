@@ -26,7 +26,7 @@ If you need runtime behavior in executable code, it belongs under `packages/plug
 Use the single CLI install path:
 
 ```bash
-corivo inject --global --codex
+corivo host install codex
 ```
 
 The installer wires Codex global instructions and notify adapters. This package does not define a separate installation pipeline.

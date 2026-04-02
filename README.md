@@ -70,13 +70,12 @@ corivo status
 corivo save --content "Use PostgreSQL for billing" --annotation "决策 · project · database"
 corivo query "database"
 corivo host list
-corivo inject
+corivo host install claude-code
 ```
 
 Notes:
 - `corivo host list` shows the supported host integrations managed by the CLI.
 - `corivo host install <host>` is the primary host-management entry point.
-- `corivo inject` remains available as a compatibility alias for project/global Claude-style installation flows.
 - The local CLI is the main product surface today.
 - `scripts/install.sh` can detect and configure Claude Code, Codex, Cursor, and OpenCode on the same machine.
 - Some integrations shown in the repository are still in progress or experimental.
@@ -86,8 +85,8 @@ Notes:
 Corivo keeps one installation control path: the local `corivo` CLI.
 
 - `scripts/install.sh` is the one-command bootstrap entry that installs and then delegates to CLI flows.
-- `corivo inject --global --<host>` is the stable host install entry for Claude Code, Codex, and Cursor.
-- OpenCode install is handled by `corivo inject --global --opencode`, which installs the packaged runtime asset from `packages/plugins/runtime/opencode/assets/corivo.ts`.
+- `corivo host install <host>` is the stable host install entry for Claude Code, Codex, Cursor, and OpenCode.
+- OpenCode install still uses the packaged runtime asset from `packages/plugins/runtime/opencode/assets/corivo.ts`.
 - Host packages under `packages/plugins/hosts/*` are host integration bundles consumed by the CLI installer where host assets are CLI-backed.
 - `packages/plugins/hosts/opencode` is currently a reserved host boundary and is not CLI asset-backed in this stage.
 - Runtime packages under `packages/plugins/runtime/*` are executable runtime plugins; they are not host installers.
@@ -127,8 +126,6 @@ Install:
 
 ```bash
 corivo host install claude-code
-# compatibility alias:
-corivo inject --global --claude-code
 ```
 
 What the installer does:
@@ -154,8 +151,6 @@ Install:
 
 ```bash
 corivo host install codex
-# compatibility alias:
-corivo inject --global --codex
 ```
 
 What the installer does:
@@ -181,8 +176,6 @@ Install:
 
 ```bash
 corivo host install cursor
-# compatibility alias:
-corivo inject --global --cursor
 ```
 
 What the installer does:
@@ -208,8 +201,6 @@ Install:
 
 ```bash
 corivo host install opencode
-# compatibility alias:
-corivo inject --global --opencode
 ```
 
 What the installer does:
@@ -278,7 +269,7 @@ Each public-facing package now has its own README so contributors can orient the
 
 ### Host Management
 
-Corivo now separates host integration management from legacy injection aliases.
+Corivo manages host integrations through the explicit `host` command surface.
 
 Primary commands:
 
@@ -289,17 +280,7 @@ corivo host doctor cursor
 corivo host uninstall opencode
 ```
 
-Compatibility aliases still exist:
-
-```bash
-corivo inject
-corivo inject --global --codex
-corivo inject --global --cursor
-corivo inject --global --opencode
-corivo inject --global --claude-code
-```
-
-Internally, the `host` command and the legacy `inject` alias both route through the same host registry and host install/doctor/uninstall use cases.
+There is no legacy inject alias in the current CLI surface.
 
 ## Privacy and Data Ownership
 

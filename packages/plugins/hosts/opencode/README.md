@@ -10,5 +10,5 @@ This directory is currently a reserved host boundary for OpenCode and is not CLI
 - Directory model: `packages/plugins/hosts/*`
 - Not this package: executable runtime plugin code
 
-OpenCode install still uses `corivo inject --global --opencode`, and the installed plugin comes from the packaged runtime asset path:
+OpenCode install uses `corivo host install opencode`, and the installed plugin comes from the packaged runtime asset path:
 `packages/plugins/runtime/opencode/assets/corivo.ts`.

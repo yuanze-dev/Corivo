@@ -22,7 +22,7 @@ This package provides host-side assets (hooks, scripts, skills, and command docs
 Install through the single CLI path:
 
 ```bash
-corivo inject --global --claude-code
+corivo host install claude-code
 ```
 
 No separate installer is defined in this package.

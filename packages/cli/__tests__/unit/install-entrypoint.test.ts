@@ -50,17 +50,18 @@ describe('install.sh entrypoint', () => {
     }
   });
 
-  it('keeps host detection and inject-driven installation flow', async () => {
+  it('keeps host detection and host-install driven installation flow', async () => {
     const content = await fs.readFile(installScriptPath, 'utf8');
 
     expect(content).toContain('detect_hosts');
-    expect(content).toContain('corivo inject --global --claude-code');
-    expect(content).toContain('corivo inject --global --codex');
-    expect(content).toContain('corivo inject --global --cursor');
-    expect(content).toContain('corivo inject --global --opencode');
+    expect(content).toContain('corivo host install claude-code');
+    expect(content).toContain('corivo host install codex');
+    expect(content).toContain('corivo host install cursor');
+    expect(content).toContain('corivo host install opencode');
+    expect(content).not.toContain('corivo inject --global --');
   });
 
-  it('runs CLI flow with detection, inject calls, and summary output', async () => {
+  it('runs CLI flow with detection, host install calls, and summary output', async () => {
     const output = execFileSync(
       'bash',
       [installScriptPath, '--lang', 'en'],
@@ -80,10 +81,10 @@ describe('install.sh entrypoint', () => {
     expect(output).toContain('Next steps: cursor agent login');
     expect(output).toContain('- OpenCode: installed, but attention is required');
     expect(output).toContain('OpenCode plugin is installed, but you should verify the default provider configuration');
-    expect(corivoLog).toContain('inject --global --codex');
-    expect(corivoLog).toContain('inject --global --cursor');
-    expect(corivoLog).toContain('inject --global --opencode');
-    expect(corivoLog).not.toContain('inject --global --claude-code');
+    expect(corivoLog).toContain('host install codex');
+    expect(corivoLog).toContain('host install cursor');
+    expect(corivoLog).toContain('host install opencode');
+    expect(corivoLog).not.toContain('inject --global --');
   });
 
   it('promises the guided journey with the stage flow, warm-up consent, and activation ending', async () => {

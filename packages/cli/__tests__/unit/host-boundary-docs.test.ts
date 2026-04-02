@@ -57,7 +57,8 @@ describe('docs boundary consistency', () => {
   it('keeps the OpenCode host README explicitly reserved and runtime-asset sourced', () => {
     const content = readRepoFile('packages/plugins/hosts/opencode/README.md');
     expect(content).toContain('not CLI asset-backed in this stage');
-    expect(content).toContain('corivo inject --global --opencode');
+    expect(content).toContain('corivo host install opencode');
+    expect(content).not.toContain('corivo inject --global --opencode');
     expect(content).toContain('packages/plugins/runtime/opencode/assets/corivo.ts');
   });
 

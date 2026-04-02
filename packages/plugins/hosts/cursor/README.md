@@ -23,7 +23,7 @@ Each script delegates to CLI commands (`corivo carry-over`, `corivo recall`, `co
 Install through the single CLI path:
 
 ```bash
-corivo inject --global --cursor
+corivo host install cursor
 ```
 
 The CLI writes global rules, installs hook scripts, and updates Cursor settings/permissions. This bundle does not define a separate installation flow.

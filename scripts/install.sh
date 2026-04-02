@@ -285,17 +285,17 @@ install_detected_hosts() {
   if printf '%s\n' "${DETECTED_HOSTS[@]}" | grep -qx 'claude-code'; then
     log_step "$(msg install_claude_host)"
     local claude_output=""
-    if claude_output="$(corivo inject --global --claude-code 2>&1)"; then
+    if claude_output="$(corivo host install claude-code 2>&1)"; then
       check_claude_process
       record_host_result "claude-code" "ready"
     else
       local claude_reason=""
-      claude_reason="$(host_inject_failed_reason "claude-code" "corivo inject --global --claude-code" "$claude_output")"
+      claude_reason="$(host_inject_failed_reason "claude-code" "corivo host install claude-code" "$claude_output")"
       record_host_result "claude-code" "blocked" "$claude_reason"
       record_failure_context \
-        "connect.claude-code.inject" \
+        "connect.claude-code.install" \
         "$(msg stage_connect)" \
-        "corivo inject --global --claude-code" \
+        "corivo host install claude-code" \
         "$claude_output" \
         "$claude_reason"
       attention=1
@@ -307,17 +307,17 @@ install_detected_hosts() {
   if printf '%s\n' "${DETECTED_HOSTS[@]}" | grep -qx 'codex'; then
     log_step "$(msg install_codex_host)"
     local codex_output=""
-    if codex_output="$(corivo inject --global --codex 2>&1)"; then
+    if codex_output="$(corivo host install codex 2>&1)"; then
       check_codex_process
       record_host_result "codex" "ready" "$(msg codex_ready_hint)"
     else
       local codex_reason=""
-      codex_reason="$(host_inject_failed_reason "codex" "corivo inject --global --codex" "$codex_output")"
+      codex_reason="$(host_inject_failed_reason "codex" "corivo host install codex" "$codex_output")"
       record_host_result "codex" "blocked" "$codex_reason"
       record_failure_context \
-        "connect.codex.inject" \
+        "connect.codex.install" \
         "$(msg stage_connect)" \
-        "corivo inject --global --codex" \
+        "corivo host install codex" \
         "$codex_output" \
         "$codex_reason"
       attention=1
@@ -329,7 +329,7 @@ install_detected_hosts() {
   if printf '%s\n' "${DETECTED_HOSTS[@]}" | grep -qx 'cursor'; then
     log_step "$(msg install_cursor_host)"
     local cursor_output=""
-    if cursor_output="$(corivo inject --global --cursor 2>&1)"; then
+    if cursor_output="$(corivo host install cursor 2>&1)"; then
       local cursor_status=""
       cursor_status="$(cursor agent status 2>/dev/null || true)"
       if printf '%s' "$cursor_status" | grep -q 'Not logged in'; then
@@ -346,12 +346,12 @@ install_detected_hosts() {
       fi
     else
       local cursor_reason=""
-      cursor_reason="$(host_inject_failed_reason "cursor" "corivo inject --global --cursor" "$cursor_output")"
+      cursor_reason="$(host_inject_failed_reason "cursor" "corivo host install cursor" "$cursor_output")"
       record_host_result "cursor" "blocked" "$cursor_reason"
       record_failure_context \
-        "connect.cursor.inject" \
+        "connect.cursor.install" \
         "$(msg stage_connect)" \
-        "corivo inject --global --cursor" \
+        "corivo host install cursor" \
         "$cursor_output" \
         "$cursor_reason"
       attention=1
@@ -363,7 +363,7 @@ install_detected_hosts() {
   if printf '%s\n' "${DETECTED_HOSTS[@]}" | grep -qx 'opencode'; then
     log_step "$(msg install_opencode_host)"
     local opencode_output=""
-    if opencode_output="$(corivo inject --global --opencode 2>&1)"; then
+    if opencode_output="$(corivo host install opencode 2>&1)"; then
       if opencode models >/dev/null 2>&1; then
         record_host_result "opencode" "ready"
       else
@@ -378,12 +378,12 @@ install_detected_hosts() {
       fi
     else
       local opencode_reason=""
-      opencode_reason="$(host_inject_failed_reason "opencode" "corivo inject --global --opencode" "$opencode_output")"
+      opencode_reason="$(host_inject_failed_reason "opencode" "corivo host install opencode" "$opencode_output")"
       record_host_result "opencode" "blocked" "$opencode_reason"
       record_failure_context \
-        "connect.opencode.inject" \
+        "connect.opencode.install" \
         "$(msg stage_connect)" \
-        "corivo inject --global --opencode" \
+        "corivo host install opencode" \
         "$opencode_output" \
         "$opencode_reason"
       attention=1

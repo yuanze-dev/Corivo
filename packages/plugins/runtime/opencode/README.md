@@ -23,7 +23,7 @@ Host installation assets for OpenCode belong in `packages/plugins/hosts/opencode
 Install via CLI:
 
 ```bash
-corivo inject --global --opencode
+corivo host install opencode
 ```
 
 The CLI installs the runtime plugin file into `~/.config/opencode/plugins/`.

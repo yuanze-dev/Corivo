@@ -4,7 +4,7 @@ import Database from 'better-sqlite3';
 import { CorivoDatabase } from '../../src/storage/database.js';
 import { KeyManager } from '../../src/crypto/keys.js';
 import { Heartbeat } from '../../src/engine/heartbeat.js';
-import * as memoryCommand from '../../src/cli/commands/memory.js';
+import * as memoryPipeline from '../../src/application/memory/run-memory-pipeline.js';
 
 describe('Heartbeat memory pipeline trigger', () => {
   let db: CorivoDatabase;
@@ -47,7 +47,7 @@ describe('Heartbeat memory pipeline trigger', () => {
 
   it('triggers the scheduled memory pipeline on cadence', async () => {
     const runnerSpy = vi
-      .spyOn(memoryCommand, 'runMemoryPipeline')
+      .spyOn(memoryPipeline, 'runMemoryPipeline')
       .mockResolvedValue({
         runId: 'run-memory-cadence',
         pipelineId: 'scheduled-memory-pipeline',
@@ -72,20 +72,20 @@ describe('Heartbeat memory pipeline trigger', () => {
 
     expect(runnerSpy).toHaveBeenCalledTimes(1);
     expect(runnerSpy).toHaveBeenCalledWith(
-      'incremental',
       expect.objectContaining({
+        mode: 'incremental',
         createTrigger: expect.any(Function),
       }),
     );
 
-    const trigger = runnerSpy.mock.calls[0]?.[1]?.createTrigger?.('incremental');
+    const trigger = runnerSpy.mock.calls[0]?.[0]?.createTrigger?.('incremental');
     expect(trigger).toMatchObject({
       type: 'scheduled',
       requestedBy: 'heartbeat',
     });
-    expect(runnerSpy.mock.calls[0]?.[1]?.resolveDatabasePath?.()).toBe(dbPath);
-    expect(runnerSpy.mock.calls[0]?.[1]?.createSessionSource).toBeUndefined();
-    expect(runnerSpy.mock.calls[0]?.[1]?.openDatabase).toBeUndefined();
+    expect(runnerSpy.mock.calls[0]?.[0]?.resolveDatabasePath?.()).toBe(dbPath);
+    expect(runnerSpy.mock.calls[0]?.[0]?.createSessionSource).toBeUndefined();
+    expect(runnerSpy.mock.calls[0]?.[0]?.openDatabase).toBeUndefined();
 
     runnerSpy.mockRestore();
     sleepSpy.mockRestore();
@@ -93,7 +93,7 @@ describe('Heartbeat memory pipeline trigger', () => {
 
   it('starts the scheduled pipeline without awaiting completion', async () => {
     let resolvePipeline: (() => void) | undefined;
-    const runnerSpy = vi.spyOn(memoryCommand, 'runMemoryPipeline').mockImplementation(
+    const runnerSpy = vi.spyOn(memoryPipeline, 'runMemoryPipeline').mockImplementation(
       () =>
         new Promise((resolve) => {
           resolvePipeline = () => resolve({
@@ -126,7 +126,7 @@ describe('Heartbeat memory pipeline trigger', () => {
 
   it('skips scheduled memory pipeline when no db path is available', async () => {
     const localHeartbeat = new Heartbeat({ db });
-    const runnerSpy = vi.spyOn(memoryCommand, 'runMemoryPipeline').mockResolvedValue({
+    const runnerSpy = vi.spyOn(memoryPipeline, 'runMemoryPipeline').mockResolvedValue({
       runId: 'run-memory-missing-db',
       pipelineId: 'scheduled-memory-pipeline',
       status: 'success',
@@ -146,7 +146,7 @@ describe('Heartbeat memory pipeline trigger', () => {
 
   it('waits for an in-flight scheduled pipeline during stop', async () => {
     let resolvePipeline: (() => void) | undefined;
-    const runnerSpy = vi.spyOn(memoryCommand, 'runMemoryPipeline').mockImplementation(
+    const runnerSpy = vi.spyOn(memoryPipeline, 'runMemoryPipeline').mockImplementation(
       () =>
         new Promise((resolve) => {
           resolvePipeline = () => resolve({
@@ -178,7 +178,7 @@ describe('Heartbeat memory pipeline trigger', () => {
   });
 
   it('does not trigger a scheduled pipeline after stop has begun', async () => {
-    const runnerSpy = vi.spyOn(memoryCommand, 'runMemoryPipeline').mockResolvedValue({
+    const runnerSpy = vi.spyOn(memoryPipeline, 'runMemoryPipeline').mockResolvedValue({
       runId: 'run-memory-stop-race',
       pipelineId: 'scheduled-memory-pipeline',
       status: 'success',

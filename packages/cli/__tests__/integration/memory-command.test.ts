@@ -6,23 +6,34 @@ import { describe, expect, it, beforeAll, beforeEach, afterAll, vi } from 'vites
 import type { CorivoDatabase } from '@/storage/database';
 import type { MemoryPipelineRunner } from '@/memory-pipeline';
 import { ArtifactStore, FileRunLock, MemoryPipelineRunner as DefaultMemoryPipelineRunner } from '@/memory-pipeline';
+import type { Logger } from '../../src/utils/logging.js';
 import {
   createMemoryCommand,
   runMemoryPipeline,
-  setMemoryCommandExecutor,
-  setMemoryCommandPrinter,
-  resetMemoryCommandOverrides,
 } from '../../src/cli/commands/memory.js';
 import { MergeFinalMemoriesStage } from '../../src/memory-pipeline/stages/merge-final-memories.js';
 
-const standaloneExecutor = vi.fn(async (mode: 'full' | 'incremental') => ({
+const standaloneExecutor = vi.fn(async (mode: 'full' | 'incremental', provider?: 'claude' | 'codex') => ({
   runId: 'run-standalone',
   pipelineId: mode === 'full' ? 'init-memory-pipeline' : 'scheduled-memory-pipeline',
   status: 'success',
   stages: [],
+  provider,
 }));
 
 const standalonePrinter = vi.fn();
+
+function createMockLogger(): Logger {
+  return {
+    log: vi.fn(),
+    info: vi.fn(),
+    success: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    isDebugEnabled: vi.fn(() => true),
+  };
+}
 
 function buildRunCommand(): Command {
   const command = createMemoryCommand({ executor: standaloneExecutor, printer: standalonePrinter });
@@ -42,7 +53,7 @@ describe('memory command (standalone)', () => {
   it('--full triggers init pipeline', async () => {
     const runCommand = buildRunCommand();
     await runCommand.parseAsync(['memory', 'run', '--full'], { from: 'user' });
-    expect(standaloneExecutor).toHaveBeenCalledWith('full');
+    expect(standaloneExecutor).toHaveBeenCalledWith('full', 'claude');
     expect(standalonePrinter).toHaveBeenCalledWith(
       expect.objectContaining({ pipelineId: 'init-memory-pipeline' }),
     );
@@ -53,7 +64,7 @@ describe('memory command (standalone)', () => {
     await runCommand.parseAsync(['memory', 'run', '--incremental'], {
       from: 'user',
     });
-    expect(standaloneExecutor).toHaveBeenCalledWith('incremental');
+    expect(standaloneExecutor).toHaveBeenCalledWith('incremental', 'claude');
     expect(standalonePrinter).toHaveBeenCalledWith(
       expect.objectContaining({ pipelineId: 'scheduled-memory-pipeline' }),
     );
@@ -62,34 +73,60 @@ describe('memory command (standalone)', () => {
   it('defaults to incremental when no flag is provided', async () => {
     const runCommand = buildRunCommand();
     await runCommand.parseAsync(['memory', 'run'], { from: 'user' });
-    expect(standaloneExecutor).toHaveBeenCalledWith('incremental');
+    expect(standaloneExecutor).toHaveBeenCalledWith('incremental', 'claude');
+  });
+
+  it('--provider codex overrides the default extraction provider', async () => {
+    const runCommand = buildRunCommand();
+    await runCommand.parseAsync(['memory', 'run', '--provider', 'codex'], { from: 'user' });
+    expect(standaloneExecutor).toHaveBeenCalledWith('incremental', 'codex');
+  });
+
+  it('emits detailed debug logs for the command flow', async () => {
+    const logger = createMockLogger();
+    const runCommand = createMemoryCommand({
+      executor: standaloneExecutor,
+      printer: standalonePrinter,
+      logger,
+    }).commands.find((cmd) => cmd.name() === 'run');
+
+    if (!runCommand) {
+      throw new Error('memory run command missing');
+    }
+
+    await runCommand.parseAsync(['memory', 'run', '--full'], { from: 'user' });
+
+    expect(logger.debug).toHaveBeenCalledWith('[memory:command] run requested full=true incremental=false provider=claude');
+    expect(logger.debug).toHaveBeenCalledWith('[memory:command] resolved mode=full provider=claude');
+    expect(logger.debug).toHaveBeenCalledWith('[memory:command] executor completed pipeline=init-memory-pipeline status=success run=run-standalone provider=claude');
+    expect(logger.debug).toHaveBeenCalledWith('[memory:command] printer completed');
   });
 });
 
 describe('memory command (CLI integration)', () => {
-  const cliExecutor = vi.fn(async (mode: 'full' | 'incremental') => ({
+  const cliExecutor = vi.fn(async (mode: 'full' | 'incremental', provider?: 'claude' | 'codex') => ({
     runId: 'run-cli',
     pipelineId: mode === 'full' ? 'init-memory-pipeline' : 'scheduled-memory-pipeline',
     status: 'success',
     stages: [],
+    provider,
   }));
   const cliPrinter = vi.fn();
   let program: Command;
 
   beforeAll(async () => {
-    setMemoryCommandExecutor(cliExecutor);
-    setMemoryCommandPrinter(cliPrinter);
     const module = await import('../../src/cli/index.js');
-    program = module.program;
-  });
-
-  afterAll(() => {
-    resetMemoryCommandOverrides();
+    program = module.createProgram({
+      memoryCommand: createMemoryCommand({
+        executor: cliExecutor,
+        printer: cliPrinter,
+      }),
+    });
   });
 
   it('runs --full through the shared CLI program', async () => {
     await program.parseAsync(['memory', 'run', '--full'], { from: 'user' });
-    expect(cliExecutor).toHaveBeenCalledWith('full');
+    expect(cliExecutor).toHaveBeenCalledWith('full', 'claude');
     expect(cliPrinter).toHaveBeenCalledWith(
       expect.objectContaining({ pipelineId: 'init-memory-pipeline' }),
     );
@@ -97,6 +134,152 @@ describe('memory command (CLI integration)', () => {
 });
 
 describe('memory pipeline cleanup', () => {
+  it('builds the incremental pipeline with a requested extraction provider', async () => {
+    let seenProvider: string | undefined;
+
+    await expect(
+      runMemoryPipeline({
+        mode: 'incremental',
+        provider: 'codex',
+        resolveConfigDir: () => '/tmp/corivo',
+        resolveDatabasePath: () => '/tmp/corivo/corivo.db',
+        readConfig: async () => ({}),
+        createArtifactStore: () => ({
+          writeArtifact: async () => ({
+            id: 'artifact',
+            kind: 'work-item',
+            version: 1,
+            path: 'artifacts/detail/test.json',
+            source: 'test',
+            createdAt: Date.now(),
+          }),
+          persistDescriptor: async () => {},
+          getDescriptor: async () => undefined,
+          readArtifact: async () => '[]',
+          listArtifacts: async () => [],
+        }),
+        createLock: () => ({
+          acquire: async () => {},
+          release: async () => {},
+        }),
+        createRunner: () =>
+          ({
+            run: async () => ({
+              runId: 'run',
+              pipelineId: 'scheduled-memory-pipeline',
+              status: 'success',
+              stages: [],
+            }),
+          } as MemoryPipelineRunner),
+        createInitPipeline: () => ({ id: 'init-memory-pipeline', stages: [] }),
+        createScheduledPipeline: ({ provider }) => {
+          seenProvider = provider;
+          return { id: 'scheduled-memory-pipeline', stages: [] };
+        },
+        createSessionSource: () => ({ collect: async () => [] }),
+        createRawSessionJobSource: () => ({
+          collect: async () => [],
+          markSucceeded: async () => {},
+          markFailed: async () => {},
+        }),
+        openDatabase: () =>
+          ({
+            close: () => {},
+          } as CorivoDatabase),
+        closeDatabase: () => {},
+      } as any),
+    ).resolves.toMatchObject({
+      pipelineId: 'scheduled-memory-pipeline',
+      status: 'success',
+    });
+
+    expect(seenProvider).toBe('codex');
+  });
+
+  it('emits detailed debug logs across pipeline setup and stage execution', async () => {
+    const logger = createMockLogger();
+
+    await expect(
+      runMemoryPipeline({
+        mode: 'incremental',
+        provider: 'codex',
+        resolveConfigDir: () => '/tmp/corivo',
+        resolveDatabasePath: () => '/tmp/corivo/corivo.db',
+        readConfig: async () => ({}),
+        createLogger: () => logger,
+        createArtifactStore: () => ({
+          writeArtifact: async () => ({
+            id: 'artifact',
+            kind: 'work-item',
+            version: 1,
+            path: 'artifacts/detail/test.json',
+            source: 'test',
+            createdAt: Date.now(),
+          }),
+          persistDescriptor: async () => {},
+          getDescriptor: async () => undefined,
+          readArtifact: async () => '[]',
+          listArtifacts: async () => [],
+        }),
+        createLock: () => ({
+          acquire: async () => {},
+          release: async () => {},
+        }),
+        createScheduledPipeline: ({ provider }) => ({
+          id: 'scheduled-memory-pipeline',
+          stages: [
+            {
+              id: 'collect-jobs',
+              run: async () => ({
+                stageId: 'collect-jobs',
+                status: 'success',
+                inputCount: 2,
+                outputCount: 1,
+                artifactIds: ['artifact-1'],
+              }),
+            },
+          ],
+        }),
+        createInitPipeline: () => ({ id: 'init-memory-pipeline', stages: [] }),
+        createSessionSource: () => ({ collect: async () => [] }),
+        createRawSessionJobSource: () => ({
+          collect: async () => [],
+          markSucceeded: async () => {},
+          markFailed: async () => {},
+        }),
+        openDatabase: () =>
+          ({
+            close: () => {},
+          } as CorivoDatabase),
+        closeDatabase: () => {},
+      } as any),
+    ).resolves.toMatchObject({
+      pipelineId: 'scheduled-memory-pipeline',
+      status: 'success',
+    });
+
+    expect(logger.debug).toHaveBeenCalledWith('[memory:pipeline] starting mode=incremental provider=codex configDir=/tmp/corivo');
+    expect(logger.debug).toHaveBeenCalledWith('[memory:pipeline] resources ready runRoot=/tmp/corivo/memory-pipeline');
+    expect(logger.debug).toHaveBeenCalledWith('[memory:pipeline] opened database path=/tmp/corivo/corivo.db');
+    expect(logger.debug).toHaveBeenCalledWith('[memory:pipeline] built pipeline id=scheduled-memory-pipeline provider=codex stageCount=1');
+    expect(logger.debug).toHaveBeenCalledWith(expect.stringMatching(/^\[memory:pipeline:runner] acquired lock run=run-/));
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^\[memory:pipeline:runner] stage start pipeline=scheduled-memory-pipeline run=run-.* stage=collect-jobs$/
+      ),
+    );
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^\[memory:pipeline:runner] stage complete pipeline=scheduled-memory-pipeline run=run-.* stage=collect-jobs status=success input=2 output=1 artifacts=1$/
+      ),
+    );
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^\[memory:pipeline] completed pipeline=scheduled-memory-pipeline status=success run=run-/
+      ),
+    );
+  });
+
   it('builds the incremental pipeline from raw-session job source', async () => {
     const createScheduledPipeline = vi.fn(() => ({
       id: 'scheduled-memory-pipeline' as const,
@@ -108,7 +291,8 @@ describe('memory pipeline cleanup', () => {
       markFailed: async () => {},
     }));
 
-    await runMemoryPipeline('incremental', {
+    await runMemoryPipeline({
+      mode: 'incremental',
       resolveConfigDir: () => '/tmp/corivo',
       resolveDatabasePath: () => '/tmp/corivo/corivo.db',
       readConfig: async () => ({}),
@@ -158,7 +342,8 @@ describe('memory pipeline cleanup', () => {
     let closed = false;
 
     await expect(
-      runMemoryPipeline('incremental', {
+      runMemoryPipeline({
+        mode: 'incremental',
         resolveConfigDir: () => '/tmp/corivo',
         resolveDatabasePath: () => '/tmp/corivo/corivo.db',
         readConfig: async () => ({}),
@@ -214,7 +399,8 @@ describe('memory pipeline cleanup', () => {
     const seenStageIds: string[] = [];
 
     await expect(
-      runMemoryPipeline('full', {
+      runMemoryPipeline({
+        mode: 'full',
         resolveConfigDir: () => '/tmp/corivo',
         resolveDatabasePath: () => '/tmp/corivo/corivo.db',
         readConfig: async () => ({}),
@@ -279,7 +465,8 @@ describe('memory pipeline cleanup', () => {
     let closed = false;
 
     await expect(
-      runMemoryPipeline('full', {
+      runMemoryPipeline({
+        mode: 'full',
         resolveConfigDir: () => '/tmp/corivo',
         resolveDatabasePath: () => '/tmp/corivo/corivo.db',
         readConfig: async () => ({}),
@@ -397,7 +584,8 @@ describe('memory pipeline cleanup', () => {
     const runRoot = path.join(configDir, 'memory-pipeline');
     await mkdir(runRoot, { recursive: true });
 
-    const result = await runMemoryPipeline('full', {
+    const result = await runMemoryPipeline({
+      mode: 'full',
       resolveConfigDir: () => configDir,
       resolveDatabasePath: () => path.join(configDir, 'corivo.db'),
       readConfig: async () => ({}),

@@ -2,12 +2,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { loadConfig, loadSolverConfig, saveSolverConfig } from '@/config';
 import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
-import { createLogger, resolveRuntimeLogLevel } from '@/utils/logging';
+import { createLogger, resolveRuntimeLogLevel, type LogTarget } from '@/utils/logging';
 import type { CliContext, CreateCliContextOptions } from './types.js';
 
 export function createCliContext(options: CreateCliContextOptions = {}): CliContext {
+  const logTarget = options.logTarget ?? createCliLogTarget(options.fileLog !== false);
   const logger = options.logger ?? createLogger(
-    options.logTarget,
+    logTarget,
     resolveRuntimeLogLevel({
       explicitLogLevel: options.logLevel,
       configLogLevel: options.configLogLevel,
@@ -65,5 +66,24 @@ export function createCliContext(options: CreateCliContextOptions = {}): CliCont
         });
       },
     },
+  };
+}
+
+function createCliLogTarget(fileLogEnabled: boolean): LogTarget {
+  const cliLogPath = path.join(getConfigDir(), 'cli.log');
+
+  const write = (method: 'log' | 'error', args: unknown[]) => {
+    console[method](...args);
+    if (!fileLogEnabled) {
+      return;
+    }
+
+    const line = `${args.map((value) => String(value)).join(' ')}\n`;
+    void fs.appendFile(cliLogPath, line).catch(() => {});
+  };
+
+  return {
+    log: (...args) => write('log', args),
+    error: (...args) => write('error', args),
   };
 }

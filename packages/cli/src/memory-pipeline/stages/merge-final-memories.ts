@@ -2,6 +2,7 @@ import { buildFinalMergePrompt } from '../prompts/final-merge-prompt.js';
 import type { ModelProcessor } from '../processors/model-processor.js';
 import { ExtractionBackedModelProcessor } from '../processors/model-processor.js';
 import { parseFinalMemoryFileBlocks, validateFinalMemoryFileBlocks } from '../markdown/memory-writer.js';
+import type { ExtractionProvider } from '../../extraction/types.js';
 import type {
   FinalMemoryBatchArtifact,
   RawMemoryBatchArtifact,
@@ -25,6 +26,7 @@ interface MemoryRootArtifactStore extends MemoryPipelineArtifactStore {
 
 export interface MergeFinalMemoriesStageOptions {
   processor?: ModelProcessor;
+  provider?: ExtractionProvider;
 }
 
 export class MergeFinalMemoriesStage implements MemoryPipelineStage {
@@ -32,7 +34,7 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
   private readonly processor: ModelProcessor;
 
   constructor(options: MergeFinalMemoriesStageOptions = {}) {
-    this.processor = options.processor ?? new ExtractionBackedModelProcessor({ provider: 'claude' });
+    this.processor = options.processor ?? new ExtractionBackedModelProcessor({ provider: options.provider ?? 'claude' });
   }
 
   async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {

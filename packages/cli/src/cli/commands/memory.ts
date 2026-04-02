@@ -1,221 +1,78 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import { Command } from 'commander';
-import { ConfigError } from '../../errors/index.js';
-import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
-import { MemoryProcessingJobQueue } from '@/raw-memory/job-queue';
-import { RawMemoryRepository } from '@/raw-memory/repository';
+import { createCliContext } from '@/cli/context';
+import type { Logger } from '@/utils/logging';
+import type { ExtractionProvider } from '@/extraction/types';
 import {
-  ArtifactStore,
-  createInitMemoryPipeline,
-  createScheduledMemoryPipeline,
-  DatabaseRawSessionJobSource,
-  DatabaseRawSessionRecordSource,
-  FileRunLock,
-  MemoryPipelineRunner,
-  type ClaudeSessionSource,
-  type MemoryPipelineArtifactStore,
-  type MemoryPipelineDefinition,
-  type MemoryPipelineRunnerOptions,
-  type MemoryPipelineRunResult,
-  type PipelineTrigger,
-  type RawSessionJobSource,
-} from '@/memory-pipeline';
-import { createCliContext } from '../context/create-context.js';
+  DEFAULT_MEMORY_PROVIDER,
+  runMemoryPipeline,
+  type MemoryPipelineMode,
+  type RunMemoryPipelineOptions,
+} from '@/application/memory/run-memory-pipeline';
+import type { MemoryPipelineRunResult } from '@/memory-pipeline';
 
-export type MemoryPipelineMode = 'full' | 'incremental';
+export {
+  DEFAULT_MEMORY_PROVIDER,
+  runMemoryPipeline,
+  type MemoryPipelineExecutionDependencies,
+  type MemoryPipelineMode,
+  type RunMemoryPipelineOptions,
+} from '@/application/memory/run-memory-pipeline';
 
-export interface MemoryPipelineExecutionDependencies {
-  resolveConfigDir: () => string;
-  resolveDatabasePath: () => string;
-  readConfig: (configDir: string) => Promise<{ encrypted_db_key?: string }>;
-  createArtifactStore: (runRoot: string) => MemoryPipelineArtifactStore;
-  createLock: (runRoot: string) => FileRunLock;
-  createRunner: (options: MemoryPipelineRunnerOptions) => MemoryPipelineRunner;
-  createInitPipeline: (options: { sessionSource: ClaudeSessionSource }) => MemoryPipelineDefinition;
-  createScheduledPipeline: (options: {
-    rawSessionJobSource: RawSessionJobSource;
-  }) => MemoryPipelineDefinition;
-  createSessionSource: (db: CorivoDatabase) => ClaudeSessionSource;
-  createRawSessionJobSource: (db: CorivoDatabase) => RawSessionJobSource;
-  openDatabase: (dbPath: string) => CorivoDatabase;
-  closeDatabase: (db: CorivoDatabase, dbPath: string) => void;
-  createTrigger: (mode: MemoryPipelineMode) => PipelineTrigger;
-}
-
-const defaultExecutionDependencies: MemoryPipelineExecutionDependencies = {
-  resolveConfigDir: getConfigDir,
-  resolveDatabasePath: getDefaultDatabasePath,
-  readConfig: async (configDir) => {
-    const configPath = path.join(configDir, 'config.json');
-    let payload: string;
-
-    try {
-      payload = await fs.readFile(configPath, 'utf-8');
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
-        throw new ConfigError('Corivo is not initialized. Please run: corivo init');
-      }
-      throw error;
-    }
-
-    let config: { encrypted_db_key?: string };
-    try {
-      config = JSON.parse(payload) as { encrypted_db_key?: string };
-    } catch (error) {
-      throw new ConfigError(
-        `Unable to parse Corivo config: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-
-    if (config.encrypted_db_key) {
-      throw new ConfigError(
-        'Detected a legacy password-based config. Corivo v0.10+ no longer supports passwords here; please run: corivo init',
-      );
-    }
-
-    return config;
-  },
-  createArtifactStore: (runRoot) => new ArtifactStore(runRoot),
-  createLock: (runRoot) => new FileRunLock(path.join(runRoot, 'run.lock')),
-  createRunner: (options) => new MemoryPipelineRunner(options),
-  createInitPipeline: ({ sessionSource }) => createInitMemoryPipeline({ sessionSource }),
-  createScheduledPipeline: ({ rawSessionJobSource }) =>
-    createScheduledMemoryPipeline({ rawSessionJobSource }),
-  createSessionSource: (db) =>
-    new DatabaseRawSessionRecordSource({
-      repository: {
-        listRawSessions: () => db.listRawSessions(),
-        getRawTranscript: (sessionKey) => db.getRawTranscript(sessionKey),
-      },
-    }) as ClaudeSessionSource,
-  createRawSessionJobSource: (db) =>
-    new DatabaseRawSessionJobSource({
-      queue: new MemoryProcessingJobQueue(db),
-      repository: new RawMemoryRepository(db),
-    }),
-  openDatabase: (dbPath) => CorivoDatabase.getInstance({ path: dbPath, enableEncryption: false }),
-  closeDatabase: () => {
-    /* No-op; the CorivoDatabase lifecycle is managed at the process level */
-  },
-  createTrigger: (mode) => ({
-    type: mode === 'full' ? 'init' : 'manual',
-    runAt: Date.now(),
-    requestedBy: 'cli',
-  }),
-};
-
-export async function runMemoryPipeline(
+type MemoryCommandExecutor = (
   mode: MemoryPipelineMode,
-  overrides: Partial<MemoryPipelineExecutionDependencies> = {},
-): Promise<MemoryPipelineRunResult> {
-  const dependencies = { ...defaultExecutionDependencies, ...overrides };
-  const configDir = dependencies.resolveConfigDir();
-  await dependencies.readConfig(configDir);
-
-  const memoryPipelineRunRoot = path.join(configDir, 'memory-pipeline');
-  const artifactStore = dependencies.createArtifactStore(memoryPipelineRunRoot);
-  const lock = dependencies.createLock(memoryPipelineRunRoot);
-  const runner = dependencies.createRunner({
-    artifactStore,
-    lock,
-    runRoot: memoryPipelineRunRoot,
-  });
-
-  let openedDatabase: CorivoDatabase | undefined;
-  let openedDatabasePath: string | undefined;
-
-  try {
-    const dbPath = dependencies.resolveDatabasePath();
-    const db = dependencies.openDatabase(dbPath);
-    openedDatabase = db;
-    openedDatabasePath = dbPath;
-
-    const pipeline =
-      mode === 'full'
-        ? dependencies.createInitPipeline({
-            sessionSource: dependencies.createSessionSource(db),
-          })
-        : dependencies.createScheduledPipeline({
-            rawSessionJobSource: dependencies.createRawSessionJobSource(db),
-          });
-
-    return await runner.run(pipeline, dependencies.createTrigger(mode));
-  } finally {
-    if (openedDatabase && openedDatabasePath) {
-      dependencies.closeDatabase(openedDatabase, openedDatabasePath);
-    }
-  }
-}
+  provider: ExtractionProvider,
+) => Promise<MemoryPipelineRunResult>;
 
 export interface MemoryCommandOptions {
-  executor?: (mode: MemoryPipelineMode) => Promise<MemoryPipelineRunResult>;
+  executor?: MemoryCommandExecutor;
   printer?: (result: MemoryPipelineRunResult) => void;
+  logger?: Logger;
 }
 
 function defaultPrinter(result: MemoryPipelineRunResult) {
   const context = createCliContext();
   const stageIds = result.stages.map((stage) => stage.stageId);
-  const stageSuffix =
-    stageIds.length > 0 ? ` [stages: ${stageIds.join(', ')}]` : '';
+  const stageSuffix = stageIds.length > 0 ? ` [stages: ${stageIds.join(', ')}]` : '';
   context.output.info(
-    `Memory pipeline ${result.pipelineId} finished with status ${result.status} (run ${result.runId})${stageSuffix}`,
+    `Memory pipeline ${result.pipelineId} finished with status ${result.status} (run ${result.runId})${stageSuffix}`
   );
 }
 
+const defaultExecutor: MemoryCommandExecutor = (mode, provider) =>
+  runMemoryPipeline({ mode, provider });
+
 export function createMemoryCommand({
-  executor = runMemoryPipeline,
+  executor = defaultExecutor,
   printer = defaultPrinter,
+  logger = createCliContext().logger,
 }: MemoryCommandOptions = {}): Command {
   const memoryCommand = new Command('memory');
   memoryCommand.description('Manage memory pipelines');
 
-  const runCommand = new Command('run');
-  runCommand
+  memoryCommand
+    .command('run')
     .description('Run a memory pipeline (default: incremental scheduled pipeline)')
     .option('--full', 'Trigger the init memory pipeline')
     .option('--incremental', 'Trigger the scheduled memory pipeline (default)')
-    .action(async (options: { full?: boolean; incremental?: boolean }) => {
+    .option('--provider <provider>', 'Extraction provider to use (claude or codex)', DEFAULT_MEMORY_PROVIDER)
+    .action(async (options: { full?: boolean; incremental?: boolean; provider?: ExtractionProvider }) => {
+      logger.debug(
+        `[memory:command] run requested full=${options.full === true} incremental=${options.incremental === true} provider=${options.provider ?? DEFAULT_MEMORY_PROVIDER}`
+      );
       if (options.full && options.incremental) {
         throw new Error('Cannot specify both --full and --incremental at the same time.');
       }
 
+      const provider = options.provider === 'codex' ? 'codex' : DEFAULT_MEMORY_PROVIDER;
       const mode: MemoryPipelineMode = options.full ? 'full' : 'incremental';
-      const result = await executor(mode);
+      logger.debug(`[memory:command] resolved mode=${mode} provider=${provider}`);
+      const result = await executor(mode, provider);
+      logger.debug(
+        `[memory:command] executor completed pipeline=${result.pipelineId} status=${result.status} run=${result.runId} provider=${provider}`
+      );
       printer(result);
+      logger.debug('[memory:command] printer completed');
     });
 
-  memoryCommand.addCommand(runCommand);
   return memoryCommand;
-}
-
-let executorOverride: MemoryCommandOptions['executor'] | undefined;
-let printerOverride: MemoryCommandOptions['printer'] | undefined;
-
-export function setMemoryCommandExecutor(executor: MemoryCommandOptions['executor']) {
-  executorOverride = executor;
-}
-
-export function resetMemoryCommandExecutor() {
-  executorOverride = undefined;
-}
-
-export function setMemoryCommandPrinter(printer: MemoryCommandOptions['printer']) {
-  printerOverride = printer;
-}
-
-export function resetMemoryCommandPrinter() {
-  printerOverride = undefined;
-}
-
-export function resetMemoryCommandOverrides() {
-  executorOverride = undefined;
-  printerOverride = undefined;
-}
-
-export function getMemoryCommand() {
-  return createMemoryCommand({
-    executor: executorOverride ?? runMemoryPipeline,
-    printer: printerOverride ?? defaultPrinter,
-  });
 }

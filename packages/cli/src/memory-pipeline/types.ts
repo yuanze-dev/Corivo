@@ -71,6 +71,8 @@ export interface MemoryPipelineContext {
   logger?: {
     log: (...args: unknown[]) => void;
     error: (...args: unknown[]) => void;
+    debug?: (...args: unknown[]) => void;
+    isDebugEnabled?: () => boolean;
   };
 }
 

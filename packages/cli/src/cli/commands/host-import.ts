@@ -1,19 +1,19 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { ConfigError } from '../../errors/index.js';
+import { ConfigError } from '@/errors';
 import {
   createHostImportUseCase,
   persistImportedSessions,
-} from '../../application/hosts/import-host.js';
-import { createEnqueueSessionExtractionUseCase } from '../../application/memory-ingest/enqueue-session-extraction.js';
-import type { HostId, HostImportResult } from '../../hosts/types.js';
-import type { HostImportRequest } from '../../application/hosts/import-host.js';
-import { HostImportCursorStore } from '../../raw-memory/import-cursors.js';
-import { MemoryProcessingJobQueue } from '../../raw-memory/job-queue.js';
-import { RawMemoryRepository } from '../../raw-memory/repository.js';
+} from '@/application/hosts/import-host';
+import { createEnqueueSessionExtractionUseCase } from '@/application/memory-ingest/enqueue-session-extraction';
+import type { HostId, HostImportResult } from '@/hosts';
+import type { HostImportRequest } from '@/application/hosts/import-host';
+import { HostImportCursorStore } from '@/raw-memory/import-cursors';
+import { MemoryProcessingJobQueue } from '@/raw-memory/job-queue';
+import { RawMemoryRepository } from '@/raw-memory/repository';
 import { loadRuntimeDb } from './runtime-support.js';
-import { createCliContext } from '../context/create-context.js';
-import { createConfiguredCliContext } from '../context/configured-context.js';
+import { createCliContext } from '@/cli/context';
+import { createConfiguredCliContext } from '@/cli/context';
 
 interface HostImportCommandOptions {
   all?: boolean;

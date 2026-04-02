@@ -1,13 +1,12 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { createHostDoctorUseCase } from '../../application/hosts/doctor-host.js';
-import { createHostInstallUseCase } from '../../application/hosts/install-host.js';
-import { createHostUninstallUseCase } from '../../application/hosts/uninstall-host.js';
+import { createHostDoctorUseCase } from '@/application/hosts/doctor-host';
+import { createHostInstallUseCase } from '@/application/hosts/install-host';
+import { createHostUninstallUseCase } from '@/application/hosts/uninstall-host';
 import { hostImportCommand } from './host-import.js';
-import { getAllHostAdapters } from '../../hosts/registry.js';
-import type { HostId } from '../../hosts/types.js';
-import { createCliContext } from '../context/create-context.js';
-import { createConfiguredCliContext } from '../context/configured-context.js';
+import type { HostId } from '@/hosts';
+import { getAllHostAdapters } from '@/hosts';
+import { createCliContext, createConfiguredCliContext } from '@/cli/context';
 
 export const hostCommand = new Command('host');
 
@@ -19,7 +18,9 @@ hostCommand
   .action(() => {
     const context = createCliContext();
     for (const adapter of getAllHostAdapters()) {
-      context.output.info(`${adapter.id}\t${adapter.displayName}\t${adapter.capabilities.join(',')}`);
+      context.output.info(
+        `${adapter.id}\t${adapter.displayName}\t${adapter.capabilities.join(',')}`
+      );
     }
   });
 

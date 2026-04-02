@@ -24,7 +24,7 @@ import { vitalityToStatus } from '../models/block.js';
 import { loadConfig } from '../config.js';
 import { createCliContext } from '../cli/context/create-context.js';
 import { createLogger, type Logger } from '../utils/logging.js';
-import { runMemoryPipeline } from '../cli/commands/memory.js';
+import { runMemoryPipeline } from '../application/memory/run-memory-pipeline.js';
 
 const HEARTBEAT_INTERVAL = 5000; // 5 seconds
 const PENDING_BATCH_SIZE = 10; // Number of pending blocks processed per cycle
@@ -164,6 +164,7 @@ export class Heartbeat {
         createCliContext({
           logger: this.logger,
           logLevel: corivoConfig?.settings?.logLevel,
+          fileLog: false,
         })
       );
       this.syncCycles = this.computeSyncCycles(corivoConfig?.settings?.syncIntervalSeconds);
@@ -899,7 +900,8 @@ export class Heartbeat {
     }
 
     this.memoryPipelineRunning = true;
-    this.memoryPipelinePromise = runMemoryPipeline('incremental', {
+    this.memoryPipelinePromise = runMemoryPipeline({
+      mode: 'incremental',
       resolveConfigDir: () => configDir,
       resolveDatabasePath: () => dbPath,
       createTrigger: () => ({

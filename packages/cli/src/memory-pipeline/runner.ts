@@ -32,7 +32,9 @@ export class MemoryPipelineRunner {
   async run(pipeline: MemoryPipelineDefinition, trigger: PipelineTrigger): Promise<MemoryPipelineRunResult> {
     const runId = this.options.runIdGenerator?.() ?? this.createRunId();
     const manifestPath = path.join(this.options.runRoot, 'runs', runId, 'manifest.json');
+    this.debug(`starting pipeline=${pipeline.id} run=${runId} trigger=${trigger.type} stageCount=${pipeline.stages.length}`);
     await this.options.lock.acquire(runId);
+    this.debug(`acquired lock run=${runId}`);
 
     const manifest: RunManifest = {
       runId,
@@ -55,26 +57,36 @@ export class MemoryPipelineRunner {
 
     try {
       await manifestWriter(manifestPath, manifest);
+      this.debug(`wrote initial manifest path=${manifestPath}`);
       for (const stage of pipeline.stages) {
+        this.debug(`stage start pipeline=${pipeline.id} run=${runId} stage=${stage.id}`);
         const result = await this.executeStage(stage, context);
         stageResults.push(result);
+        this.debug(
+          `stage complete pipeline=${pipeline.id} run=${runId} stage=${stage.id} status=${result.status} input=${result.inputCount} output=${result.outputCount} artifacts=${result.artifactIds.length}`
+        );
         manifest.status = result.status === 'failed' ? 'failed' : 'running';
         await manifestWriter(manifestPath, manifest);
+        this.debug(`updated manifest path=${manifestPath} status=${manifest.status}`);
 
         if (result.status === 'failed') {
           await this.markClaimedJobsFailed(context.state, result.error ?? `${stage.id} failed`);
+          this.debug(`pipeline failed pipeline=${pipeline.id} run=${runId} failedStage=${stage.id}`);
           return this.buildResult(runId, pipeline.id, 'failed', stageResults);
         }
       }
 
       manifest.status = 'success';
       await manifestWriter(manifestPath, manifest);
+      this.debug(`pipeline succeeded pipeline=${pipeline.id} run=${runId}`);
       return this.buildResult(runId, pipeline.id, 'success', stageResults);
     } catch (error) {
       await this.markClaimedJobsFailed(context.state, this.toErrorMessage(error));
+      this.debug(`pipeline threw pipeline=${pipeline.id} run=${runId} error=${this.toErrorMessage(error)}`);
       throw error;
     } finally {
       await this.options.lock.release();
+      this.debug(`released lock run=${runId}`);
     }
   }
 
@@ -139,5 +151,9 @@ export class MemoryPipelineRunner {
     const timestamp = Date.now();
     const suffix = Math.random().toString(16).slice(2, 8);
     return `run-${timestamp}-${suffix}`;
+  }
+
+  private debug(message: string): void {
+    this.options.logger?.debug?.(`[memory:pipeline:runner] ${message}`);
   }
 }

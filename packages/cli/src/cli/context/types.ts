@@ -61,4 +61,5 @@ export interface CreateCliContextOptions {
   logLevel?: string;
   configLogLevel?: string;
   logTarget?: LogTarget;
+  fileLog?: boolean;
 }

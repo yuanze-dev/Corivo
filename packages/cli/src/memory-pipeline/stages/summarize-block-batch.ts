@@ -6,12 +6,14 @@ import type {
 import { getRawSessionJobs } from '../pipeline-state.js';
 import type { ModelProcessor, ModelProcessorMetadata } from '../processors/model-processor.js';
 import { ExtractionBackedModelProcessor } from '../processors/model-processor.js';
+import type { ExtractionProvider } from '../../extraction/types.js';
 
 const STAGE_ID = 'summarize-block-batch';
 
 export interface SummarizeBlockBatchStageOptions {
   processor?: ModelProcessor;
   blockContents?: string[];
+  provider?: ExtractionProvider;
 }
 
 export class SummarizeBlockBatchStage implements MemoryPipelineStage {
@@ -21,7 +23,7 @@ export class SummarizeBlockBatchStage implements MemoryPipelineStage {
 
   constructor(options: SummarizeBlockBatchStageOptions = {}) {
     this.processor =
-      options.processor ?? new ExtractionBackedModelProcessor({ provider: 'claude' });
+      options.processor ?? new ExtractionBackedModelProcessor({ provider: options.provider ?? 'claude' });
     this.blockContents = options.blockContents ?? [];
   }
 

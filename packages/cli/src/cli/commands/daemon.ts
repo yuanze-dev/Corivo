@@ -17,7 +17,7 @@ daemonCommand
   .command('run')
   .description('Run the heartbeat loop (invoked by the system, not intended for manual execution)')
   .action(async () => {
-    const context = createCliContext()
+    const context = createCliContext({ fileLog: false })
     const pidPath = context.paths.heartbeatPidPath()
 
     // Write its own PID for TUI hook (useDaemon.ts) to detect the survival status

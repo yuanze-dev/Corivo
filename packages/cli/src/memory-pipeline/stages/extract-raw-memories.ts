@@ -2,6 +2,7 @@ import type { SessionRecord } from '../contracts/session-record.js';
 import { buildRawExtractionPrompt } from '../prompts/raw-extraction-prompt.js';
 import type { ModelProcessor } from '../processors/model-processor.js';
 import { ExtractionBackedModelProcessor } from '../processors/model-processor.js';
+import type { ExtractionProvider } from '../../extraction/types.js';
 import type {
   ArtifactDescriptor,
   MemoryPipelineContext,
@@ -25,6 +26,7 @@ interface SessionWorkItem extends WorkItem {
 
 export interface ExtractRawMemoriesStageOptions {
   processor?: ModelProcessor;
+  provider?: ExtractionProvider;
 }
 
 export class ExtractRawMemoriesStage implements MemoryPipelineStage {
@@ -32,7 +34,7 @@ export class ExtractRawMemoriesStage implements MemoryPipelineStage {
   private readonly processor: ModelProcessor;
 
   constructor(options: ExtractRawMemoriesStageOptions = {}) {
-    this.processor = options.processor ?? new ExtractionBackedModelProcessor({ provider: 'claude' });
+    this.processor = options.processor ?? new ExtractionBackedModelProcessor({ provider: options.provider ?? 'claude' });
   }
 
   async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {

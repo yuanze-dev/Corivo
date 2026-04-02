@@ -1,16 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {
-  loadConfig,
-  loadSolverConfig,
-  saveSolverConfig,
-} from '../../config.js';
-import {
-  CorivoDatabase,
-  getConfigDir,
-  getDefaultDatabasePath,
-} from '@/storage/database';
-import { createLogger } from '../../utils/logging.js';
+import { loadConfig, loadSolverConfig, saveSolverConfig } from '@/config';
+import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
+import { createLogger } from '@/utils/logging';
 import type { CliContext, CreateCliContextOptions } from './types.js';
 
 export function createCliContext(options: CreateCliContextOptions = {}): CliContext {

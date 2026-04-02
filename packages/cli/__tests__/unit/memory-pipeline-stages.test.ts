@@ -1022,6 +1022,108 @@ describe('memory pipeline extension points', () => {
     });
   });
 
+  it('marks raw extraction as partial and does not emit NO_MEMORIES when a processor call times out', async () => {
+    const store = new RecordingArtifactStore();
+    await store.writeArtifact({
+      runId: 'run-extract-partial',
+      kind: 'work-item',
+      source: 'collect-claude-sessions',
+      body: JSON.stringify([
+        {
+          id: 'session-1',
+          kind: 'session',
+          sourceRef: 'claude://session-1',
+          metadata: {
+            session: {
+              id: 'session-1',
+              sessionId: 'session-1',
+              sourceRef: 'claude://session-1',
+              messages: [{ role: 'user', content: 'Remember my PR style.' }],
+            },
+          },
+        },
+        {
+          id: 'session-2',
+          kind: 'session',
+          sourceRef: 'claude://session-2',
+          metadata: {
+            session: {
+              id: 'session-2',
+              sessionId: 'session-2',
+              sourceRef: 'claude://session-2',
+              messages: [{ role: 'user', content: 'This one times out.' }],
+            },
+          },
+        },
+      ]),
+    });
+    const processor: ModelProcessor = {
+      process: vi
+        .fn()
+        .mockResolvedValueOnce({
+          outputs: ['<!-- FILE: private/pr-style.md -->\n```markdown\nshort PRs\n```'],
+          metadata: { provider: 'claude', status: 'success' },
+        })
+        .mockResolvedValueOnce({
+          outputs: [],
+          metadata: { provider: 'claude', status: 'timeout', error: 'timed out' },
+        }),
+    };
+    const stage = new ExtractRawMemoriesStage({ processor });
+
+    const result = await stage.run(createContext(store, 'run-extract-partial'));
+
+    expect(result).toMatchObject({
+      stageId: stage.id,
+      status: 'partial',
+      inputCount: 2,
+      outputCount: 1,
+      error: 'timed out',
+      artifactIds: [store.descriptors[1].id],
+    });
+    expect(store.writes).toHaveLength(2);
+    expect(JSON.parse(store.writes[1].body)).toEqual({
+      sessionId: 'session-1',
+      markdown: '<!-- FILE: private/pr-style.md -->\n```markdown\nshort PRs\n```',
+    });
+  });
+
+  it('fails fast when a collected session work item lacks a valid session transcript payload', async () => {
+    const store = new RecordingArtifactStore();
+    await store.writeArtifact({
+      runId: 'run-extract-invalid-session',
+      kind: 'work-item',
+      source: 'collect-claude-sessions',
+      body: JSON.stringify([
+        {
+          id: 'session-1',
+          kind: 'session',
+          sourceRef: 'claude://session-1',
+          metadata: {
+            session: {
+              id: 'session-1',
+              sessionId: 'session-1',
+              sourceRef: 'claude://session-1',
+              messages: [],
+            },
+          },
+        },
+      ]),
+    });
+    const processor: ModelProcessor = {
+      process: vi.fn(async () => ({
+        outputs: ['should not run'],
+      })),
+    };
+    const stage = new ExtractRawMemoriesStage({ processor });
+
+    await expect(stage.run(createContext(store, 'run-extract-invalid-session'))).rejects.toThrow(
+      'ExtractRawMemoriesStage requires a valid session payload with at least one usable message',
+    );
+    expect(processor.process).not.toHaveBeenCalled();
+    expect(store.writes).toHaveLength(1);
+  });
+
   it('marks summarize session batch as failed when processor returns no outputs', async () => {
     const store = new RecordingArtifactStore();
     const processor: ModelProcessor = {

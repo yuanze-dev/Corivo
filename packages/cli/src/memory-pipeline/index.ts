@@ -19,6 +19,7 @@ export * from './markdown/memory-writer.js';
 export * from './pipelines/init-pipeline.js';
 export * from './pipelines/scheduled-pipeline.js';
 export * from './stages/collect-claude-sessions.js';
+export * from './stages/extract-raw-memories.js';
 export * from './stages/summarize-session-batch.js';
 export * from './stages/consolidate-session-summaries.js';
 export * from './stages/collect-stale-blocks.js';

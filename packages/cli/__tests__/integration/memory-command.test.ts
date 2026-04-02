@@ -204,4 +204,59 @@ describe('memory pipeline cleanup', () => {
 
     expect(closed).toBe(true);
   });
+
+  it('builds the full pipeline with extract-raw-memories in the shared execution path', async () => {
+    const seenStageIds: string[] = [];
+
+    await expect(
+      runMemoryPipeline('full', {
+        resolveConfigDir: () => '/tmp/corivo',
+        resolveDatabasePath: () => '/tmp/corivo/corivo.db',
+        readConfig: async () => ({}),
+        createArtifactStore: () => ({
+          writeArtifact: async () => ({
+            id: 'artifact',
+            kind: 'work-item',
+            version: 1,
+            path: 'artifacts/detail/test.json',
+            source: 'test',
+            createdAt: Date.now(),
+          }),
+          persistDescriptor: async () => {},
+          getDescriptor: async () => undefined,
+          readArtifact: async () => '[]',
+          listArtifacts: async () => [],
+        }),
+        createLock: () => ({
+          acquire: async () => {},
+          release: async () => {},
+        }),
+        createRunner: () =>
+          ({
+            run: async (pipeline) => {
+              seenStageIds.push(...pipeline.stages.map((stage) => stage.id));
+              return {
+                runId: 'run',
+                pipelineId: pipeline.id,
+                status: 'success',
+                stages: [],
+              };
+            },
+          } as MemoryPipelineRunner),
+        createSessionSource: () => ({ collect: async () => [] }),
+      }),
+    ).resolves.toMatchObject({
+      pipelineId: 'init-memory-pipeline',
+      status: 'success',
+    });
+
+    expect(seenStageIds).toEqual([
+      'collect-claude-sessions',
+      'extract-raw-memories',
+      'summarize-session-batch',
+      'consolidate-session-summaries',
+      'append-detail-records',
+      'rebuild-memory-index',
+    ]);
+  });
 });

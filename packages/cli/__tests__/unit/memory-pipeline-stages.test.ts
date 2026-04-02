@@ -17,6 +17,7 @@ import {
   ConsolidateSessionSummariesStage,
   DatabaseRawSessionJobSource,
   DatabaseStaleBlockSource,
+  ExtractRawMemoriesStage,
   ExtractionBackedModelProcessor,
   ModelProcessor,
   NoopModelProcessor,
@@ -67,6 +68,7 @@ const createBlockRow = (overrides: Partial<BlockWithExtras> = {}): BlockWithExtr
 class RecordingArtifactStore implements MemoryPipelineArtifactStore {
   readonly writes: ArtifactWriteInput[] = [];
   readonly descriptors: ArtifactDescriptor[] = [];
+  readonly bodies = new Map<string, string>();
 
   async writeArtifact(input: ArtifactWriteInput): Promise<ArtifactDescriptor> {
     this.writes.push(input);
@@ -81,6 +83,7 @@ class RecordingArtifactStore implements MemoryPipelineArtifactStore {
       metadata: input.metadata,
     };
     this.descriptors.push(descriptor);
+    this.bodies.set(descriptor.id, input.body);
     return descriptor;
   }
 
@@ -90,6 +93,37 @@ class RecordingArtifactStore implements MemoryPipelineArtifactStore {
 
   async getDescriptor(_id: string): Promise<ArtifactDescriptor | undefined> {
     return undefined;
+  }
+
+  async readArtifact(id: string): Promise<string> {
+    const body = this.bodies.get(id);
+    if (!body) {
+      throw new Error(`artifact not found: ${id}`);
+    }
+    return body;
+  }
+
+  async listArtifacts(query?: { runId?: string; source?: string; kind?: string }): Promise<ArtifactDescriptor[]> {
+    return this.descriptors.filter((descriptor, index) => {
+      const write = this.writes[index];
+      if (!write) {
+        return false;
+      }
+
+      if (query?.runId && write.runId !== query.runId) {
+        return false;
+      }
+
+      if (query?.source && descriptor.source !== query.source) {
+        return false;
+      }
+
+      if (query?.kind && descriptor.kind !== query.kind) {
+        return false;
+      }
+
+      return true;
+    });
   }
 }
 
@@ -246,6 +280,7 @@ describe('memory pipeline extension points', () => {
     const ids = pipeline.stages.map((stage) => stage.id);
     expect(ids).toEqual([
       'collect-claude-sessions',
+      'extract-raw-memories',
       'summarize-session-batch',
       'consolidate-session-summaries',
       'append-detail-records',
@@ -890,6 +925,101 @@ describe('memory pipeline extension points', () => {
       outputCount: 2,
     });
     expect(result.artifactIds).toEqual([store.descriptors[0].id]);
+  });
+
+  it('extracts one raw markdown artifact per collected session work item', async () => {
+    const store = new RecordingArtifactStore();
+    const collectDescriptor = await store.writeArtifact({
+      runId: 'run-extract',
+      kind: 'work-item',
+      source: 'collect-claude-sessions',
+      body: JSON.stringify([
+        {
+          id: 'session-1',
+          kind: 'session',
+          sourceRef: 'claude://session-1',
+          freshnessToken: '42',
+          metadata: {
+            session: {
+              id: 'session-1',
+              sessionId: 'session-1',
+              sourceRef: 'claude://session-1',
+              messages: [
+                { role: 'user', content: 'Remember that I prefer short PR descriptions.' },
+                { role: 'assistant', content: 'I will remember that preference.' },
+              ],
+            },
+          },
+        },
+        {
+          id: 'session-2',
+          kind: 'session',
+          sourceRef: 'claude://session-2',
+          freshnessToken: '84',
+          metadata: {
+            session: {
+              id: 'session-2',
+              sessionId: 'session-2',
+              sourceRef: 'claude://session-2',
+              messages: [{ role: 'user', content: 'No durable memory here.' }],
+            },
+          },
+        },
+      ]),
+    });
+    const processor: ModelProcessor = {
+      process: vi
+        .fn()
+        .mockResolvedValueOnce({
+          outputs: [
+            '<!-- FILE: private/short-prs.md -->\n```markdown\nremembered\n```',
+          ],
+          metadata: { provider: 'claude', status: 'success' },
+        })
+        .mockResolvedValueOnce({
+          outputs: [],
+          metadata: { provider: 'claude', status: 'success' },
+        }),
+    };
+    const stage = new ExtractRawMemoriesStage({ processor });
+
+    const result = await stage.run(createContext(store, 'run-extract'));
+
+    expect(processor.process).toHaveBeenCalledTimes(2);
+    expect((processor.process as any).mock.calls[0][0][0]).toContain('Session filename: session-1.md');
+    expect((processor.process as any).mock.calls[0][0][0]).toContain(
+      'Remember that I prefer short PR descriptions.',
+    );
+    expect((processor.process as any).mock.calls[1][0][0]).toContain('Session filename: session-2.md');
+    expect(store.writes.slice(1)).toMatchObject([
+      {
+        runId: 'run-extract',
+        kind: 'raw-memory-batch',
+        source: 'extract-raw-memories',
+        upstreamIds: [collectDescriptor.id],
+      },
+      {
+        runId: 'run-extract',
+        kind: 'raw-memory-batch',
+        source: 'extract-raw-memories',
+        upstreamIds: [collectDescriptor.id],
+      },
+    ]);
+    expect(JSON.parse(store.writes[1].body)).toEqual({
+      sessionId: 'session-1',
+      markdown: '<!-- FILE: private/short-prs.md -->\n```markdown\nremembered\n```',
+    });
+    expect(JSON.parse(store.writes[2].body)).toEqual({
+      sessionId: 'session-2',
+      markdown: '<!-- NO_MEMORIES -->',
+    });
+    expect(result).toMatchObject({
+      stageId: stage.id,
+      status: 'success',
+      inputCount: 2,
+      outputCount: 2,
+      artifactIds: [store.descriptors[1].id, store.descriptors[2].id],
+    });
   });
 
   it('marks summarize session batch as failed when processor returns no outputs', async () => {

@@ -2,6 +2,7 @@ import { AppendDetailRecordsStage } from '../stages/append-detail-records.js';
 import { CollectClaudeSessionsStage } from '../stages/collect-claude-sessions.js';
 import { ConsolidateSessionSummariesStage } from '../stages/consolidate-session-summaries.js';
 import { ExtractRawMemoriesStage } from '../stages/extract-raw-memories.js';
+import { MergeFinalMemoriesStage } from '../stages/merge-final-memories.js';
 import { RebuildMemoryIndexStage } from '../stages/rebuild-memory-index.js';
 import { SummarizeSessionBatchStage } from '../stages/summarize-session-batch.js';
 import type { ClaudeSessionSource } from '../sources/claude-session-source.js';
@@ -23,6 +24,7 @@ export const createInitMemoryPipeline = ({
     stages: [
       new CollectClaudeSessionsStage(sessionSource),
       new ExtractRawMemoriesStage(),
+      new MergeFinalMemoriesStage(),
       new SummarizeSessionBatchStage(),
       new ConsolidateSessionSummariesStage(),
       new AppendDetailRecordsStage(),

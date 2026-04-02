@@ -1,3 +1,6 @@
+import { mkdtemp, mkdir, readFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { Block, BlockFilter } from '../../src/models/block.js';
 import type {
@@ -8,6 +11,7 @@ import type {
 } from '../../src/memory-pipeline/types.js';
 import {
   AppendDetailRecordsStage,
+  ArtifactStore,
   BlockWorkItem,
   ClaudeSessionSource,
   CompleteRawSessionJobsStage,
@@ -30,6 +34,7 @@ import {
   createScheduledMemoryPipeline,
 } from '../../src/memory-pipeline/index.js';
 import type { RawSessionJobSource } from '../../src/memory-pipeline/sources/raw-session-job-source.js';
+import { MergeFinalMemoriesStage } from '../../src/memory-pipeline/stages/merge-final-memories.js';
 import { DatabaseClaudeSessionSource } from '../../src/memory-pipeline/sources/claude-session-source.js';
 import type { StaleBlockSource } from '../../src/memory-pipeline/stages/collect-stale-blocks.js';
 import {
@@ -281,6 +286,7 @@ describe('memory pipeline extension points', () => {
     expect(ids).toEqual([
       'collect-claude-sessions',
       'extract-raw-memories',
+      'merge-final-memories',
       'summarize-session-batch',
       'consolidate-session-summaries',
       'append-detail-records',
@@ -1122,6 +1128,148 @@ describe('memory pipeline extension points', () => {
     );
     expect(processor.process).not.toHaveBeenCalled();
     expect(store.writes).toHaveLength(1);
+  });
+
+  it('merges raw memories into final private and team markdown files plus MEMORY indexes under the memory root', async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'corivo-merge-stage-'));
+    const runRoot = path.join(tempRoot, 'memory-pipeline');
+    await mkdir(runRoot, { recursive: true });
+    const store = new ArtifactStore(runRoot);
+
+    await store.writeArtifact({
+      runId: 'run-merge-final',
+      kind: 'raw-memory-batch',
+      source: 'extract-raw-memories',
+      body: JSON.stringify({
+        sessionId: 'session-001',
+        markdown: `<!-- FILE: private/user-short-prs.md -->
+\`\`\`markdown
+---
+name: User prefers short PRs
+description: User usually wants small reviewable pull requests
+type: user
+scope: private
+source_session: session-001
+---
+
+Keep PRs narrowly scoped and easy to review.
+\`\`\`
+`,
+      }),
+    });
+
+    await store.writeArtifact({
+      runId: 'run-merge-final',
+      kind: 'raw-memory-batch',
+      source: 'extract-raw-memories',
+      body: JSON.stringify({
+        sessionId: 'session-002',
+        markdown: `<!-- FILE: team/release-checks.md -->
+\`\`\`markdown
+---
+name: Release check cadence
+description: Team standard for post-release verification
+type: project
+scope: team
+source_session: session-002
+---
+
+Always verify the deployment with a focused smoke test.
+\`\`\`
+`,
+      }),
+    });
+
+    const processor: ModelProcessor = {
+      process: vi.fn(async () => ({
+        outputs: [
+          `<!-- FILE: memories/final/private/user-short-prs.md -->
+\`\`\`markdown
+---
+name: User prefers short PRs
+description: Canonical preference for small reviewable pull requests
+type: user
+scope: private
+merged_from: [session-001]
+---
+
+Prefer small, reviewable pull requests by default.
+\`\`\`
+
+<!-- FILE: memories/final/team/release-checks.md -->
+\`\`\`markdown
+---
+name: Release check cadence
+description: Canonical team expectation for post-release verification
+type: project
+scope: team
+merged_from: [session-002]
+---
+
+Always verify the deployment with a focused smoke test.
+\`\`\`
+
+<!-- FILE: memories/final/private/MEMORY.md -->
+\`\`\`markdown
+- [User prefers short PRs](user-short-prs.md) — Small, reviewable PRs are the default expectation.
+\`\`\`
+
+<!-- FILE: memories/final/team/MEMORY.md -->
+\`\`\`markdown
+- [Release check cadence](release-checks.md) — Post-release verification is a standing team habit.
+\`\`\`
+`,
+        ],
+        metadata: { provider: 'claude', status: 'success' },
+      })),
+    };
+    const stage = new MergeFinalMemoriesStage({ processor });
+
+    const result = await stage.run(createContext(store, 'run-merge-final'));
+
+    expect(processor.process).toHaveBeenCalledTimes(1);
+    expect((processor.process as any).mock.calls[0][0][0]).toContain(
+      'You are acting as the final memory merge subagent.',
+    );
+    expect((processor.process as any).mock.calls[0][0][0]).toContain('session-001.memories.md');
+    expect((processor.process as any).mock.calls[0][0][0]).toContain('session-002.memories.md');
+
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'raw', 'session-001.memories.md'), 'utf8'),
+    ).resolves.toContain('source_session: session-001');
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'raw', 'session-002.memories.md'), 'utf8'),
+    ).resolves.toContain('source_session: session-002');
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'final', 'private', 'user-short-prs.md'), 'utf8'),
+    ).resolves.toContain('merged_from: [session-001]');
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'final', 'team', 'release-checks.md'), 'utf8'),
+    ).resolves.toContain('merged_from: [session-002]');
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'final', 'private', 'MEMORY.md'), 'utf8'),
+    ).resolves.toContain('[User prefers short PRs](user-short-prs.md)');
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'final', 'team', 'MEMORY.md'), 'utf8'),
+    ).resolves.toContain('[Release check cadence](release-checks.md)');
+
+    const descriptors = await store.listArtifacts({
+      runId: 'run-merge-final',
+      kind: 'final-memory-batch',
+      source: 'merge-final-memories',
+    });
+    expect(descriptors).toHaveLength(1);
+    await expect(store.readArtifact(descriptors[0]!.id)).resolves.toContain(
+      'memory/final/private/user-short-prs.md',
+    );
+
+    expect(result).toMatchObject({
+      stageId: 'merge-final-memories',
+      status: 'success',
+      inputCount: 2,
+      outputCount: 4,
+      artifactIds: [descriptors[0]!.id],
+    });
   });
 
   it('marks summarize session batch as failed when processor returns no outputs', async () => {

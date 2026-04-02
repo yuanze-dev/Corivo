@@ -24,6 +24,10 @@ export class ArtifactStore implements MemoryPipelineArtifactStore {
     this.rootDir = rootDir;
   }
 
+  getMemoryRootDir(): string {
+    return path.join(this.rootDir, '..', 'memory');
+  }
+
   async writeArtifact(input: ArtifactWriteInput): Promise<ArtifactDescriptor> {
     const id = this.buildId(input.kind);
     const dir = this.resolveDir(input.kind, input.runId);
@@ -117,6 +121,63 @@ export class ArtifactStore implements MemoryPipelineArtifactStore {
       .sort((left, right) => right.createdAt - left.createdAt);
   }
 
+  async writeMemoryFile(relativePath: string, body: string): Promise<string> {
+    const memoryRoot = this.getMemoryRootDir();
+    await mkdir(memoryRoot, { recursive: true });
+    const { dir: relativeDir, fileName } = await this.ensureInsideDirectory(memoryRoot, relativePath);
+    const absoluteDir = path.join(memoryRoot, relativeDir);
+
+    await mkdir(absoluteDir, { recursive: true });
+    await writeFile(path.join(absoluteDir, fileName), body, 'utf8');
+
+    return path.join(relativeDir, fileName);
+  }
+
+  async readMemoryFile(relativePath: string): Promise<string> {
+    const memoryRoot = this.getMemoryRootDir();
+    const { dir: relativeDir, fileName } = await this.ensureInsideDirectory(memoryRoot, relativePath);
+    return readFile(path.join(memoryRoot, relativeDir, fileName), 'utf8');
+  }
+
+  async listMemoryFiles(relativeDir = ''): Promise<string[]> {
+    const memoryRoot = this.getMemoryRootDir();
+    await mkdir(memoryRoot, { recursive: true });
+    const { dir } = await this.ensureInsideDirectory(memoryRoot, relativeDir || '.');
+    const startDir = path.join(memoryRoot, dir);
+    const files: string[] = [];
+
+    const walk = async (currentDir: string) => {
+      let entries: string[];
+      try {
+        entries = await readdir(currentDir);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          return;
+        }
+        throw error;
+      }
+
+      for (const entry of entries) {
+        const entryPath = path.join(currentDir, entry);
+        const stats = await lstat(entryPath);
+        if (stats.isSymbolicLink()) {
+          throw new Error('path escapes root directory');
+        }
+        if (stats.isDirectory()) {
+          await walk(entryPath);
+          continue;
+        }
+        if (stats.isFile()) {
+          files.push(path.relative(memoryRoot, entryPath));
+        }
+      }
+    };
+
+    await walk(startDir);
+
+    return files.sort();
+  }
+
   private resolveDir(kind: string, runId?: string): string {
     if (kind === 'detail-record') {
       return DETAIL_DIR;
@@ -186,17 +247,21 @@ export class ArtifactStore implements MemoryPipelineArtifactStore {
   }
 
   private async ensureInsideRootPath(subPath: string): Promise<ArtifactSubpath> {
-    const rootReal = await this.getRootRealPath();
-    const absoluteTarget = path.resolve(this.rootDir, subPath);
-    const relativeToRoot = path.relative(this.rootDir, absoluteTarget);
+    return this.ensureInsideDirectory(this.rootDir, subPath);
+  }
+
+  private async ensureInsideDirectory(baseDir: string, subPath: string): Promise<ArtifactSubpath> {
+    const baseReal = await this.getRealPath(baseDir);
+    const absoluteTarget = path.resolve(baseDir, subPath);
+    const relativeToRoot = path.relative(baseDir, absoluteTarget);
     if (relativeToRoot.startsWith('..') || path.isAbsolute(relativeToRoot)) {
       throw new Error('path escapes root directory');
     }
 
-    const resolvedTarget = path.resolve(rootReal, relativeToRoot);
-    await this.ensureNoSymlinkTraversal(rootReal, resolvedTarget);
+    const resolvedTarget = path.resolve(baseReal, relativeToRoot);
+    await this.ensureNoSymlinkTraversal(baseReal, resolvedTarget);
 
-    const relative = path.relative(rootReal, resolvedTarget);
+    const relative = path.relative(baseReal, resolvedTarget);
     return {
       dir: path.dirname(relative) === '.' ? '' : path.dirname(relative),
       fileName: path.basename(resolvedTarget),
@@ -227,9 +292,16 @@ export class ArtifactStore implements MemoryPipelineArtifactStore {
     if (this.rootRealPathPromise) {
       return this.rootRealPathPromise;
     }
-    this.rootRealPathPromise = realpath(this.rootDir)
+    this.rootRealPathPromise = this.getRealPath(this.rootDir).then((real) => {
+      this.rootDir = real;
+      return real;
+    });
+    return this.rootRealPathPromise;
+  }
+
+  private async getRealPath(targetDir: string): Promise<string> {
+    return realpath(targetDir)
       .then((real) => {
-        this.rootDir = real;
         return real;
       })
       .catch((error) => {
@@ -238,6 +310,5 @@ export class ArtifactStore implements MemoryPipelineArtifactStore {
         }
         throw error;
       });
-    return this.rootRealPathPromise;
   }
 }

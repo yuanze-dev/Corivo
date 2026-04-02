@@ -1,7 +1,11 @@
+import { mkdtemp, mkdir, readFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { Command } from 'commander';
 import { describe, expect, it, beforeAll, beforeEach, afterAll, vi } from 'vitest';
 import type { CorivoDatabase } from '@/storage/database';
 import type { MemoryPipelineRunner } from '@/memory-pipeline';
+import { ArtifactStore, FileRunLock, MemoryPipelineRunner as DefaultMemoryPipelineRunner } from '@/memory-pipeline';
 import {
   createMemoryCommand,
   runMemoryPipeline,
@@ -9,6 +13,7 @@ import {
   setMemoryCommandPrinter,
   resetMemoryCommandOverrides,
 } from '../../src/cli/commands/memory.js';
+import { MergeFinalMemoriesStage } from '../../src/memory-pipeline/stages/merge-final-memories.js';
 
 const standaloneExecutor = vi.fn(async (mode: 'full' | 'incremental') => ({
   runId: 'run-standalone',
@@ -253,10 +258,114 @@ describe('memory pipeline cleanup', () => {
     expect(seenStageIds).toEqual([
       'collect-claude-sessions',
       'extract-raw-memories',
+      'merge-final-memories',
       'summarize-session-batch',
       'consolidate-session-summaries',
       'append-detail-records',
       'rebuild-memory-index',
     ]);
+  });
+
+  it('writes raw and final memory files under the configured memory root in the shared execution path', async () => {
+    const configDir = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-command-'));
+    const runRoot = path.join(configDir, 'memory-pipeline');
+    await mkdir(runRoot, { recursive: true });
+
+    const result = await runMemoryPipeline('full', {
+      resolveConfigDir: () => configDir,
+      readConfig: async () => ({}),
+      createArtifactStore: (incomingRunRoot) => new ArtifactStore(incomingRunRoot),
+      createLock: (incomingRunRoot) => new FileRunLock(path.join(incomingRunRoot, 'run.lock')),
+      createRunner: (options) => new DefaultMemoryPipelineRunner(options),
+      createInitPipeline: () => ({
+        id: 'init-memory-pipeline',
+        stages: [
+          {
+            id: 'seed-raw-memories',
+            async run(context) {
+              const descriptor = await context.artifactStore.writeArtifact({
+                runId: context.runId,
+                kind: 'raw-memory-batch',
+                source: 'extract-raw-memories',
+                body: JSON.stringify({
+                  sessionId: 'session-123',
+                  markdown: `<!-- FILE: private/user-short-prs.md -->
+\`\`\`markdown
+---
+name: User prefers short PRs
+description: User usually wants small reviewable pull requests
+type: user
+scope: private
+source_session: session-123
+---
+
+Keep PRs narrowly scoped and easy to review.
+\`\`\`
+`,
+                }),
+              });
+
+              return {
+                stageId: 'seed-raw-memories',
+                status: 'success' as const,
+                inputCount: 0,
+                outputCount: 1,
+                artifactIds: [descriptor.id],
+              };
+            },
+          },
+          new MergeFinalMemoriesStage({
+            processor: {
+              process: vi.fn(async () => ({
+                outputs: [
+                  `<!-- FILE: memories/final/private/user-short-prs.md -->
+\`\`\`markdown
+---
+name: User prefers short PRs
+description: Canonical preference for small reviewable pull requests
+type: user
+scope: private
+merged_from: [session-123]
+---
+
+Prefer small, reviewable pull requests by default.
+\`\`\`
+
+<!-- FILE: memories/final/private/MEMORY.md -->
+\`\`\`markdown
+- [User prefers short PRs](user-short-prs.md) — Small, reviewable PRs are the default expectation.
+\`\`\`
+
+<!-- FILE: memories/final/team/MEMORY.md -->
+\`\`\`markdown
+\`\`\`
+`,
+                ],
+                metadata: { provider: 'claude', status: 'success' as const },
+              })),
+            },
+          }),
+        ],
+      }),
+      createSessionSource: () => ({ collect: async () => [] }),
+    });
+
+    expect(result).toMatchObject({
+      pipelineId: 'init-memory-pipeline',
+      status: 'success',
+    });
+
+    await expect(
+      readFile(path.join(configDir, 'memory', 'raw', 'session-123.memories.md'), 'utf8'),
+    ).resolves.toContain('source_session: session-123');
+    await expect(
+      readFile(path.join(configDir, 'memory', 'final', 'private', 'user-short-prs.md'), 'utf8'),
+    ).resolves.toContain('merged_from: [session-123]');
+    await expect(
+      readFile(path.join(configDir, 'memory', 'final', 'private', 'MEMORY.md'), 'utf8'),
+    ).resolves.toContain('[User prefers short PRs](user-short-prs.md)');
+    await expect(
+      readFile(path.join(configDir, 'memory', 'final', 'team', 'MEMORY.md'), 'utf8'),
+    ).resolves.toBe('');
   });
 });

@@ -42,3 +42,17 @@ export interface MemoryIndexEntry {
   filename: string;
   hook: string;
 }
+
+export interface RawMemoryBatchArtifact {
+  sessionId: string;
+  markdown: string;
+}
+
+export interface FinalMemoryFileBlock {
+  filePath: string;
+  content: string;
+}
+
+export interface FinalMemoryBatchArtifact {
+  files: string[];
+}

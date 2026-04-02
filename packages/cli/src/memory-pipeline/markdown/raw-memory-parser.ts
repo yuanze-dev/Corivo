@@ -1,8 +1,11 @@
 import type {
+  MemoryScope,
   ParsedRawMemoryDocument,
   RawMemoryDocument,
   RawMemoryFrontmatter,
 } from '../contracts/memory-documents.js';
+import { MEMORY_SCOPES } from '../contracts/memory-documents.js';
+import { MEMORY_TYPES, type MemoryType } from '../prompts/memory-types.js';
 
 const NO_MEMORIES_MARKER = '<!-- NO_MEMORIES -->';
 const FILE_BLOCK_PATTERN =
@@ -19,13 +22,28 @@ export function parseRawMemoryDocument(markdown: string): ParsedRawMemoryDocumen
   }
 
   const documents: RawMemoryDocument[] = [];
+  let matchedAny = false;
+  let cursor = 0;
 
   for (const match of trimmed.matchAll(FILE_BLOCK_PATTERN)) {
     const [, filePath, blockBody] = match;
+    const matchStart = match.index ?? 0;
+    const matchEnd = matchStart + match[0].length;
+
+    if (trimmed.slice(cursor, matchStart).trim() !== '') {
+      throw new Error('Malformed raw memory document: found content outside a FILE markdown block.');
+    }
+
+    matchedAny = true;
+    cursor = matchEnd;
     documents.push({
       filePath: filePath.trim(),
       ...parseMarkdownBlock(blockBody),
     });
+  }
+
+  if (!matchedAny || trimmed.slice(cursor).trim() !== '') {
+    throw new Error('Malformed raw memory document: expected FILE comments followed by fenced markdown blocks.');
   }
 
   return {
@@ -71,12 +89,60 @@ function parseFrontmatter(frontmatterBody: string): RawMemoryFrontmatter {
 
   const frontmatter = Object.fromEntries(entries) as Record<string, string>;
 
+  const name = requireNonEmpty(frontmatter.name, 'name');
+  const description = requireNonEmpty(frontmatter.description, 'description');
+  const type = parseMemoryType(frontmatter.type);
+  const scope = parseMemoryScope(frontmatter.scope);
+  const sourceSession = requireNonEmpty(frontmatter.source_session, 'source_session');
+
   return {
-    name: frontmatter.name,
-    description: frontmatter.description,
-    type: frontmatter.type as RawMemoryFrontmatter['type'],
-    scope: frontmatter.scope as RawMemoryFrontmatter['scope'],
-    source_session: frontmatter.source_session,
-    ...(frontmatter.forget ? { forget: frontmatter.forget } : {}),
+    name,
+    description,
+    type,
+    scope,
+    source_session: sourceSession,
+    ...(frontmatter.forget ? { forget: parseForgetValue(frontmatter.forget) } : {}),
   };
+}
+
+function requireNonEmpty(value: string | undefined, key: string): string {
+  if (!value || value.trim() === '') {
+    throw new Error(`Invalid raw memory frontmatter: missing required field "${key}".`);
+  }
+
+  return value.trim();
+}
+
+function parseMemoryType(value: string | undefined): MemoryType {
+  const normalized = requireNonEmpty(value, 'type');
+
+  if (!MEMORY_TYPES.includes(normalized as MemoryType)) {
+    throw new Error(`Invalid raw memory frontmatter: unsupported type "${normalized}".`);
+  }
+
+  return normalized as MemoryType;
+}
+
+function parseMemoryScope(value: string | undefined): MemoryScope {
+  const normalized = requireNonEmpty(value, 'scope');
+
+  if (!MEMORY_SCOPES.includes(normalized as MemoryScope)) {
+    throw new Error(`Invalid raw memory frontmatter: unsupported scope "${normalized}".`);
+  }
+
+  return normalized as MemoryScope;
+}
+
+function parseForgetValue(value: string): boolean | string {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === 'true') {
+    return true;
+  }
+
+  if (normalized === 'false') {
+    return false;
+  }
+
+  return value.trim();
 }

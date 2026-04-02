@@ -1,17 +1,19 @@
 import type {
   FinalMemoryDocument,
+  FinalMemoryFrontmatter,
   MemoryIndexEntry,
   RawMemoryDocument,
+  RawMemoryFrontmatter,
 } from '../contracts/memory-documents.js';
+
+type FrontmatterValue = string | boolean | string[];
+type RenderableFrontmatter = RawMemoryFrontmatter | FinalMemoryFrontmatter;
 
 export function renderRawMemoryDocument(document: RawMemoryDocument): string {
   return [
     `<!-- FILE: ${document.filePath} -->`,
     '```markdown',
-    renderFrontmatter({
-      ...document.frontmatter,
-      source_session: document.frontmatter.source_session,
-    }),
+    renderFrontmatter(document.frontmatter),
     '',
     document.body.trim(),
     '```',
@@ -20,10 +22,7 @@ export function renderRawMemoryDocument(document: RawMemoryDocument): string {
 
 export function renderFinalMemoryDocument(document: FinalMemoryDocument): string {
   return [
-    renderFrontmatter({
-      ...document.frontmatter,
-      merged_from: `[${document.frontmatter.merged_from.join(', ')}]`,
-    }),
+    renderFrontmatter(document.frontmatter),
     '',
     document.body.trim(),
   ].join('\n');
@@ -34,11 +33,25 @@ export function renderMemoryIndex(entries: MemoryIndexEntry[]): string {
 }
 
 export function renderMemoryIndexLine(entry: MemoryIndexEntry): string {
-  return `- [${entry.title}](${entry.filename}) - ${entry.hook}`;
+  return `- [${entry.title}](${entry.filename}) — ${entry.hook}`;
 }
 
-function renderFrontmatter(fields: Record<string, string>): string {
-  return ['---', ...Object.entries(fields).map(([key, value]) => `${key}: ${value}`), '---'].join(
-    '\n',
-  );
+function renderFrontmatter(fields: RenderableFrontmatter): string {
+  return [
+    '---',
+    ...Object.entries(fields).map(([key, value]) => `${key}: ${formatFrontmatterValue(value)}`),
+    '---',
+  ].join('\n');
+}
+
+function formatFrontmatterValue(value: RenderableFrontmatter[keyof RenderableFrontmatter]): string {
+  if (Array.isArray(value)) {
+    return `[${value.join(', ')}]`;
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 'true' : 'false';
+  }
+
+  return value;
 }

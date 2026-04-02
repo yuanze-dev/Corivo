@@ -8,11 +8,19 @@ export interface FinalMergePromptInput {
 const MERGE_RULES_SECTION = [
   '## Merge rules',
   'Dedup by semantics, not filenames',
+  'Treat memories as duplicates when they express the same fact, rule, or preference even if the filenames or wording differ.',
+  'Prefer the more complete, more specific, or more recent version when memories overlap semantically.',
   'Merge evolving facts',
+  'When a newer memory naturally supersedes an older one, keep the newer, more accurate canonical version instead of preserving both.',
   'Resolve conflicts explicitly',
+  'If two memories look inconsistent but can both be true under different conditions, integrate them into one clearer canonical memory instead of keeping them as conflicting duplicates.',
+  'Only keep multiple memories when splitting them makes the canonical set clearer.',
   'Preserve scope correctly',
+  'Re-check scope during merge so user memories stay private, feedback defaults to private, project constraints usually land in team, and reference memories usually land in team.',
   'Drop stale project memories',
+  'Remove project memories that are clearly outdated, date-bound, or no longer represent a durable project constraint.',
   'Respect the exclusion list',
+  'Apply the exclusion rules again as a second defense and do not let raw output force low-value or disallowed memories into the final set.',
 ].join('\n');
 
 const OUTPUT_TARGETS_SECTION = `## Output targets

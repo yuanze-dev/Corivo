@@ -26,6 +26,12 @@ describe('memory pipeline prompts', () => {
     expect(prompt).toContain('scope: {private, team}');
     expect(prompt).toContain('source_session: {session filename}');
     expect(prompt).toContain(WHAT_NOT_TO_SAVE_SECTION);
+    expect(prompt).toContain('Do not save code patterns, coding conventions, architecture, file paths, or project structure as memories.');
+    expect(prompt).toContain('Do not save git history, recent changes, or who changed what.');
+    expect(prompt).toContain('Do not save debugging solutions or fix recipes unless they become a stable project rule.');
+    expect(prompt).toContain('Do not save anything already documented in CLAUDE.md files.');
+    expect(prompt).toContain('Do not save ephemeral task details or current conversation-only context.');
+    expect(prompt).toContain('Do not save secrets, credentials, tokens, private keys, or other sensitive information.');
     expect(MEMORY_TYPES).toEqual(['user', 'feedback', 'project', 'reference']);
   });
 
@@ -41,6 +47,9 @@ describe('memory pipeline prompts', () => {
     expect(prompt).toContain('Preserve scope correctly');
     expect(prompt).toContain('Drop stale project memories');
     expect(prompt).toContain('Respect the exclusion list');
+    expect(prompt).toContain('Prefer the more complete, more specific, or more recent version when memories overlap semantically.');
+    expect(prompt).toContain('If two memories look inconsistent but can both be true under different conditions, integrate them into one clearer canonical memory instead of keeping them as conflicting duplicates.');
+    expect(prompt).toContain('Only keep multiple memories when splitting them makes the canonical set clearer.');
     expect(prompt).toContain('Write the final memory files directly to disk');
     expect(prompt).toContain('Private memories -> memories/final/private/{filename}.md');
     expect(prompt).toContain('Team memories -> memories/final/team/{filename}.md');

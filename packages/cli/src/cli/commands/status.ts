@@ -1,96 +1,104 @@
 /**
- * CLI command - status (plain-text output mode)
+ * CLI command - status
  *
  * TUI mode is handled by renderTui() in src/tui/index.ts,
  * dynamically imported via the --tui flag in index.ts.
  */
-
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import chalk from 'chalk';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
-import { printBanner } from '@/utils/banner';
-import { ConfigError } from '../../errors/index.js';
-import { loadSolverConfig } from '../../config.js';
-import { ContextPusher } from '../../push/context.js';
-import { getServiceManager } from '../../service/index.js';
+import { loadSolverConfig } from '@/config';
+import { ContextPusher } from '@/push/context.js';
+import { getServiceManager } from '@/service/index.js';
+import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
+import { ConfigError } from '@/errors';
 
-export async function statusCommand(_options: { noPassword?: boolean } = {}): Promise<void> {
+type StatusCommandOptions = {
+  json?: boolean;
+};
+
+export const statusCommand = async (options: StatusCommandOptions) => {
+  if (options.json) {
+    await jsonStatus();
+    return;
+  }
+  const { renderTui } = await import('@/tui/index.js');
+  await renderTui();
+};
+
+
+const jsonStatus = async () => {
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');
 
-  let config;
+  let config: { encrypted_db_key?: unknown };
   try {
     const content = await fs.readFile(configPath, 'utf-8');
-    config = JSON.parse(content);
+    config = JSON.parse(content) as { encrypted_db_key?: unknown };
   } catch {
     throw new ConfigError('Corivo is not initialized. Please run: corivo init');
   }
 
-  // Check daemon status (via ServiceManager)
-  const serviceManager = getServiceManager()
-  const serviceStatus = await serviceManager.getStatus()
-
   if (config.encrypted_db_key) {
-    throw new ConfigError('Detected a legacy password-based config. Corivo v0.10+ no longer supports passwords here; please run: corivo init');
+    throw new ConfigError(
+      'Detected a legacy password-based config. Corivo v0.10+ no longer supports passwords here; please run: corivo init',
+    );
   }
 
   const dbPath = getDefaultDatabasePath();
-  const db = CorivoDatabase.getInstance({ path: dbPath, enableEncryption: false });
+  const db = CorivoDatabase.getInstance({
+    path: dbPath,
+    enableEncryption: false,
+  });
+
+  const [serviceStatus, solverConfig, attentionMessage] = await Promise.all([
+    getServiceManager().getStatus(),
+    loadSolverConfig(configDir),
+    new ContextPusher(db).pushNeedsAttention(),
+  ]);
 
   const stats = db.getStats();
   const health = db.checkHealth();
-  const solverConfig = await loadSolverConfig(configDir);
+  const encryption = db.getEncryptionInfo();
 
-  printBanner('Corivo Status', { width: 55, color: chalk.cyan });
-
-  console.log(chalk.cyan('📊 Memory Stats'));
-  console.log(chalk.gray('  Total:    ') + chalk.white(stats.total.toString()));
-  console.log(chalk.gray('  Active:   ') + chalk.green((stats.byStatus.active || 0).toString()));
-  console.log(chalk.gray('  Cooling:  ') + chalk.yellow((stats.byStatus.cooling || 0).toString()));
-  console.log(chalk.gray('  Cold:     ') + chalk.hex('#FF9500')((stats.byStatus.cold || 0).toString()));
-  console.log(chalk.gray('  Archived: ') + chalk.gray((stats.byStatus.archived || 0).toString()));
-
-  const annotations = Object.entries(stats.byAnnotation);
-  if (annotations.length > 0) {
-    console.log(chalk.cyan('\n🏷️  Annotation Distribution'));
-    for (const [annotation, count] of annotations) {
-      console.log(chalk.gray(`  ${annotation}: `) + chalk.white(count.toString()));
-    }
-  }
-
-  console.log(chalk.cyan('\n💾 Database'));
-  console.log(chalk.gray('  Path:    ') + chalk.white(dbPath));
-  console.log(chalk.gray('  Status:  ') + (health.ok ? chalk.green('✅ OK') : chalk.red('❌ Error')));
-  if (health.size) {
-    console.log(chalk.gray('  Size:    ') + chalk.white(`${(health.size / 1024 / 1024).toFixed(2)} MB`));
-  }
-
-  console.log(chalk.cyan('\n⚡ Heartbeat Daemon'))
-  console.log(chalk.gray('  Status:  ') + (serviceStatus.running ? chalk.green('🟢 Running') : chalk.gray('⚪ Not started')))
-  if (serviceStatus.pid) {
-    console.log(chalk.gray('  PID:    ') + chalk.white(serviceStatus.pid.toString()))
-  }
-
-  console.log(chalk.cyan('\n🔗 Sync'));
-  if (solverConfig) {
-    console.log(chalk.gray('  Server:  ') + chalk.white(solverConfig.server_url));
-    console.log(chalk.gray('  Pushed:  ') + chalk.white(solverConfig.last_push_version.toString()) + chalk.gray(' items'));
-    console.log(chalk.gray('  Pulled:  ') + chalk.white(solverConfig.last_pull_version.toString()) + chalk.gray(' items'));
-  } else {
-    console.log(chalk.gray('  Status:  ') + chalk.gray('⚪ Not registered'));
-  }
-
-  const pusher = new ContextPusher(db);
-  const needsAttention = await pusher.pushNeedsAttention();
-  if (needsAttention) {
-    console.log(needsAttention);
-  }
-
-  console.log(chalk.cyan('\n🚀 Next steps:'));
-  console.log(chalk.gray('  corivo save --content "..." --annotation "..."'));
-  console.log(chalk.gray('  corivo save --pending --content "..."'));
-  console.log(chalk.gray('  corivo query "..."'));
-  console.log(chalk.gray('  corivo start | stop'));
-  console.log('');
-}
+  console.log(
+    JSON.stringify(
+      {
+        memory: {
+          total: stats.total,
+          byStatus: stats.byStatus,
+          byAnnotation: stats.byAnnotation,
+        },
+        database: {
+          path: dbPath,
+          healthy: health.ok,
+          integrity: health.integrity,
+          sizeBytes: health.size ?? 0,
+          blockCount: health.blockCount ?? stats.total,
+          encryption,
+        },
+        daemon: serviceStatus,
+        sync: solverConfig
+          ? {
+              configured: true,
+              serverUrl: solverConfig.server_url,
+              lastPushVersion: solverConfig.last_push_version,
+              lastPullVersion: solverConfig.last_pull_version,
+            }
+          : {
+              configured: false,
+            },
+        attention: {
+          message: attentionMessage,
+        },
+        nextSteps: [
+          'corivo save --content "..." --annotation "..."',
+          'corivo save --pending --content "..."',
+          'corivo query "..."',
+          'corivo start | stop',
+        ],
+      },
+      null,
+      2,
+    ),
+  );
+};

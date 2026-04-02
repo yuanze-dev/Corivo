@@ -9,20 +9,10 @@ import chalk from 'chalk';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-
-// Read version number
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-// Read from the project root directory in development environment and from the dist directory in production environment
-const packagePath = join(__dirname, '../../package.json');
-const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
-const VERSION = packageJson.version;
-
 // import command
 import { initCommand } from './commands/init.js';
 import { saveCommand } from './commands/save.js';
 import { queryCommand } from './commands/query.js';
-import { statusCommand } from './commands/status.js';
 import { startCommand } from './commands/start.js';
 import { stopCommand } from './commands/stop.js';
 import { doctorCommand } from './commands/doctor.js';
@@ -47,13 +37,19 @@ import { createSyncCommand } from './commands/sync.js';
 import { listCommand } from './commands/list.js';
 import { getMemoryCommand } from './commands/memory.js';
 import { ingestMessageCommand } from './commands/ingest-message.js';
+import { statusCommand } from '@/cli/commands/status';
+
+// Read version number
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+// Read from the project root directory in development environment and from the dist directory in production environment
+const packagePath = join(__dirname, '../../package.json');
+const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
+const VERSION = packageJson.version;
 
 const program = new Command();
 
-program
-  .name('corivo')
-  .description('Your silicon teammate, alive only for you')
-  .version(VERSION);
+program.name('corivo').description('Your silicon teammate, alive only for you').version(VERSION);
 
 // Register command
 program
@@ -86,36 +82,16 @@ program
 program
   .command('status')
   .description('View status')
-  .option('--tui', 'Launch the interactive status panel')
-  .option('--no-password', 'Skip password prompt (development mode)')
-  .action(async (options) => {
-    if (options.tui) {
-      const { renderTui } = await import('../tui/index.js');
-      await renderTui();
-    } else {
-      await statusCommand(options);
-    }
-  });
+  .option('--json', 'Output JSON formate')
+  .action(statusCommand);
 
-program
-  .command('start')
-  .description('Start the daemon')
-  .action(startCommand);
+program.command('start').description('Start the daemon').action(startCommand);
 
-program
-  .command('stop')
-  .description('Stop the daemon')
-  .action(stopCommand);
+program.command('stop').description('Stop the daemon').action(stopCommand);
 
-program
-  .command('doctor')
-  .description('Run health checks')
-  .action(doctorCommand);
+program.command('doctor').description('Run health checks').action(doctorCommand);
 
-program
-  .command('recover')
-  .description('Recover keys')
-  .action(recoverCommand);
+program.command('recover').description('Recover keys').action(recoverCommand);
 
 program
   .command('inject')

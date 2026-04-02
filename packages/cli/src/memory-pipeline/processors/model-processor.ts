@@ -16,8 +16,12 @@ export interface ModelProcessorResult {
   metadata?: ModelProcessorMetadata;
 }
 
+export interface ModelProcessorProcessOptions {
+  timeoutMs?: number;
+}
+
 export interface ModelProcessor {
-  process(inputs: string[]): Promise<ModelProcessorResult>;
+  process(inputs: string[], options?: ModelProcessorProcessOptions): Promise<ModelProcessorResult>;
 }
 
 export class NoopModelProcessor implements ModelProcessor {
@@ -45,7 +49,7 @@ export class ExtractionBackedModelProcessor implements ModelProcessor {
     this.extractor = options.extract ?? extractWithProvider;
   }
 
-  async process(inputs: string[]): Promise<ModelProcessorResult> {
+  async process(inputs: string[], processOptions: ModelProcessorProcessOptions = {}): Promise<ModelProcessorResult> {
     if (!inputs?.length) {
       return { outputs: [] };
     }
@@ -56,7 +60,7 @@ export class ExtractionBackedModelProcessor implements ModelProcessor {
       const extraction = await this.extractor({
         provider: this.options.provider,
         prompt,
-        timeoutMs: this.options.timeoutMs,
+        timeoutMs: processOptions.timeoutMs ?? this.options.timeoutMs,
       });
 
       if (extraction.status === 'success' && extraction.result !== null) {

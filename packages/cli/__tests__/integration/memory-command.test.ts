@@ -272,8 +272,9 @@ describe('memory pipeline cleanup', () => {
     ]);
   });
 
-  it('builds the full pipeline from database-backed Claude sessions in the shared execution path', async () => {
-    let capturedQuery: unknown;
+  it('builds the full pipeline from database-backed raw sessions in the shared execution path', async () => {
+    let listedSessions = false;
+    let transcriptLookupKey: string | undefined;
     let sessionItemsPromise: Promise<unknown[]> | undefined;
     let closed = false;
 
@@ -315,19 +316,43 @@ describe('memory pipeline cleanup', () => {
         },
         openDatabase: () =>
           ({
-            querySessionRecords: (query: unknown) => {
-              capturedQuery = query;
+            listRawSessions: () => {
+              listedSessions = true;
               return [
                 {
-                  id: 'record-1',
-                  sessionId: 'session-1',
-                  kind: 'claude-session',
-                  host: 'claude',
-                  sourceRef: 'claude://session-1',
+                  id: 'raw-session-1',
+                  host: 'codex',
+                  externalSessionId: 'session-1',
+                  sessionKey: 'codex:session-1',
+                  sourceType: 'history-import',
                   updatedAt: 123,
-                  messages: [],
                 },
               ];
+            },
+            getRawTranscript: (sessionKey: string) => {
+              transcriptLookupKey = sessionKey;
+              return {
+                session: {
+                  id: 'raw-session-1',
+                  host: 'codex',
+                  externalSessionId: 'session-1',
+                  sessionKey: 'codex:session-1',
+                  sourceType: 'history-import',
+                  updatedAt: 123,
+                },
+                messages: [
+                  {
+                    id: 'raw-message-1',
+                    sessionKey: 'codex:session-1',
+                    role: 'user',
+                    content: 'Remember that I prefer small PRs.',
+                    ordinal: 1,
+                    ingestedFrom: 'host-import',
+                    createdDbAt: 123,
+                    updatedDbAt: 123,
+                  },
+                ],
+              };
             },
             close: () => {},
           } as CorivoDatabase),
@@ -340,20 +365,26 @@ describe('memory pipeline cleanup', () => {
       status: 'success',
     });
 
-    expect(capturedQuery).toEqual({
-      mode: 'full',
-      sessionKind: 'claude-session',
-    });
+    expect(listedSessions).toBe(true);
+    expect(transcriptLookupKey).toBe('codex:session-1');
     await expect(sessionItemsPromise).resolves.toEqual([
       expect.objectContaining({
-        id: 'record-1',
+        id: 'raw-session-1',
         kind: 'session',
-        sourceRef: 'claude://session-1',
+        sourceRef: 'codex:session-1',
         freshnessToken: '123',
         metadata: {
           session: expect.objectContaining({
-            id: 'record-1',
+            id: 'raw-session-1',
             sessionId: 'session-1',
+            kind: 'raw-session',
+            host: 'codex',
+            messages: [
+              expect.objectContaining({
+                role: 'user',
+                content: 'Remember that I prefer small PRs.',
+              }),
+            ],
           }),
         },
       }),

@@ -8,6 +8,7 @@ export * from './contracts/memory-documents.js';
 export * from './state/run-lock.js';
 export * from './processors/model-processor.js';
 export * from './sources/claude-session-source.js';
+export * from './sources/raw-session-record-source.js';
 export * from './sources/stale-block-source.js';
 export * from './sources/raw-session-job-source.js';
 export * from './prompts/memory-types.js';

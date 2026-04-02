@@ -10,6 +10,10 @@ import type {
 export class RawMemoryRepository {
   constructor(private readonly db: CorivoDatabase) {}
 
+  listSessions(): RawSessionRecord[] {
+    return this.db.listRawSessions();
+  }
+
   upsertSession(input: RawSessionInput): RawSessionRecord {
     return this.db.upsertRawSession(input);
   }

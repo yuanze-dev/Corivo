@@ -1597,6 +1597,16 @@ export class CorivoDatabase {
     return row ? this.rowToRawSession(row) : null;
   }
 
+  listRawSessions(): RawSessionRecord[] {
+    const rows = this.db.prepare(`
+      SELECT *
+      FROM raw_sessions
+      ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC, updated_at DESC
+    `).all() as any[];
+
+    return rows.map((row) => this.rowToRawSession(row));
+  }
+
   upsertRawMessage(input: RawMessageInput): RawMessageRecord {
     if (
       !input.sessionKey

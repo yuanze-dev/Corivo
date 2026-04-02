@@ -10,7 +10,7 @@ import {
   createInitMemoryPipeline,
   createScheduledMemoryPipeline,
   DatabaseRawSessionJobSource,
-  DatabaseClaudeSessionSource,
+  DatabaseRawSessionRecordSource,
   FileRunLock,
   MemoryPipelineRunner,
   type ClaudeSessionSource,
@@ -82,10 +82,12 @@ const defaultExecutionDependencies: MemoryPipelineExecutionDependencies = {
   createScheduledPipeline: ({ rawSessionJobSource }) =>
     createScheduledMemoryPipeline({ rawSessionJobSource }),
   createSessionSource: (db) =>
-    new DatabaseClaudeSessionSource({
-      repository: db,
-      mode: 'full',
-    }),
+    new DatabaseRawSessionRecordSource({
+      repository: {
+        listRawSessions: () => db.listRawSessions(),
+        getRawTranscript: (sessionKey) => db.getRawTranscript(sessionKey),
+      },
+    }) as ClaudeSessionSource,
   createRawSessionJobSource: (db) =>
     new DatabaseRawSessionJobSource({
       queue: new MemoryProcessingJobQueue(db),

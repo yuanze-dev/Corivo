@@ -74,6 +74,7 @@ class RecordingArtifactStore implements MemoryPipelineArtifactStore {
   readonly writes: ArtifactWriteInput[] = [];
   readonly descriptors: ArtifactDescriptor[] = [];
   readonly bodies = new Map<string, string>();
+  readonly memoryFiles = new Map<string, string>();
 
   async writeArtifact(input: ArtifactWriteInput): Promise<ArtifactDescriptor> {
     this.writes.push(input);
@@ -129,6 +130,26 @@ class RecordingArtifactStore implements MemoryPipelineArtifactStore {
 
       return true;
     });
+  }
+
+  async writeMemoryFile(relativePath: string, body: string): Promise<string> {
+    this.memoryFiles.set(relativePath, body);
+    return relativePath;
+  }
+
+  async readMemoryFile(relativePath: string): Promise<string> {
+    const body = this.memoryFiles.get(relativePath);
+    if (body === undefined) {
+      throw new Error(`memory file not found: ${relativePath}`);
+    }
+    return body;
+  }
+
+  async listMemoryFiles(relativeDir = ''): Promise<string[]> {
+    const prefix = relativeDir ? `${relativeDir.replace(/\/+$/, '')}/` : '';
+    return [...this.memoryFiles.keys()]
+      .filter((file) => file.startsWith(prefix))
+      .sort();
   }
 }
 
@@ -438,27 +459,116 @@ describe('memory pipeline extension points', () => {
     );
   });
 
-  it('appends detail records and reports a detail-record artifact', async () => {
+  it('appends detail records from final memory files and reports a detail-record artifact', async () => {
     const store = new RecordingArtifactStore();
+    await store.writeMemoryFile(
+      'final/private/user-short-prs.md',
+      `---
+name: User prefers short PRs
+description: Canonical preference for small reviewable pull requests
+type: user
+scope: private
+merged_from: [session-001]
+---
+
+Prefer small, reviewable pull requests by default.
+`,
+    );
+    await store.writeMemoryFile(
+      'final/private/MEMORY.md',
+      '- [User prefers short PRs](user-short-prs.md) — Small, reviewable PRs are the default expectation.\n',
+    );
     const stage = new AppendDetailRecordsStage();
     const context = createContext(store, 'run-detail');
 
     const result = await stage.run(context);
 
     const [write] = store.writes;
-    expect(write).toMatchObject({
-      runId: 'run-detail',
-      kind: 'detail-record',
-      source: stage.id,
-      body: '[]',
+    expect(write.runId).toBe('run-detail');
+    expect(write.kind).toBe('detail-record');
+    expect(write.source).toBe(stage.id);
+    expect(JSON.parse(write.body)).toEqual({
+      files: [
+        {
+          path: 'final/private/user-short-prs.md',
+          content: expect.stringContaining('merged_from: [session-001]'),
+        },
+      ],
     });
     expect(result).toMatchObject({
       stageId: stage.id,
       status: 'success',
-      inputCount: 0,
+      inputCount: 1,
       outputCount: 1,
     });
     expect(result.artifactIds).toEqual([store.descriptors[0].id]);
+  });
+
+  it('refreshes the memory index artifact from existing MEMORY.md files', async () => {
+    const store = new RecordingArtifactStore();
+    await store.writeMemoryFile(
+      'final/private/MEMORY.md',
+      '- [User prefers short PRs](user-short-prs.md) — Small, reviewable PRs are the default expectation.\n',
+    );
+    await store.writeMemoryFile(
+      'final/team/MEMORY.md',
+      '- [Release check cadence](release-checks.md) — Post-release verification is a standing team habit.\n',
+    );
+    const stage = new RefreshMemoryIndexStage();
+
+    const result = await stage.run(createContext(store, 'run-refresh-index'));
+    const [write] = store.writes;
+
+    expect(write.kind).toBe('memory-index');
+    expect(JSON.parse(write.body)).toEqual({
+      indexes: [
+        {
+          path: 'final/private/MEMORY.md',
+          content:
+            '- [User prefers short PRs](user-short-prs.md) — Small, reviewable PRs are the default expectation.\n',
+        },
+        {
+          path: 'final/team/MEMORY.md',
+          content:
+            '- [Release check cadence](release-checks.md) — Post-release verification is a standing team habit.\n',
+        },
+      ],
+    });
+    expect(result).toMatchObject({
+      stageId: stage.id,
+      status: 'success',
+      inputCount: 2,
+      outputCount: 2,
+    });
+  });
+
+  it('rebuilds the memory index artifact from existing MEMORY.md files', async () => {
+    const store = new RecordingArtifactStore();
+    await store.writeMemoryFile(
+      'final/private/MEMORY.md',
+      '- [User prefers short PRs](user-short-prs.md) — Small, reviewable PRs are the default expectation.\n',
+    );
+    const stage = new RebuildMemoryIndexStage();
+
+    const result = await stage.run(createContext(store, 'run-rebuild-index'));
+    const [write] = store.writes;
+
+    expect(write.kind).toBe('memory-index');
+    expect(JSON.parse(write.body)).toEqual({
+      indexes: [
+        {
+          path: 'final/private/MEMORY.md',
+          content:
+            '- [User prefers short PRs](user-short-prs.md) — Small, reviewable PRs are the default expectation.\n',
+        },
+      ],
+    });
+    expect(result).toMatchObject({
+      stageId: stage.id,
+      status: 'success',
+      inputCount: 1,
+      outputCount: 1,
+    });
   });
 
   it('runs collect stale blocks stage with its source dependency', async () => {
@@ -1607,6 +1717,10 @@ not valid final memory content
 
   it('runs refresh memory index stage and writes index artifact', async () => {
     const store = new RecordingArtifactStore();
+    await store.writeMemoryFile(
+      'final/private/MEMORY.md',
+      '- [User prefers short PRs](user-short-prs.md) — Small, reviewable PRs are the default expectation.\n',
+    );
     const stage = new RefreshMemoryIndexStage();
     const context = createContext(store, 'run-refresh');
 
@@ -1618,14 +1732,18 @@ not valid final memory content
       source: stage.id,
     });
     expect(JSON.parse(store.writes[0].body)).toEqual({
-      runId: 'run-refresh',
-      stage: stage.id,
-      status: 'refreshed',
+      indexes: [
+        {
+          path: 'final/private/MEMORY.md',
+          content:
+            '- [User prefers short PRs](user-short-prs.md) — Small, reviewable PRs are the default expectation.\n',
+        },
+      ],
     });
     expect(result).toMatchObject({
       stageId: stage.id,
       status: 'success',
-      inputCount: 0,
+      inputCount: 1,
       outputCount: 1,
     });
     expect(result.artifactIds).toEqual([store.descriptors[0].id]);
@@ -1633,6 +1751,10 @@ not valid final memory content
 
   it('writes a rebuild index artifact with the correct metadata', async () => {
     const store = new RecordingArtifactStore();
+    await store.writeMemoryFile(
+      'final/team/MEMORY.md',
+      '- [Release check cadence](release-checks.md) — Post-release verification is a standing team habit.\n',
+    );
     const stage = new RebuildMemoryIndexStage();
     const context = createContext(store, 'run-index');
 
@@ -1645,14 +1767,18 @@ not valid final memory content
       source: stage.id,
     });
     expect(JSON.parse(write.body)).toEqual({
-      runId: 'run-index',
-      stage: stage.id,
-      status: 'rebuilt',
+      indexes: [
+        {
+          path: 'final/team/MEMORY.md',
+          content:
+            '- [Release check cadence](release-checks.md) — Post-release verification is a standing team habit.\n',
+        },
+      ],
     });
     expect(result).toMatchObject({
       stageId: stage.id,
       status: 'success',
-      inputCount: 0,
+      inputCount: 1,
       outputCount: 1,
     });
     expect(result.artifactIds).toEqual([store.descriptors[0].id]);

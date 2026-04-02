@@ -175,7 +175,9 @@ Keep PRs narrowly scoped and easy to review.
       },
     ]);
 
-    expect(index).toBe('- [User prefers short PRs](user-short-prs.md) — Small, reviewable PRs are the default expectation.');
+    expect(index).toBe(
+      '- [User prefers short PRs](user-short-prs.md) — Small, reviewable PRs are the default expectation.',
+    );
     expect(index).toMatch(/^[^\n]+$/);
     expect(index).toMatch(/^- \[[^\]]+\]\([^)]+\.md\) — .+$/);
   });

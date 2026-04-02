@@ -1,7 +1,7 @@
 import type {
+  FinalMemoryDocument,
   FinalMemoryFileBlock,
   FinalMemoryFrontmatter,
-  FinalMemoryDocument,
   MemoryIndexEntry,
   MemoryScope,
   RawMemoryDocument,
@@ -10,8 +10,8 @@ import type {
 import { MEMORY_SCOPES } from '../contracts/memory-documents.js';
 import { MEMORY_TYPES, type MemoryType } from '../prompts/memory-types.js';
 
-type FrontmatterValue = string | boolean | string[];
 type RenderableFrontmatter = RawMemoryFrontmatter | FinalMemoryFrontmatter;
+
 const FILE_BLOCK_PATTERN =
   /<!--\s*FILE:\s*([^\s].*?)\s*-->\s*```markdown\s*([\s\S]*?)\s*```/g;
 const OUTPUT_FILE_PATH_PATTERN =
@@ -28,11 +28,7 @@ export function renderRawMemoryDocument(document: RawMemoryDocument): string {
 }
 
 export function renderFinalMemoryDocument(document: FinalMemoryDocument): string {
-  return [
-    renderFrontmatter(document.frontmatter),
-    '',
-    document.body.trim(),
-  ].join('\n');
+  return [renderFrontmatter(document.frontmatter), '', document.body.trim()].join('\n');
 }
 
 export function renderMemoryIndex(entries: MemoryIndexEntry[]): string {

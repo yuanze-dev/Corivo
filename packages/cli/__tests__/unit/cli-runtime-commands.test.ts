@@ -1,3 +1,6 @@
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Block } from '../../src/models/block.js';
 import { runCarryOverCommand } from '../../src/cli/commands/carry-over.js';
@@ -50,8 +53,22 @@ function createDb(blocks: Block[]): RuntimeDbStub {
 }
 
 describe('runtime CLI command helpers', () => {
+  let tempHome: string;
+  let previousHome: string | undefined;
+
   beforeEach(() => {
     loadRuntimeDb.mockReset();
+  });
+
+  beforeEach(async () => {
+    tempHome = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-runtime-cli-'));
+    previousHome = process.env.HOME;
+    process.env.HOME = tempHome;
+  });
+
+  afterEach(async () => {
+    process.env.HOME = previousHome;
+    await fs.rm(tempHome, { recursive: true, force: true });
   });
 
   it('returns text output for carry-over', async () => {
@@ -87,6 +104,61 @@ describe('runtime CLI command helpers', () => {
       mode: 'recall',
       confidence: 'high',
     });
+  });
+
+  it('prefers markdown memory index for query --prompt when available', async () => {
+    await fs.mkdir(path.join(tempHome, '.corivo', 'memory', 'final', 'private'), { recursive: true });
+    await fs.writeFile(
+      path.join(tempHome, '.corivo', 'memory', 'final', 'private', 'MEMORY.md'),
+      '- [User prefers short PRs](user-short-prs.md) — Small, reviewable pull requests are the default expectation.\n',
+    );
+    await fs.writeFile(
+      path.join(tempHome, '.corivo', 'memory', 'final', 'private', 'user-short-prs.md'),
+      `---
+name: User prefers short PRs
+description: Canonical preference for small reviewable pull requests
+type: user
+scope: private
+merged_from: [session-001]
+---
+
+Prefer small, reviewable pull requests by default.
+`,
+    );
+    loadRuntimeDb.mockResolvedValue(createDb([]));
+
+    const output = await runPromptQueryCommand({
+      password: false,
+      format: 'text',
+      prompt: 'Keep small reviewable pull requests',
+    });
+
+    expect(output).toContain('[corivo]');
+    expect(output).toContain('Prefer small, reviewable pull requests by default.');
+  });
+
+  it('falls back to raw transcript recall when markdown memory index misses', async () => {
+    loadRuntimeDb.mockResolvedValue({
+      ...createDb([]),
+      listRawSessions: () => [{ sessionKey: 'codex:session-1' }],
+      getRawTranscript: () => ({
+        session: { sessionKey: 'codex:session-1' },
+        messages: [
+          {
+            content: 'Remember that I prefer small reviewable pull requests.',
+          },
+        ],
+      }),
+    });
+
+    const output = await runPromptQueryCommand({
+      password: false,
+      format: 'text',
+      prompt: 'What do I prefer about pull requests?',
+    });
+
+    expect(output).toContain('[corivo]');
+    expect(output).toContain('small reviewable pull requests');
   });
 
   it('returns hook-text output for query --prompt with explicit Corivo attribution guidance', async () => {

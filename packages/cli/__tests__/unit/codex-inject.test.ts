@@ -126,12 +126,15 @@ describe('Codex Corivo integration', () => {
       expect(sessionInitContent).toContain('hookEventName:"SessionStart"');
       expect(ingestTurnContent).toContain('corivo ingest-message');
       expect(userPromptSubmitContent).toContain('hookEventName:"UserPromptSubmit"');
+      expect(userPromptSubmitContent).toContain('corivo query --prompt "$PROMPT" --format hook-text');
+      expect(userPromptSubmitContent).not.toContain('corivo list --annotation');
       expect(stopContent).toContain('"decision":"block"');
       expect(hooksConfig).toContain(sessionInitPath);
       expect(hooksConfig).toContain(ingestTurnPath);
       expect(hooksConfig).toContain(userPromptSubmitPath);
       expect(hooksConfig).toContain(stopPath);
       expect(globalAgents).toContain(packagedTemplate.trim());
+      expect(globalAgents).toContain('优先使用 Corivo 返回的 Markdown memory / recall 结果');
     } finally {
       process.env.HOME = previousHome;
       await fs.rm(tempHome, { recursive: true, force: true });

@@ -7,6 +7,20 @@ export interface RuntimeDatabase {
   searchBlocks: (query: string, limit?: number) => Block[];
   getBlockAssociations: (blockId: string, minConfidence?: number) => Association[];
   getBlock: (id: string) => Block | null;
+  listRawSessions?: () => Array<{ sessionKey: string }> | Promise<Array<{ sessionKey: string }>>;
+  getRawTranscript?: (
+    sessionKey: string,
+  ) => (
+    | {
+        session: { sessionKey: string };
+        messages: Array<{ content: string }>;
+      }
+    | null
+    | Promise<{
+        session: { sessionKey: string };
+        messages: Array<{ content: string }>;
+      } | null>
+  );
 }
 
 export interface CandidateRecord {

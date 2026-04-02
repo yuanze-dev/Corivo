@@ -174,6 +174,40 @@ describe('generateRecall', () => {
     expect(result?.memoryIds).toEqual(['blk_cn']);
   });
 
+  it('prefers markdown memory index matches over block recall when provided', () => {
+    const db = createDb([
+      createBlock({
+        id: 'blk_old',
+        content: '旧的 block recall 结果',
+        annotation: '决策 · project · legacy',
+      }),
+    ]);
+
+    const result = generateRecall(
+      db,
+      createQueryPack({
+        prompt: 'Keep small reviewable pull requests',
+      }),
+      {
+        memoryIndex: [
+          {
+            scope: 'private',
+            title: 'User prefers short PRs',
+            filename: 'user-short-prs.md',
+            hook: 'Small, reviewable pull requests are the default expectation.',
+            detailPath: '/tmp/.corivo/memory/final/private/user-short-prs.md',
+            detailContent: 'Prefer small, reviewable pull requests by default.',
+          },
+        ],
+      },
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.mode).toBe('recall');
+    expect(result?.memoryIds).toEqual(['memory-index:private/user-short-prs.md']);
+    expect(result?.claim).toContain('Prefer small, reviewable pull requests');
+  });
+
   it('does not surface archived memories', () => {
     const db = createDb([
       createBlock({

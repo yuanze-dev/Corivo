@@ -13,6 +13,8 @@ import { ContextPusher } from '../../push/context.js';
 import { createQueryPack } from '../../runtime/query-pack.js';
 import { formatSurfaceItem, type RuntimeOutputFormat } from '../../runtime/render.js';
 import { generateRecall } from '../../runtime/recall.js';
+import { loadMemoryIndex } from '../../runtime/memory-index.js';
+import { generateRawTranscriptRecall } from '../../runtime/raw-recall.js';
 import { createCliContext } from '../context/create-context.js';
 import { createConfiguredCliContext } from '../context/configured-context.js';
 import type { CliContext } from '../context/types.js';
@@ -50,10 +52,13 @@ export async function runPromptQueryCommand(
     return '';
   }
 
-  return formatSurfaceItem(
-    generateRecall(db, createQueryPack({ prompt: options.prompt })),
-    options.format,
-  );
+  const queryPack = createQueryPack({ prompt: options.prompt });
+  const memoryIndex = await loadMemoryIndex();
+  const recall =
+    generateRecall(db, queryPack, { memoryIndex })
+    ?? await generateRawTranscriptRecall(db, queryPack);
+
+  return formatSurfaceItem(recall, options.format);
 }
 
 export async function queryCommand(rawQuery: string | undefined, options: QueryOptions): Promise<void> {

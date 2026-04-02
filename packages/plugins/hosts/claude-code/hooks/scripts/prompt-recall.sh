@@ -4,7 +4,7 @@
 set -euo pipefail
 
 INPUT=$(cat)
-PROMPT=$(echo "$INPUT" | jq -r '.prompt // empty' 2>/dev/null || echo "")
+PROMPT=$(printf '%s' "$INPUT" | jq -r '.prompt // empty' 2>/dev/null || echo "")
 
 if [ -z "$PROMPT" ]; then
   exit 0

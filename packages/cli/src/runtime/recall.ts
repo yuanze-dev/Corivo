@@ -1,12 +1,24 @@
 import type { QueryPack } from './query-pack.js';
+import type { MemoryIndexEntry } from './memory-index.js';
 import type { CorivoSurfaceItem } from './types.js';
 import { collectCandidates, hasTensionAssociation, type RuntimeDatabase } from './retrieval.js';
 import { countAnchorMatches, hasChangeIntent, isDecisionBlock } from './scoring.js';
+import { recallFromMemoryIndex } from './memory-index.js';
 
 export function generateRecall(
   db: RuntimeDatabase,
   queryPack: QueryPack,
+  options: {
+    memoryIndex?: MemoryIndexEntry[];
+  } = {},
 ): CorivoSurfaceItem | null {
+  const memoryIndexResult = options.memoryIndex
+    ? recallFromMemoryIndex(options.memoryIndex, queryPack)
+    : null;
+  if (memoryIndexResult) {
+    return memoryIndexResult;
+  }
+
   const candidates = collectCandidates(db, queryPack)
     .map((candidate) => ({
       ...candidate,

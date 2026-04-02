@@ -18,7 +18,7 @@ corivo carry-over --format text
 corivo query --prompt "<用户问题>" --format text
 ```
 
-如果你采纳了这条来自 Corivo 的记忆，请在回答中明确说“根据 Corivo 的记忆”或“从 Corivo 中查到”。
+优先使用 Corivo 返回的 Markdown memory / recall 结果；如果你采纳了这条来自 Corivo 的记忆，请在回答中明确说“根据 Corivo 的记忆”或“从 Corivo 中查到”。
 
 ### 答后 review
 

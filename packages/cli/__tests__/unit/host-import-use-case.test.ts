@@ -10,6 +10,13 @@ import { createEnqueueSessionExtractionUseCase } from '../../src/application/mem
 describe('host import use case', () => {
   const dbPaths = new Set<string>();
 
+  function createLogger() {
+    return {
+      debug: vi.fn(),
+      isDebugEnabled: () => true,
+    };
+  }
+
   afterEach(async () => {
     for (const dbPath of dbPaths) {
       const instance = (CorivoDatabase as any).instances?.get(dbPath);
@@ -52,6 +59,7 @@ describe('host import use case', () => {
       nextCursor: 'cursor-2',
       summary: 'imported 2 sessions',
     }));
+    const logger = createLogger();
 
     const run = createHostImportUseCase({
       getAdapter: () =>
@@ -61,11 +69,18 @@ describe('host import use case', () => {
         }) as any,
       getLastCursor: async () => 'cursor-1',
       saveLastCursor: async () => {},
+      logger,
     });
 
     await run({ host: 'claude-code' });
 
     expect(importHistory).toHaveBeenCalledWith(expect.objectContaining({ since: 'cursor-1' }));
+    expect(logger.debug).toHaveBeenCalledWith(
+      '[host:import] using stored cursor host=claude-code since=cursor-1'
+    );
+    expect(logger.debug).toHaveBeenCalledWith(
+      '[host:import] completed host=claude-code mode=incremental sessions=2 messages=6 nextCursor=cursor-2 dryRun=false persisted=true cursorSaved=true'
+    );
   });
 
   it('persists nextCursor when import succeeds with a cursor', async () => {

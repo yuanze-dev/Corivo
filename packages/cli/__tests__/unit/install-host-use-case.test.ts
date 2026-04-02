@@ -3,6 +3,13 @@ import { createHostInstallUseCase } from '../../src/application/hosts/install-ho
 import type { HostAdapter, HostId, HostImportResult, HostInstallResult } from '../../src/hosts/types.js';
 
 describe('install host use case', () => {
+  function createLogger() {
+    return {
+      debug: vi.fn(),
+      isDebugEnabled: () => true,
+    };
+  }
+
   function createInstallResult(host: HostId): HostInstallResult {
     return {
       success: true,
@@ -65,6 +72,7 @@ describe('install host use case', () => {
     const confirmImport = vi.fn(async () => true);
     const importHistory = vi.fn(async () => createImportResult('cursor'));
     const getAdapter = vi.fn(() => createAdapter('cursor', ['history-import']));
+    const logger = createLogger();
 
     const run = createHostInstallUseCase({
       install,
@@ -72,6 +80,7 @@ describe('install host use case', () => {
       confirmImport,
       isInteractive: () => true,
       importHistory,
+      logger,
     });
 
     await run({ host: 'cursor', target: '/tmp/cursor-project' });
@@ -81,6 +90,12 @@ describe('install host use case', () => {
       all: true,
       target: '/tmp/cursor-project',
     });
+    expect(logger.debug).toHaveBeenCalledWith(
+      '[host:install] start host=cursor target=/tmp/cursor-project'
+    );
+    expect(logger.debug).toHaveBeenCalledWith(
+      '[host:install] import confirmed host=cursor mode=full'
+    );
   });
 
   it('skips the import prompt for unsupported hosts', async () => {

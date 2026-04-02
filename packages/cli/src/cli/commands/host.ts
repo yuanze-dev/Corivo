@@ -6,6 +6,7 @@ import { createHostUninstallUseCase } from '../../application/hosts/uninstall-ho
 import { hostImportCommand } from './host-import.js';
 import { getAllHostAdapters } from '../../hosts/registry.js';
 import type { HostId } from '../../hosts/types.js';
+import { createCliContext } from '../context/create-context.js';
 
 export const hostCommand = new Command('host');
 
@@ -27,7 +28,8 @@ hostCommand
   .option('-t, --target <path>', 'Target path')
   .option('-f, --force', 'Force install')
   .action(async (host: HostId, options: { target?: string; force?: boolean }) => {
-    const installHost = createHostInstallUseCase();
+    const context = createCliContext();
+    const installHost = createHostInstallUseCase({ logger: context.logger });
     const result = await installHost({ host, target: options.target, force: options.force });
 
     if (!result.success) {

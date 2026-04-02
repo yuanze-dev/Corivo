@@ -8,8 +8,10 @@ import type {
 import type { RawMemoryRepository } from '../../raw-memory/repository.js';
 import type { RawMessageRole } from '../../raw-memory/types.js';
 import type { EnqueueSessionExtractionRequest } from '../memory-ingest/enqueue-session-extraction.js';
+import type { Logger } from '../../utils/logging.js';
 
 export type HostImportRequest = HostImportOptions & { host: HostId };
+type HostImportLogger = Pick<Logger, 'debug'>;
 
 interface ImportedMessageLike {
   externalMessageId?: string;
@@ -40,22 +42,28 @@ export function createHostImportUseCase(deps?: {
   getLastCursor?: (host: HostId) => Promise<string | undefined> | string | undefined;
   saveLastCursor?: (host: HostId, cursor: string) => Promise<void> | void;
   persistImportResult?: (result: HostImportResult) => Promise<void> | void;
+  logger?: HostImportLogger;
 }) {
   return async (input: HostImportRequest): Promise<HostImportResult> => {
     if (deps?.run) {
       return deps.run(input);
     }
 
+    const logger = deps?.logger;
     const getAdapter = deps?.getAdapter ?? ((host: HostId) => getHostAdapter(host));
     const getLastCursor = deps?.getLastCursor ?? (() => undefined);
     const saveLastCursor = deps?.saveLastCursor ?? (() => {});
     const persistImportResult = deps?.persistImportResult ?? (() => {});
 
     const mode: HostImportResult['mode'] = input.all ? 'full' : 'incremental';
+    logger?.debug(
+      `[host:import] start host=${input.host} mode=${mode} dryRun=${input.dryRun ? 'true' : 'false'} target=${input.target ?? '<default>'}`
+    );
 
     const adapter = getAdapter(input.host);
     if (!adapter?.importHistory) {
       const message = `Host import is not supported for ${input.host}.`;
+      logger?.debug(`[host:import] unsupported host=${input.host}`);
       return {
         success: false,
         host: input.host,
@@ -79,6 +87,7 @@ export function createHostImportUseCase(deps?: {
       const cursor = await getLastCursor(input.host);
       if (!cursor) {
         const message = `No previous import cursor found for ${input.host}. Use --all or --since to bootstrap the first import.`;
+        logger?.debug(`[host:import] missing bootstrap cursor host=${input.host}`);
         return {
           success: false,
           host: input.host,
@@ -90,17 +99,25 @@ export function createHostImportUseCase(deps?: {
         };
       }
       resolvedOptions.since = cursor;
+      logger?.debug(`[host:import] using stored cursor host=${input.host} since=${cursor}`);
     }
 
     const result = await adapter.importHistory(resolvedOptions);
+    const shouldPersist = result.success && !input.dryRun;
+    const shouldSaveCursor = shouldPersist && Boolean(result.nextCursor);
 
-    if (result.success && !input.dryRun) {
+    if (shouldPersist) {
+      logger?.debug(`[host:import] persisting imported sessions host=${input.host}`);
       await persistImportResult(result);
     }
 
-    if (result.success && result.nextCursor && !input.dryRun) {
+    if (shouldSaveCursor && result.nextCursor) {
       await saveLastCursor(input.host, result.nextCursor);
     }
+
+    logger?.debug(
+      `[host:import] completed host=${input.host} mode=${result.mode} sessions=${result.importedSessionCount} messages=${result.importedMessageCount} nextCursor=${result.nextCursor ?? '<none>'} dryRun=${input.dryRun ? 'true' : 'false'} persisted=${shouldPersist ? 'true' : 'false'} cursorSaved=${shouldSaveCursor ? 'true' : 'false'}`
+    );
 
     return result;
   };

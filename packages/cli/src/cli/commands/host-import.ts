@@ -12,6 +12,7 @@ import { HostImportCursorStore } from '../../raw-memory/import-cursors.js';
 import { MemoryProcessingJobQueue } from '../../raw-memory/job-queue.js';
 import { RawMemoryRepository } from '../../raw-memory/repository.js';
 import { loadRuntimeDb } from './runtime-support.js';
+import { createCliContext } from '../context/create-context.js';
 
 interface HostImportCommandOptions {
   all?: boolean;
@@ -80,6 +81,7 @@ export function createHostImportCommand(deps: HostImportCommandDeps = {}): Comma
 export const hostImportCommand = createHostImportCommand();
 
 async function createDefaultExecuteImport() {
+  const context = createCliContext();
   const db = await loadRuntimeDb({ password: false });
   if (!db) {
     throw new ConfigError('Corivo is not initialized. Please run: corivo init');
@@ -99,5 +101,6 @@ async function createDefaultExecuteImport() {
         enqueueSessionExtraction,
       });
     },
+    logger: context.logger,
   });
 }

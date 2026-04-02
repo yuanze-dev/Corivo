@@ -83,9 +83,38 @@ export function resolvePackagedOpencodePluginAssetPath(options: {
   const installedPackageRoot = existsSync(path.join(explicitInstalledPackageRoot, 'package.json'))
     ? explicitInstalledPackageRoot
     : resolveInstalledPackageRoot(OPENCODE_RUNTIME_PACKAGE_NAME, { packageRoot });
+
+  if (configuredOverrideRoot) {
+    const overrideAssetPath = path.join(
+      configuredOverrideRoot,
+      'runtime',
+      'opencode',
+      OPENCODE_RUNTIME_ASSET_FILE,
+    );
+
+    if (existsSync(overrideAssetPath)) {
+      return overrideAssetPath;
+    }
+
+    throw new Error(
+      `Missing packaged OpenCode runtime asset. Checked paths: ${overrideAssetPath}. Rebuild or reinstall corivo if published assets are missing.`,
+    );
+  }
+
+  if (installedPackageRoot) {
+    const installedAssetPath = path.join(installedPackageRoot, 'assets', OPENCODE_RUNTIME_ASSET_FILE);
+    if (existsSync(installedAssetPath)) {
+      return installedAssetPath;
+    }
+
+    throw new Error(
+      `Missing packaged OpenCode runtime asset. Checked paths: ${installedAssetPath}. Rebuild or reinstall corivo if published assets are missing.`,
+    );
+  }
+
   const selectedRoot = resolvePreferredAssetRoot({
-    overrideRoot: configuredOverrideRoot ? path.join(configuredOverrideRoot, 'runtime', 'opencode') : null,
-    packageRoot: installedPackageRoot ? path.join(installedPackageRoot, 'assets') : null,
+    overrideRoot: null,
+    packageRoot: null,
     repoRoot: path.join(packageRoot, OPENCODE_RUNTIME_REPO_ROOT),
     scopeLabel: 'Corivo OpenCode runtime assets',
   });

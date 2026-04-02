@@ -5,17 +5,20 @@
  */
 
 import { getServiceManager } from '../../service/index.js'
+import { createCliContext } from '../context/create-context.js'
 
 export async function stopCommand(): Promise<void> {
+  const context = createCliContext()
+  const output = context.output
   const manager = getServiceManager()
 
-  console.log('Stopping heartbeat daemon...')
+  output.info('Stopping heartbeat daemon...')
 
   const result = await manager.uninstall()
 
   if (result.success) {
-    console.log('✅ Heartbeat daemon stopped')
+    output.success('✅ Heartbeat daemon stopped')
   } else {
-    console.log(`❌ Stop failed: ${result.error}`)
+    output.error(`❌ Stop failed: ${result.error}`)
   }
 }

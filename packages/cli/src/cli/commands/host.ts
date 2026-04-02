@@ -16,8 +16,9 @@ hostCommand
   .command('list')
   .description('List supported hosts')
   .action(() => {
+    const context = createCliContext();
     for (const adapter of getAllHostAdapters()) {
-      console.log(`${adapter.id}\t${adapter.displayName}\t${adapter.capabilities.join(',')}`);
+      context.output.info(`${adapter.id}\t${adapter.displayName}\t${adapter.capabilities.join(',')}`);
     }
   });
 
@@ -33,12 +34,12 @@ hostCommand
     const result = await installHost({ host, target: options.target, force: options.force });
 
     if (!result.success) {
-      console.error(chalk.red(result.error || result.summary));
+      context.output.error(chalk.red(result.error || result.summary));
       process.exitCode = 1;
       return;
     }
 
-    console.log(chalk.green(result.summary));
+    context.output.success(chalk.green(result.summary));
   });
 
 hostCommand
@@ -47,12 +48,13 @@ hostCommand
   .argument('<host>', 'Host id')
   .option('-t, --target <path>', 'Target path')
   .action(async (host: HostId, options: { target?: string }) => {
+    const context = createCliContext();
     const doctorHost = createHostDoctorUseCase();
     const result = await doctorHost({ host, target: options.target });
 
     for (const check of result.checks) {
       const marker = check.ok ? chalk.green('✔') : chalk.red('✖');
-      console.log(`${marker} ${check.label}: ${check.detail}`);
+      context.output.info(`${marker} ${check.label}: ${check.detail}`);
     }
 
     if (!result.ok) {
@@ -66,16 +68,17 @@ hostCommand
   .argument('<host>', 'Host id')
   .option('-t, --target <path>', 'Target path')
   .action(async (host: HostId, options: { target?: string }) => {
+    const context = createCliContext();
     const uninstallHost = createHostUninstallUseCase();
     const result = await uninstallHost({ host, target: options.target });
 
     if (!result.success) {
-      console.error(chalk.red(result.error || result.summary));
+      context.output.error(chalk.red(result.error || result.summary));
       process.exitCode = 1;
       return;
     }
 
-    console.log(chalk.green(result.summary));
+    context.output.success(chalk.green(result.summary));
   });
 
 hostCommand.addCommand(hostImportCommand);

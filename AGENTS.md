@@ -18,20 +18,19 @@ Corivo 是一个融入用户已有工作流的赛博**伙伴**。它不是一个
 
 - [`packages/cli/README.md`](./packages/cli/README.md) — CLI 工具、数据库、心跳引擎
 - [`packages/solver/README.md`](./packages/solver/README.md) — CRDT 同步服务器
-- [`packages/plugins/hosts/codex/README.md`](./packages/plugins/hosts/codex/README.md) — Codex host integration bundle（主机侧集成资产）
-- [`packages/plugins/hosts/claude-code/README.md`](./packages/plugins/hosts/claude-code/README.md) — Claude Code host integration bundle
-- [`packages/plugins/hosts/cursor/README.md`](./packages/plugins/hosts/cursor/README.md) — Cursor host integration bundle
-- [`packages/plugins/hosts/opencode/README.md`](./packages/plugins/hosts/opencode/README.md) — OpenCode host integration asset bundle
-- [`packages/plugins/runtime/opencode/README.md`](./packages/plugins/runtime/opencode/README.md) — OpenCode executable runtime plugin
-- [`packages/plugins/runtime/openclaw/README.md`](./packages/plugins/runtime/openclaw/README.md) — OpenClaw executable runtime plugin
+- [`packages/plugins/codex/README.md`](./packages/plugins/codex/README.md) — Codex plugin root（当前以主机侧集成资产为主）
+- [`packages/plugins/claude-code/README.md`](./packages/plugins/claude-code/README.md) — Claude Code plugin root
+- [`packages/plugins/cursor/README.md`](./packages/plugins/cursor/README.md) — Cursor plugin root
+- [`packages/plugins/opencode/README.md`](./packages/plugins/opencode/README.md) — OpenCode plugin root（同时包含安装资产与运行时代码）
+- [`packages/plugins/openclaw/README.md`](./packages/plugins/openclaw/README.md) — OpenClaw plugin root（运行时代码）
 
 **进入某个 package 工作时，优先阅读该 package 的本地说明文档。**
 
 ### plugins 目录边界（必须遵守）
 
-- `packages/plugins/hosts/*`：host integration bundle。只放主机安装与集成资产（hooks、skills、templates、assets、adapter scripts）。
-- `packages/plugins/runtime/*`：runtime plugin。只放可执行运行时代码（TS/JS 源码、构建配置、运行时事件适配逻辑）。
-- 安装入口保持单一路径：通过 `corivo inject`（或 `scripts/install.sh` 委托到 CLI）完成，不在 host/runtime 包内扩展第二套安装逻辑。
+- `packages/plugins/<plugin>`：按插件名组织。每个插件目录放这个插件实际需要的 assets、runtime code、scripts、templates、README。
+- 插件内部仍要保持职责清晰：主机安装资产、可执行运行时代码、构建脚本不要混成无边界的大杂烩。
+- 安装入口保持单一路径：通过 `corivo host install`（或 `scripts/install.sh` 委托到 CLI）完成，不在插件包内扩展第二套安装逻辑。
 
 ---
 
@@ -52,8 +51,8 @@ npm run dev            # tsx watch src/index.ts（开发热重载）
 npm run build          # tsc
 npm run start          # node dist/index.js
 
-# packages/plugins/hosts/codex
-cd packages/plugins/hosts/codex
+# packages/plugins/codex
+cd packages/plugins/codex
 # 配置/文档型 package，无独立构建步骤
 ```
 
@@ -175,9 +174,9 @@ Changeset 存储于服务端 SQLite（`src/db/server-db.ts`），每条记录按
 
 ---
 
-### packages/plugins/hosts/codex（`@corivo/codex`）
+### packages/plugins/codex（`@corivo/codex`）
 
-Codex host integration bundle。当前为纯主机侧资产包，不承载可执行 runtime 代码。
+Codex plugin root。当前为纯主机侧资产包，不承载可执行 runtime 代码。
 
 **组成：**
 
@@ -189,17 +188,17 @@ Codex host integration bundle。当前为纯主机侧资产包，不承载可执
 - `adapters/notify-review.sh`：Codex notify 适配器
 - `assets/`：插件展示资产
 
-### packages/plugins/hosts/cursor（`@corivo/cursor`）
+### packages/plugins/cursor（`@corivo/cursor`）
 
-Cursor host integration bundle。目标是与 Claude Code 保持相同生命周期：
+Cursor plugin root。当前以主机侧集成资产为主，目标是与 Claude Code 保持相同生命周期：
 
 - `SessionStart`
 - `UserPromptSubmit`
 - `Stop`
 
-### packages/plugins/runtime/opencode（`@corivo/opencode`）
+### packages/plugins/opencode（`@corivo/opencode`）
 
-OpenCode executable runtime plugin。通过原生 plugin/event API 接入：
+OpenCode plugin root。当前同时包含可执行 runtime 代码和可安装插件资产，通过原生 plugin/event API 接入：
 
 - `session.created`
 - `chat.message`

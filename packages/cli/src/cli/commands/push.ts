@@ -9,6 +9,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { generateFirstPush, getWelcomeMessage } from '../../first-push/index.js';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
+import { createCliContext } from '../context/create-context.js';
 
 export const pushCommand = new Command('push');
 
@@ -17,12 +18,14 @@ pushCommand
   .option('-f, --first-activation', 'Intro message for first activation')
   .option('-w, --welcome', 'Welcome message')
   .action(async (options) => {
+    const context = createCliContext();
+    const output = context.output;
     try {
       if (options.welcome) {
         // Output welcome message
-        console.log('');
-        console.log(chalk.cyan(getWelcomeMessage()));
-        console.log('');
+        output.info('');
+        output.info(chalk.cyan(getWelcomeMessage()));
+        output.info('');
         return;
       }
 
@@ -35,18 +38,18 @@ pushCommand
         const content = await fs.readFile(configPath, 'utf-8');
         config = JSON.parse(content);
       } catch {
-        console.log('');
-        console.log(chalk.yellow('Please run corivo init first'));
-        console.log('');
+        output.info('');
+        output.warn(chalk.yellow('Please run corivo init first'));
+        output.info('');
         return;
       }
 
       const dbPath = process.env.CORIVO_DB_PATH || getDefaultDatabasePath();
 
       if (config.encrypted_db_key) {
-        console.log('');
-        console.log(chalk.yellow('Detected a legacy password-based config. Please run: corivo init'));
-        console.log('');
+        output.info('');
+        output.warn(chalk.yellow('Detected a legacy password-based config. Please run: corivo init'));
+        output.info('');
         return;
       }
 
@@ -71,9 +74,9 @@ pushCommand
           }))
         );
 
-        console.log('');
-        console.log(chalk.cyan(message));
-        console.log('');
+        output.info('');
+        output.info(chalk.cyan(message));
+        output.info('');
         return;
       }
 
@@ -81,23 +84,23 @@ pushCommand
       const blocks = db.queryBlocks({ limit: 10 });
 
       if (blocks.length === 0) {
-        console.log('');
-        console.log(chalk.gray('No pending push messages'));
-        console.log('');
+        output.info('');
+        output.info(chalk.gray('No pending push messages'));
+        output.info('');
         return;
       }
 
-      console.log('');
-      console.log(chalk.cyan('Pending push messages:'));
-      console.log('');
+      output.info('');
+      output.info(chalk.cyan('Pending push messages:'));
+      output.info('');
 
       for (const block of blocks) {
-        console.log(chalk.gray(`[${block.annotation}]`));
-        console.log(block.content);
-        console.log('');
+        output.info(chalk.gray(`[${block.annotation}]`));
+        output.info(block.content);
+        output.info('');
       }
     } catch (error) {
-      console.error(chalk.red('Error:'), error);
+      output.error(chalk.red('Error:'), error);
       process.exit(1);
     }
   });

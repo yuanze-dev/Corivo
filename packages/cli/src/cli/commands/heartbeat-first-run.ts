@@ -10,6 +10,7 @@ import chalk from 'chalk';
 import { Heartbeat } from '../../engine/heartbeat.js';
 import { getConfigDir, getDefaultDatabasePath } from '@/storage/database';
 import { printBanner } from '@/utils/banner';
+import { createCliContext } from '../context/create-context.js';
 
 export const firstRunCommand = new Command('first-run');
 
@@ -20,6 +21,8 @@ firstRunCommand
   .option('--no-decay', 'Skip decay')
   .option('--no-cold-zone', 'Skip cold-zone consolidation')
   .action(async (options) => {
+    const context = createCliContext();
+    const output = context.output;
     try {
       printBanner('Organizing memories...', { color: chalk.cyan });
 
@@ -32,9 +35,9 @@ firstRunCommand
         const content = await fs.readFile(configPath, 'utf-8');
         config = JSON.parse(content);
       } catch {
-        console.log('');
-        console.log(chalk.yellow('Please run corivo init first'));
-        console.log('');
+        output.info('');
+        output.warn(chalk.yellow('Please run corivo init first'));
+        output.info('');
         return;
       }
 
@@ -49,11 +52,11 @@ firstRunCommand
       });
 
       printBanner('Organization complete!', { color: chalk.green });
-      console.log(`Processed ${result.processedBlocks} memories`);
-      console.log(`Elapsed time: ${result.elapsedTime}ms`);
-      console.log('');
+      output.info(`Processed ${result.processedBlocks} memories`);
+      output.info(`Elapsed time: ${result.elapsedTime}ms`);
+      output.info('');
     } catch (error) {
-      console.error(chalk.red('Error:'), error);
+      output.error(chalk.red('Error:'), error);
       process.exit(1);
     }
   });

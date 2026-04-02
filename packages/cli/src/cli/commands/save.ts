@@ -11,6 +11,7 @@ import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/
 import { ConfigError, ValidationError } from '../../errors/index.js';
 import { validateAnnotation } from '../../models/index.js';
 import { ConflictDetector } from '../../engine/conflict-detector.js';
+import { createCliContext } from '../context/create-context.js';
 
 interface SaveOptions {
   content?: string;
@@ -20,6 +21,8 @@ interface SaveOptions {
 }
 
 export async function saveCommand(options: SaveOptions): Promise<void> {
+  const context = createCliContext();
+  const output = context.output;
   // Read configuration
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');
@@ -41,8 +44,8 @@ export async function saveCommand(options: SaveOptions): Promise<void> {
   const annotation = options.annotation || (options.pending ? 'pending' : '');
 
   if (!options.pending && !annotation) {
-    console.log(chalk.yellow('\n⚠️  No annotation provided, saving in pending mode'));
-    console.log(chalk.gray('The heartbeat daemon will try to annotate it automatically later\n'));
+    output.warn(chalk.yellow('\n⚠️  No annotation provided, saving in pending mode'));
+    output.info(chalk.gray('The heartbeat daemon will try to annotate it automatically later\n'));
   }
 
   // Only non-pending mode will verify the annotation format.
@@ -73,16 +76,16 @@ export async function saveCommand(options: SaveOptions): Promise<void> {
   const conflictReminder = conflictDetector.detect(options.content, existingBlocks);
 
   // Show results
-  console.log(chalk.green('\n✅ Memory saved\n'));
-  console.log(chalk.gray('ID:       ') + chalk.white(block.id));
-  console.log(chalk.gray('Content:   ') + chalk.white(block.content));
-  console.log(chalk.gray('Annotation:') + chalk.cyan(block.annotation));
-  console.log(chalk.gray('Vitality:  ') + chalk.yellow('100 (active)'));
-  console.log();
+  output.success(chalk.green('\n✅ Memory saved\n'));
+  output.info(chalk.gray('ID:       ') + chalk.white(block.id));
+  output.info(chalk.gray('Content:   ') + chalk.white(block.content));
+  output.info(chalk.gray('Annotation:') + chalk.cyan(block.annotation));
+  output.info(chalk.gray('Vitality:  ') + chalk.yellow('100 (active)'));
+  output.info('');
 
   // If there is any conflict, please give a friendly reminder
   if (conflictReminder && conflictReminder.hasConflict) {
-    console.log(chalk.yellow(conflictReminder.message));
-    console.log();
+    output.warn(chalk.yellow(conflictReminder.message));
+    output.info('');
   }
 }

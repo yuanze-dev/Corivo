@@ -14,6 +14,7 @@ import {
   fetchVersionInfo,
 } from '../../update/checker.js';
 import type { UpdateConfig } from '../../update/types.js';
+import { createCliContext } from '../context/create-context.js';
 
 export const updateCommand = new Command('update');
 
@@ -39,139 +40,145 @@ updateCommand
   });
 
 async function handleUpdateCommand(options: { check?: boolean }) {
+  const context = createCliContext();
+  const output = context.output;
   printBanner('Corivo Update', { color: chalk.cyan });
 
   const currentVersion = getCurrentVersion();
-  console.log(`Current version: ${currentVersion}`);
-  console.log('');
+  output.info(`Current version: ${currentVersion}`);
+  output.info('');
 
   // Check for updates
-  console.log('Checking for updates...');
+  output.info('Checking for updates...');
 
   const status = await checkForUpdate();
 
   if (!status.latestVersion) {
-    console.log(chalk.yellow('Unable to connect to the update server'));
-    console.log('');
+    output.warn(chalk.yellow('Unable to connect to the update server'));
+    output.info('');
     return;
   }
 
   if (!status.hasUpdate) {
-    console.log(chalk.green('Already on the latest version'));
-    console.log('');
+    output.success(chalk.green('Already on the latest version'));
+    output.info('');
     return;
   }
 
-  console.log('');
-  console.log(chalk.green(`New version available: ${status.latestVersion}`));
+  output.info('');
+  output.success(chalk.green(`New version available: ${status.latestVersion}`));
 
   if (status.isBreaking) {
-    console.log(chalk.yellow('Note: this update contains breaking changes'));
+    output.warn(chalk.yellow('Note: this update contains breaking changes'));
   }
 
   // If you just check, don’t install
   if (options.check) {
-    console.log('');
-    console.log('To install the update, run: corivo update');
-    console.log('');
+    output.info('');
+    output.info('To install the update, run: corivo update');
+    output.info('');
     return;
   }
 
   // Breaking updates require confirmation
   if (status.isBreaking) {
-    console.log('');
-    console.log(chalk.yellow('Breaking updates require manual confirmation'));
-    console.log('Please review the changelog before updating');
-    console.log('');
+    output.info('');
+    output.warn(chalk.yellow('Breaking updates require manual confirmation'));
+    output.info('Please review the changelog before updating');
+    output.info('');
     return;
   }
 
   // perform update
-  console.log('');
-  console.log('Downloading update...');
+  output.info('');
+  output.info('Downloading update...');
 
   const versionInfo = await fetchVersionInfo();
   if (!versionInfo) {
-    console.log(chalk.red('Failed to fetch update information'));
-    console.log('');
+    output.error(chalk.red('Failed to fetch update information'));
+    output.info('');
     return;
   }
 
   const result = await performUpdate(versionInfo, getPlatform());
 
   if (result.success) {
-    console.log(chalk.green('✔ Update successful'));
-    console.log('');
-    console.log(`Version: ${currentVersion} -> ${versionInfo.version}`);
-    console.log('');
-    console.log('The new version will be used on the next CLI invocation');
-    console.log('');
+    output.success(chalk.green('✔ Update successful'));
+    output.info('');
+    output.info(`Version: ${currentVersion} -> ${versionInfo.version}`);
+    output.info('');
+    output.info('The new version will be used on the next CLI invocation');
+    output.info('');
   } else {
-    console.log(chalk.red('✖ Update failed:'), result.error);
-    console.log('');
+    output.error(chalk.red('✖ Update failed:'), result.error);
+    output.info('');
   }
 }
 
 async function checkUpdates() {
-  console.log('');
-  console.log(chalk.cyan('Corivo Version Check'));
-  console.log('');
+  const context = createCliContext();
+  const output = context.output;
+  output.info('');
+  output.info(chalk.cyan('Corivo Version Check'));
+  output.info('');
 
   const currentVersion = getCurrentVersion();
-  console.log(`Current version: ${currentVersion}`);
-  console.log('');
+  output.info(`Current version: ${currentVersion}`);
+  output.info('');
 
   const status = await checkForUpdate();
 
   if (!status.latestVersion) {
-    console.log(chalk.yellow('Unable to connect to the update server'));
-    console.log('');
+    output.warn(chalk.yellow('Unable to connect to the update server'));
+    output.info('');
     return;
   }
 
-  console.log(`Latest version: ${status.latestVersion}`);
-  console.log('');
+  output.info(`Latest version: ${status.latestVersion}`);
+  output.info('');
 
   if (status.hasUpdate) {
-    console.log(chalk.green('An update is available'));
+    output.success(chalk.green('An update is available'));
 
     const record = await getUpdateRecord();
     if (record && record.to !== status.latestVersion) {
-      console.log(`Recent update: ${record.from} -> ${record.to}`);
+      output.info(`Recent update: ${record.from} -> ${record.to}`);
     }
   } else {
-    console.log(chalk.gray('Already on the latest version'));
+    output.info(chalk.gray('Already on the latest version'));
   }
 
-  console.log('');
+  output.info('');
 }
 
 async function showUpdateStatus() {
-  console.log('');
-  console.log(chalk.cyan('Corivo Update Status'));
-  console.log('');
+  const context = createCliContext();
+  const output = context.output;
+  output.info('');
+  output.info(chalk.cyan('Corivo Update Status'));
+  output.info('');
 
   const record = await getUpdateRecord();
 
   if (record) {
-    console.log(`Recent update: ${record.from} -> ${record.to}`);
-    console.log(`Updated at: ${record.at}`);
-    console.log('');
+    output.info(`Recent update: ${record.from} -> ${record.to}`);
+    output.info(`Updated at: ${record.at}`);
+    output.info('');
 
     if (record.changelog) {
-      console.log(chalk.gray('Changelog:'));
-      console.log(chalk.gray(record.changelog));
-      console.log('');
+      output.info(chalk.gray('Changelog:'));
+      output.info(chalk.gray(record.changelog));
+      output.info('');
     }
   } else {
-    console.log(chalk.gray('No update history yet'));
-    console.log('');
+    output.info(chalk.gray('No update history yet'));
+    output.info('');
   }
 
   const status = await checkForUpdate();
   if (status.hasUpdate) {
-    console.log(chalk.green(`Update available: ${status.latestVersion}`));
-    console.log('');
+    output.success(chalk.green(`Update available: ${status.latestVersion}`));
+    output.info('');
   }
 }
 

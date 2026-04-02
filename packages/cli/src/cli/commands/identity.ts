@@ -9,6 +9,7 @@ import path from 'node:path';
 import { getConfigDir } from '@/storage/database';
 import { printBanner } from '@/utils/banner';
 import { IdentityManager, FingerprintCollector } from '../../identity/index.js';
+import { createCliContext } from '../context/create-context.js';
 
 /**
  * Show identity information
@@ -16,6 +17,8 @@ import { IdentityManager, FingerprintCollector } from '../../identity/index.js';
 export async function identityCommand(options: {
   verbose?: boolean;
 }): Promise<void> {
+  const context = createCliContext();
+  const output = context.output;
   const configDir = getConfigDir();
   const identityPath = path.join(configDir, 'identity.json');
 
@@ -25,17 +28,17 @@ export async function identityCommand(options: {
 
     printBanner('Corivo Identity Information', { width: 55 });
 
-    console.log(`Identity ID: ${identity.identity_id}`);
-    console.log(`Created at: ${new Date(identity.created_at).toLocaleString('en-US')}`);
-    console.log(`Updated at: ${new Date(identity.updated_at).toLocaleString('en-US')}`);
+    output.info(`Identity ID: ${identity.identity_id}`);
+    output.info(`Created at: ${new Date(identity.created_at).toLocaleString('en-US')}`);
+    output.info(`Updated at: ${new Date(identity.updated_at).toLocaleString('en-US')}`);
 
     if (identity.display_name) {
-      console.log(`Display name: ${identity.display_name}`);
+      output.info(`Display name: ${identity.display_name}`);
     }
 
     // Display platform fingerprint
     if (Object.keys(identity.fingerprints).length > 0) {
-      console.log('\nLinked platforms:');
+      output.info('\nLinked platforms:');
       const platformNames: Record<string, string> = {
         claude_code: 'Claude Code',
         feishu: 'Feishu',
@@ -44,19 +47,19 @@ export async function identityCommand(options: {
 
       for (const [platform, data] of Object.entries(identity.fingerprints)) {
         const fp = data as { value: string; added_at: string };
-        console.log(
+        output.info(
           `  🟢 ${platformNames[platform] || platform}: ${fp.value.substring(0, 8)}...`
         );
         if (options.verbose) {
-          console.log(`     Full value: ${fp.value}`);
-          console.log(`     Added at: ${new Date(fp.added_at).toLocaleString('en-US')}`);
+          output.info(`     Full value: ${fp.value}`);
+          output.info(`     Added at: ${new Date(fp.added_at).toLocaleString('en-US')}`);
         }
       }
     }
 
     // Show device list
     if (Object.keys(identity.devices).length > 0) {
-      console.log('\nAuthorized devices:');
+      output.info('\nAuthorized devices:');
       for (const [deviceId, data] of Object.entries(identity.devices)) {
         const device = data as { name: string; last_seen: string };
         const lastSeen = new Date(device.last_seen);
@@ -71,16 +74,16 @@ export async function identityCommand(options: {
           status = 'Recently active 🟡';
         }
 
-        console.log(`  📱 ${device.name} (${deviceId.substring(0, 16)}...)`);
-        console.log(`     Last seen: ${lastSeen.toLocaleString('en-US')} (${status})`);
+        output.info(`  📱 ${device.name} (${deviceId.substring(0, 16)}...)`);
+        output.info(`     Last seen: ${lastSeen.toLocaleString('en-US')} (${status})`);
       }
     }
 
-    console.log('');
+    output.info('');
 
     // Check if the new fingerprint can be detected
     if (options.verbose) {
-      console.log('Scanning for new platform fingerprints...\n');
+      output.info('Scanning for new platform fingerprints...\n');
       const fingerprints = await FingerprintCollector.collectAll();
 
       for (const fp of fingerprints) {
@@ -91,15 +94,15 @@ export async function identityCommand(options: {
             feishu: 'Feishu',
             device: 'Device',
           };
-          console.log(`  ➕ Added: ${platformNames[fp.platform] || fp.platform} (${fp.value.substring(0, 8)}...)`);
+          output.info(`  ➕ Added: ${platformNames[fp.platform] || fp.platform} (${fp.value.substring(0, 8)}...)`);
         }
       }
-      console.log('');
+      output.info('');
     }
 
   } catch {
-    console.log('\n❌ Identity information not found');
-    console.log('Please run: corivo init\n');
+    output.error('\n❌ Identity information not found');
+    output.info('Please run: corivo init\n');
     process.exit(1);
   }
 }

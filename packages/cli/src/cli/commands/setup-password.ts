@@ -12,12 +12,15 @@ import { getConfigDir } from '@/storage/database';
 import { printBanner } from '@/utils/banner';
 import { ConfigError, ValidationError } from '../../errors/index.js';
 import { readPassword } from '../utils/password.js';
+import { createCliContext } from '../context/create-context.js';
 
 interface SetupPasswordOptions {
   force?: boolean;
 }
 
 export async function setupPasswordCommand(options: SetupPasswordOptions = {}): Promise<void> {
+  const context = createCliContext();
+  const output = context.output;
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');
 
@@ -34,22 +37,22 @@ export async function setupPasswordCommand(options: SetupPasswordOptions = {}): 
   const hasPassword = config.encrypted_db_key !== undefined;
 
   if (hasPassword && !options.force) {
-    console.log(chalk.yellow('\\n⚠️  Master password is already set'));
-    console.log(chalk.gray('To change it, run: corivo setup-password --force\\n'));
+    output.warn(chalk.yellow('\\n⚠️  Master password is already set'));
+    output.info(chalk.gray('To change it, run: corivo setup-password --force\\n'));
     return;
   }
 
   printBanner('Set Master Password', { width: 55 });
 
-  console.log('The master password is used for:');
-  console.log('  • Protecting database encryption (for cloud sync security)');
-  console.log('  • Cross-device identity verification');
-  console.log('  • Identity recovery credentials\\n');
+  output.info('The master password is used for:');
+  output.info('  • Protecting database encryption (for cloud sync security)');
+  output.info('  • Cross-device identity verification');
+  output.info('  • Identity recovery credentials\\n');
 
-  console.log(chalk.gray('Tips:'));
-  console.log(chalk.gray('  • Use at least 8 characters, including letters and numbers'));
-  console.log(chalk.gray('  • Pick something memorable but hard to guess'));
-  console.log(chalk.gray('  • Forgotten passwords cannot be recovered, so keep it safe\\n'));
+  output.info(chalk.gray('Tips:'));
+  output.info(chalk.gray('  • Use at least 8 characters, including letters and numbers'));
+  output.info(chalk.gray('  • Pick something memorable but hard to guess'));
+  output.info(chalk.gray('  • Forgotten passwords cannot be recovered, so keep it safe\\n'));
 
   // If you already have a password, you need to verify it first
   if (hasPassword && options.force) {
@@ -89,7 +92,7 @@ export async function setupPasswordCommand(options: SetupPasswordOptions = {}): 
 
   await fs.writeFile(configPath, JSON.stringify(config, null, 2));
 
-  console.log(chalk.green('\\n✅ Master password set successfully!\\n'));
-  console.log(chalk.gray('From now on, you will need to enter the password when using Corivo.'));
-  console.log(chalk.gray('Database contents are now encrypted.\\n'));
+  output.success(chalk.green('\\n✅ Master password set successfully!\\n'));
+  output.info(chalk.gray('From now on, you will need to enter the password when using Corivo.'));
+  output.info(chalk.gray('Database contents are now encrypted.\\n'));
 }

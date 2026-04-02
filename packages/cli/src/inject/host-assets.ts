@@ -198,7 +198,7 @@ function getInstalledHostAssetRootCandidate(packageRoot: string): HostAssetRootC
 }
 
 function getRepoHostAssetRootCandidate(packageRoot: string): HostAssetRootCandidate | null {
-  const repoRoot = path.join(packageRoot, '..', 'plugins', 'hosts');
+  const repoRoot = path.join(packageRoot, '..', 'plugins');
   if (!existsSync(repoRoot)) {
     return null;
   }

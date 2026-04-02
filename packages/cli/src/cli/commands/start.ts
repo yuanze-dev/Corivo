@@ -9,8 +9,11 @@ import path from 'node:path'
 import { getConfigDir, getDefaultDatabasePath } from '@/storage/database'
 import { ConfigError } from '../../errors/index.js'
 import { getServiceManager, resolveCorivoBin } from '../../service/index.js'
+import { createCliContext } from '../context/create-context.js'
 
 export async function startCommand(): Promise<void> {
+  const context = createCliContext()
+  const output = context.output
   const configDir = getConfigDir()
   const configPath = path.join(configDir, 'config.json')
 
@@ -23,11 +26,11 @@ export async function startCommand(): Promise<void> {
   }
 
   if (config.encrypted_db_key) {
-    console.log('⚠️  Detected legacy config format (password-based)')
-    console.log('')
-    console.log('Corivo v0.10+ removed the password system. Please migrate using these steps:')
-    console.log('  1. Back up the database: cp ~/.corivo/corivo.db ~/.corivo/corivo.db.backup')
-    console.log('  2. Re-initialize: corivo init')
+    output.warn('⚠️  Detected legacy config format (password-based)')
+    output.info('')
+    output.info('Corivo v0.10+ removed the password system. Please migrate using these steps:')
+    output.info('  1. Back up the database: cp ~/.corivo/corivo.db ~/.corivo/corivo.db.backup')
+    output.info('  2. Re-initialize: corivo init')
     return
   }
 
@@ -35,19 +38,19 @@ export async function startCommand(): Promise<void> {
   const corivoBin = await resolveCorivoBin()
   const dbPath = getDefaultDatabasePath()
 
-  console.log('Starting heartbeat daemon...')
+  output.info('Starting heartbeat daemon...')
 
   const result = await manager.install({ corivoBin, dbPath })
 
   if (result.success) {
-    console.log('✅ Heartbeat daemon started')
-    console.log('\nLog paths:')
-    console.log(`  stdout: ${path.join(configDir, 'daemon.log')}`)
-    console.log(`  stderr: ${path.join(configDir, 'daemon.err')}`)
+    output.success('✅ Heartbeat daemon started')
+    output.info('\nLog paths:')
+    output.info(`  stdout: ${path.join(configDir, 'daemon.log')}`)
+    output.info(`  stderr: ${path.join(configDir, 'daemon.err')}`)
   } else {
-    console.log(`❌ Start failed: ${result.error}`)
-    console.log('')
-    console.log('You can start heartbeat manually:')
-    console.log('  node ./dist/engine/heartbeat.js')
+    output.error(`❌ Start failed: ${result.error}`)
+    output.info('')
+    output.info('You can start heartbeat manually:')
+    output.info('  node ./dist/engine/heartbeat.js')
   }
 }

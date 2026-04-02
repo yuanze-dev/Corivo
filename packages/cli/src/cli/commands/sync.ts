@@ -209,19 +209,21 @@ export function createSyncCommand(): Command {
 
   cmd.action(async (options, command: Command) => {
     const bootstrapContext = createCliContext();
+    const bootstrapOutput = bootstrapContext.output;
 
     // --pair: generate pairing code
     if (options.pair) {
       const config = await bootstrapContext.config.load();
       if (!config) {
-        console.error('Corivo is not initialized, please run corivo init');
+        bootstrapOutput.error('Corivo is not initialized, please run corivo init');
         process.exit(1);
       }
       const context = createConfiguredCliContext(config);
       const { logger } = context;
+      const output = context.output;
       const solverConfig = await context.config.loadSolver();
       if (!solverConfig) {
-        console.error('Not connected to a sync server, please run corivo sync --register');
+        output.error('Not connected to a sync server, please run corivo sync --register');
         process.exit(1);
       }
       const pairServerUrl = command.getOptionValueSource('server') === 'cli'
@@ -231,24 +233,25 @@ export function createSyncCommand(): Command {
       try {
         token = await authenticate(pairServerUrl, config.identity_id, solverConfig.shared_secret, logger);
       } catch (err: unknown) {
-        console.error('Authentication failed:', err instanceof Error ? err.message : String(err));
+        output.error('Authentication failed:', err instanceof Error ? err.message : String(err));
         process.exit(1);
       }
       const result = await post(`${pairServerUrl}/auth/pair`, {}, logger, token, 'pair') as { pairing_code: string; expires_at: number };
       const expiresIn = Math.round((result.expires_at - Date.now()) / 60000);
-      console.log(`\nPairing code: ${result.pairing_code}  (valid for ${expiresIn} minutes)\n`);
-      console.log('Run this on the new device:');
-      console.log(`  corivo init --join ${result.pairing_code} --server ${pairServerUrl}\n`);
+      output.info(`\nPairing code: ${result.pairing_code}  (valid for ${expiresIn} minutes)\n`);
+      output.info('Run this on the new device:');
+      output.info(`  corivo init --join ${result.pairing_code} --server ${pairServerUrl}\n`);
       return;
     }
 
     const config = await bootstrapContext.config.load();
     if (!config) {
-      console.error('Corivo is not initialized, please run corivo init');
+      bootstrapOutput.error('Corivo is not initialized, please run corivo init');
       process.exit(1);
     }
     const context = createConfiguredCliContext(config);
     const { logger } = context;
+    const output = context.output;
 
     let solverConfig = await context.config.loadSolver();
 
@@ -258,7 +261,7 @@ export function createSyncCommand(): Command {
       const siteId = randomBytes(16).toString('hex');
       const deviceId = randomBytes(8).toString('hex');
 
-      console.log(`Registering with ${serverUrl}...`);
+      output.info(`Registering with ${serverUrl}...`);
       let result: RegisterResponse;
       try {
         result = await post(`${serverUrl}/auth/register`, {
@@ -273,9 +276,9 @@ export function createSyncCommand(): Command {
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
         if (errMsg.includes('409')) {
-          console.error('This identity is already registered. Use the existing solver.json or add --register to force reconfiguration');
+          output.error('This identity is already registered. Use the existing solver.json or add --register to force reconfiguration');
         } else {
-          console.error('Registration failed:', errMsg);
+          output.error('Registration failed:', errMsg);
         }
         process.exit(1);
       }
@@ -291,26 +294,26 @@ export function createSyncCommand(): Command {
       try {
         await context.config.saveSolver(solverConfig);
       } catch (err: unknown) {
-        console.error('Failed to save solver.json:', err instanceof Error ? err.message : String(err));
+        output.error('Failed to save solver.json:', err instanceof Error ? err.message : String(err));
         // Continue execution without terminating the process
       }
-      console.log(`Registration successful! site_id: ${siteId}`);
-      console.log('solver.json saved to ~/.corivo/solver.json');
+      output.success(`Registration successful! site_id: ${siteId}`);
+      output.info('solver.json saved to ~/.corivo/solver.json');
     }
 
     const { server_url, shared_secret, site_id } = solverConfig;
     logger.debug(`[sync:cli] starting sync server=${server_url} site=${site_id} lastPull=${solverConfig.last_pull_version} lastPush=${solverConfig.last_push_version}`);
 
     // Certification
-    console.log('Authenticating...');
+    output.info('Authenticating...');
     let token: string;
     try {
       token = await authenticate(server_url, config.identity_id, shared_secret, logger);
     } catch (err: unknown) {
-      console.error('Authentication failed:', err instanceof Error ? err.message : String(err));
+      output.error('Authentication failed:', err instanceof Error ? err.message : String(err));
       process.exit(1);
     }
-    console.log('Authentication successful');
+    output.success('Authentication successful');
 
     const db = context.db.get({
       path: context.paths.databasePath(),
@@ -350,12 +353,12 @@ export function createSyncCommand(): Command {
           await context.config.saveSolver(solverConfig!);
           logger.debug(`[sync:cli] updated last_push_version=${solverConfig!.last_push_version}`);
         } catch (err: any) {
-          console.error('Failed to save solver.json:', err.message);
+          output.error('Failed to save solver.json:', err.message);
           // Continue execution without terminating the process
         }
       }
     } catch (err: unknown) {
-      console.error('Push failed:', err instanceof Error ? err.message : String(err));
+      output.error('Push failed:', err instanceof Error ? err.message : String(err));
     }
 
     // Pull: Pull remote changes
@@ -382,11 +385,11 @@ export function createSyncCommand(): Command {
           await context.config.saveSolver(solverConfig!);
           logger.debug(`[sync:cli] updated last_pull_version=${solverConfig!.last_pull_version}`);
         } catch (err: any) {
-          console.error('Failed to save solver.json:', err.message);
+          output.error('Failed to save solver.json:', err.message);
         }
       }
     } catch (err: unknown) {
-      console.error('Pull failed:', err instanceof Error ? err.message : String(err));
+      output.error('Pull failed:', err instanceof Error ? err.message : String(err));
     }
 
     // Pull the server device list and update the local identity.json
@@ -431,7 +434,7 @@ export function createSyncCommand(): Command {
     } catch { /* failure to fetch devices does not affect the main flow */ }
 
     logger.debug(`[sync:cli] sync finished push=${pushStored} pull=${pullCount}`);
-    console.log(`Sync complete - Push: ${pushStored}, Pull: ${pullCount}`);
+    output.info(`Sync complete - Push: ${pushStored}, Pull: ${pullCount}`);
   });
 
   return cmd;

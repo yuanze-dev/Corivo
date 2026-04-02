@@ -10,6 +10,7 @@ import chalk from 'chalk';
 import { coldScan } from '@/cold-scan';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 import { printBanner } from '@/utils/banner';
+import { createCliContext } from '../context/create-context.js';
 
 export const coldScanCommand = new Command('cold-scan');
 
@@ -19,6 +20,8 @@ coldScanCommand
   .option('--dry-run', 'Do not save to the database')
   .option('--skip <sources...>', 'Skip specified scan sources')
   .action(async (options) => {
+    const context = createCliContext();
+    const output = context.output;
     try {
       printBanner('Getting to know you...', {
         subtitle: chalk.gray('Let me take a look at your workspace...'),
@@ -41,10 +44,10 @@ coldScanCommand
           const content = await fs.readFile(configPath, 'utf-8');
           config = JSON.parse(content);
         } catch {
-          console.log('');
-          console.log(chalk.yellow('⚠️  No config file found, skipping database save'));
-          console.log(chalk.gray('Tip: run corivo init to initialize the database'));
-          console.log('');
+          output.info('');
+          output.warn(chalk.yellow('⚠️  No config file found, skipping database save'));
+          output.info(chalk.gray('Tip: run corivo init to initialize the database'));
+          output.info('');
         }
 
         if (config && !config.encrypted_db_key) {
@@ -71,38 +74,38 @@ coldScanCommand
           db['db'].pragma('wal_checkpoint(TRUNCATE)');
 
           if (saved > 0) {
-            console.log('');
-            console.log(chalk.green(`💾 Saved ${saved} items to the database`));
+            output.info('');
+            output.success(chalk.green(`💾 Saved ${saved} items to the database`));
           }
         }
       }
 
       printBanner('Profile scan complete!', { color: chalk.green });
-      console.log(`Places scanned: ${result.totalScanned}`);
-      console.log(`Items remembered: ${result.totalFound}`);
-      console.log('');
+      output.info(`Places scanned: ${result.totalScanned}`);
+      output.info(`Items remembered: ${result.totalFound}`);
+      output.info('');
 
       // Show summary
       const successCount = result.results.filter((r) => r.success).length;
       const failCount = result.results.filter((r) => !r.success).length;
 
       if (successCount > 0) {
-        console.log(chalk.green(`Successful sources: ${successCount}`));
+        output.success(chalk.green(`Successful sources: ${successCount}`));
       }
 
       if (failCount > 0) {
-        console.log(chalk.yellow(`Failed sources: ${failCount}`));
+        output.warn(chalk.yellow(`Failed sources: ${failCount}`));
       }
 
       // Next step tips
       if (!options.dryRun && result.totalFound > 0) {
-        console.log('');
-        console.log(chalk.gray('Next step: run corivo first-run to organize this information'));
+        output.info('');
+        output.info(chalk.gray('Next step: run corivo first-run to organize this information'));
       }
 
-      console.log('');
+      output.info('');
     } catch (error) {
-      console.error(chalk.red('Scan failed:'), error);
+      output.error(chalk.red('Scan failed:'), error);
       process.exit(1);
     }
   });

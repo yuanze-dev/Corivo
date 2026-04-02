@@ -21,6 +21,7 @@ import {
   type PipelineTrigger,
   type RawSessionJobSource,
 } from '@/memory-pipeline';
+import { createCliContext } from '../context/create-context.js';
 
 export type MemoryPipelineMode = 'full' | 'incremental';
 
@@ -153,10 +154,11 @@ export interface MemoryCommandOptions {
 }
 
 function defaultPrinter(result: MemoryPipelineRunResult) {
+  const context = createCliContext();
   const stageIds = result.stages.map((stage) => stage.stageId);
   const stageSuffix =
     stageIds.length > 0 ? ` [stages: ${stageIds.join(', ')}]` : '';
-  console.log(
+  context.output.info(
     `Memory pipeline ${result.pipelineId} finished with status ${result.status} (run ${result.runId})${stageSuffix}`,
   );
 }

@@ -11,6 +11,7 @@ import chalk from 'chalk';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 import { ConfigError } from '../../errors/index.js';
 import type { BlockFilter, BlockStatus } from '../../models/block.js';
+import { createCliContext } from '../context/create-context.js';
 
 const VALID_STATUSES: BlockStatus[] = ['active', 'cooling', 'cold', 'archived'];
 const VALID_SORTS = ['time', 'vitality'];
@@ -43,20 +44,22 @@ listCommand
     verbose?: boolean;
     json?: boolean;
   }) => {
+    const context = createCliContext();
+    const output = context.output;
     // Parameter verification
     const limit = parseInt(options.limit, 10);
     if (isNaN(limit) || limit < 1) {
-      console.error(chalk.red('Error: --limit must be a positive integer'));
+      output.error(chalk.red('Error: --limit must be a positive integer'));
       process.exit(1);
     }
 
     if (options.status && !VALID_STATUSES.includes(options.status as BlockStatus)) {
-      console.error(chalk.red(`Error: --status must be one of ${VALID_STATUSES.join(' / ')}`));
+      output.error(chalk.red(`Error: --status must be one of ${VALID_STATUSES.join(' / ')}`));
       process.exit(1);
     }
 
     if (!VALID_SORTS.includes(options.sort)) {
-      console.error(chalk.red(`Error: --sort must be one of ${VALID_SORTS.join(' / ')}`));
+      output.error(chalk.red(`Error: --sort must be one of ${VALID_SORTS.join(' / ')}`));
       process.exit(1);
     }
 
@@ -100,17 +103,17 @@ listCommand
 
     // JSON output mode
     if (options.json) {
-      console.log(JSON.stringify(blocks, null, 2));
+      output.info(JSON.stringify(blocks, null, 2));
       return;
     }
 
     // human readable output
     if (blocks.length === 0) {
-      console.log(chalk.yellow('\nNo matching memories found'));
+      output.warn(chalk.yellow('\nNo matching memories found'));
       return;
     }
 
-    console.log(chalk.cyan(`\nFound ${blocks.length} memories:\n`));
+    output.info(chalk.cyan(`\nFound ${blocks.length} memories:\n`));
 
     const termWidth = process.stdout.columns ?? 80;
 
@@ -126,21 +129,21 @@ listCommand
       const contentWidth = Math.max(10, termWidth - 12 - 2 - 22 - 2 - 10 - 1 - 3 - 1 - 8 - 4);
       const contentStr = chalk.white(truncate(block.content, contentWidth).padEnd(contentWidth));
 
-      console.log(`${idStr}  ${annotationStr}  ${contentStr}  ${vitalityBar} ${vitalityNum} ${statusStr}`);
+      output.info(`${idStr}  ${annotationStr}  ${contentStr}  ${vitalityBar} ${vitalityNum} ${statusStr}`);
 
       if (options.verbose) {
         const createdDate = new Date(block.created_at * 1000).toLocaleDateString('en-US');
         const updatedDate = new Date(block.updated_at * 1000).toLocaleDateString('en-US');
-        console.log(
+        output.info(
           chalk.gray(`  Source: ${block.source} | Accesses: ${block.access_count} | Created: ${createdDate} | Updated: ${updatedDate}`)
         );
         if (block.refs && block.refs.length > 0) {
-          console.log(chalk.gray(`  Refs: ${block.refs.join(', ')}`));
+          output.info(chalk.gray(`  Refs: ${block.refs.join(', ')}`));
         }
       }
     }
 
-    console.log();
+    output.info('');
   });
 
 /**

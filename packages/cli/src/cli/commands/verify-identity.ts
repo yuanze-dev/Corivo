@@ -15,12 +15,15 @@ import { getConfigDir } from '@/storage/database';
 import { printBanner } from '@/utils/banner';
 import { ConfigError } from '../../errors/index.js';
 import { readPassword } from '../utils/password.js';
+import { createCliContext } from '../context/create-context.js';
 
 interface VerifyIdentityOptions {
   verbose?: boolean;
 }
 
 export async function verifyIdentityCommand(options: VerifyIdentityOptions = {}): Promise<void> {
+  const context = createCliContext();
+  const output = context.output;
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');
   const identityPath = path.join(configDir, 'identity.json');
@@ -46,21 +49,21 @@ export async function verifyIdentityCommand(options: VerifyIdentityOptions = {})
   printBanner('Cross-Device Identity Verification', { width: 55 });
 
   // Show current identity information
-  console.log(chalk.gray('Current identity ID: ') + chalk.white(identity.identity_id));
-  console.log(chalk.gray('Created at: ') + chalk.gray(new Date(identity.created_at).toLocaleString('en-US')));
-  console.log();
+  output.info(chalk.gray('Current identity ID: ') + chalk.white(identity.identity_id));
+  output.info(chalk.gray('Created at: ') + chalk.gray(new Date(identity.created_at).toLocaleString('en-US')));
+  output.info('');
 
   // Initialize the fingerprint collector
   initializeDefaultSoftwareConfigs();
   const currentFingerprints = await DynamicFingerprintCollector.collectAll();
   const fingerprintValues = currentFingerprints.map(fp => fp.value);
 
-  console.log(chalk.cyan(`📸 Collected ${currentFingerprints.length} fingerprints:`));
+  output.info(chalk.cyan(`📸 Collected ${currentFingerprints.length} fingerprints:`));
   for (const fp of currentFingerprints) {
     const confidence = fp.confidence === 'high' ? '🔴' : fp.confidence === 'medium' ? '🟡' : '🟢';
-    console.log(`  ${confidence} ${fp.platform}: ${fp.value.substring(0, 8)}...`);
+    output.info(`  ${confidence} ${fp.platform}: ${fp.value.substring(0, 8)}...`);
   }
-  console.log();
+  output.info('');
 
   // Load target identity
   const identityManager = new IdentityManager(configDir);
@@ -69,15 +72,15 @@ export async function verifyIdentityCommand(options: VerifyIdentityOptions = {})
   // Match fingerprint
   const matchResult = identityManager.matchIdentity(currentFingerprints);
 
-  console.log(chalk.cyan('🔍 Fingerprint match results:'));
-  console.log(`  Match score: ${(matchResult.confidence * 100).toFixed(0)}/100`);
-  console.log(`  Matched platforms: ${matchResult.matched_platforms.join(', ') || 'none'}`);
-  console.log(`  Match status: ${matchResult.matched ? chalk.green('✓ Matched') : chalk.red('✗ Not matched')}`);
-  console.log();
+  output.info(chalk.cyan('🔍 Fingerprint match results:'));
+  output.info(`  Match score: ${(matchResult.confidence * 100).toFixed(0)}/100`);
+  output.info(`  Matched platforms: ${matchResult.matched_platforms.join(', ') || 'none'}`);
+  output.info(`  Match status: ${matchResult.matched ? chalk.green('✓ Matched') : chalk.red('✗ Not matched')}`);
+  output.info('');
 
   // If fingerprint match is insufficient, request password verification
   if (!matchResult.matched || matchResult.confidence < 0.6) {
-    console.log(chalk.yellow('⚠️  Fingerprint match is insufficient, password verification is required\\n'));
+    output.warn(chalk.yellow('⚠️  Fingerprint match is insufficient, password verification is required\\n'));
 
     // If a password is set
     if (config.encrypted_db_key) {
@@ -98,26 +101,26 @@ export async function verifyIdentityCommand(options: VerifyIdentityOptions = {})
           password
         );
 
-        console.log(chalk.cyan('\\n🔐 Combined verification result:'));
-        console.log(`  Method: ${result.method}`);
-        console.log(`  Confidence: ${result.confidence}`);
-        console.log(`  Status: ${result.success ? chalk.green('✓ Passed') : chalk.red('✗ Failed')}`);
+        output.info(chalk.cyan('\\n🔐 Combined verification result:'));
+        output.info(`  Method: ${result.method}`);
+        output.info(`  Confidence: ${result.confidence}`);
+        output.info(`  Status: ${result.success ? chalk.green('✓ Passed') : chalk.red('✗ Failed')}`);
 
         if (result.success) {
-          console.log(chalk.green('\\n✅ Identity verification successful!\\n'));
-          console.log(chalk.gray('You have proven that you are the legitimate owner of this identity.'));
+          output.success(chalk.green('\\n✅ Identity verification successful!\\n'));
+          output.info(chalk.gray('You have proven that you are the legitimate owner of this identity.'));
         } else {
-          console.log(chalk.red('\\n❌ Identity verification failed\\n'));
-          console.log(chalk.gray('Neither fingerprints nor password matched, so identity could not be verified.'));
+          output.error(chalk.red('\\n❌ Identity verification failed\\n'));
+          output.info(chalk.gray('Neither fingerprints nor password matched, so identity could not be verified.'));
         }
       } catch {
-        console.log(chalk.red('\\n❌ Incorrect password\\n'));
+        output.error(chalk.red('\\n❌ Incorrect password\\n'));
       }
     } else {
-      console.log(chalk.yellow('Tip: no master password is set yet. Please run: corivo setup-password\\n'));
+      output.warn(chalk.yellow('Tip: no master password is set yet. Please run: corivo setup-password\\n'));
     }
   } else {
-    console.log(chalk.green('\\n✅ Fingerprint verification passed!\\n'));
-    console.log(chalk.gray('Identity has been verified through fingerprint recognition.'));
+    output.success(chalk.green('\\n✅ Fingerprint verification passed!\\n'));
+    output.info(chalk.gray('Identity has been verified through fingerprint recognition.'));
   }
 }

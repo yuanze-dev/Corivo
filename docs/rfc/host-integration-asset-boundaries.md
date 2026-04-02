@@ -1,27 +1,21 @@
-# RFC: Host Integration Asset Boundaries
+# RFC: Plugin Root Boundaries
 
 Date: 2026-03-31  
 Status: Accepted (docs alignment baseline)
 
 ## Context
 
-Corivo now uses a split plugin tree:
+Corivo now uses a plugin-root tree:
 
-- `packages/plugins/hosts/*`
-- `packages/plugins/runtime/*`
+- `packages/plugins/<plugin>`
 
-Historically, docs mixed host integration assets and runtime plugin code terminology. This RFC defines a single boundary contract used by root docs, package READMEs, and lightweight tests.
+Historically, docs mixed plugin names with a split `hosts/*` and `runtime/*` topology. This RFC updates the contract so repository navigation is by plugin name, while host-facing assets and runtime code remain internal responsibilities inside a plugin root.
 
 ## Definitions
 
-### Host Integration Bundle
+### Plugin Root
 
-A host integration bundle is a package/directory under `packages/plugins/hosts/*` that provides host-facing install assets consumed by the `corivo` CLI installer.
-
-Current-stage exception:
-
-- `packages/plugins/hosts/opencode` is a reserved host boundary and is not CLI asset-backed in this stage.
-- OpenCode install still uses `corivo inject --global --opencode`, sourcing the installed plugin from `packages/plugins/runtime/opencode/assets/corivo.ts`.
+A plugin root is a package/directory under `packages/plugins/<plugin>` that contains the files required by one integration.
 
 Typical contents:
 
@@ -30,25 +24,17 @@ Typical contents:
 - adapter scripts
 - marketplace/plugin metadata
 - static assets
-
-### Runtime Plugin
-
-A runtime plugin is an executable code package under `packages/plugins/runtime/*` that runs runtime logic (event handling, ingestion, transforms) and can be built/tested as code.
-
-Typical contents:
-
 - runtime source code (`src/*`)
 - package/runtime entrypoints
 - build/typecheck configs
 
 ## Boundary Rules
 
-1. Host integration assets live only in `packages/plugins/hosts/*`.
-2. Executable runtime plugin code lives only in `packages/plugins/runtime/*`.
-3. `hosts/opencode` stays reserved and non-asset-backed at this stage; OpenCode install is runtime-asset sourced.
-4. Host README files must describe host integration bundles, not runtime plugin implementation.
-5. Runtime README files must describe runtime plugins, not host installer assets.
-6. Installation behavior remains centralized through the CLI path (`corivo inject` and installer delegation), not redefined per package.
+1. Every plugin lives at `packages/plugins/<plugin>`.
+2. Host-facing install assets and executable runtime code can coexist in one plugin root.
+3. `opencode` keeps both concerns in one directory; the install asset is `packages/plugins/opencode/assets/corivo.ts`.
+4. Plugin README files must explain the internal responsibilities of that plugin root.
+5. Installation behavior remains centralized through the CLI path (`corivo host install` and installer delegation), not redefined per package.
 
 ## Non-Goals
 
@@ -60,9 +46,8 @@ Typical contents:
 
 Add a lightweight docs consistency test to assert:
 
-- root docs mention both directory boundaries
-- host index docs + RFC describe the OpenCode host exception consistently
-- host docs include host-bundle framing
-- runtime docs include runtime-plugin framing
+- root docs mention the plugin-root model
+- plugin docs describe whether a plugin root is asset-oriented, code-oriented, or mixed
+- OpenCode docs and RFC consistently point to `packages/plugins/opencode/assets/corivo.ts`
 
 This is intended to catch high-impact wording regressions early without over-constraining documentation style.

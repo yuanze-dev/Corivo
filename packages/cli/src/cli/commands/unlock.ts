@@ -11,11 +11,13 @@ import { KeyManager } from '../../crypto/keys.js';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 import { ConfigError, ValidationError } from '../../errors/index.js';
 import { readPassword } from '../utils/password.js';
+import { createCliContext } from '../context/create-context.js';
 
 /**
  * Simple form printing
  */
 function printTable(headers: string[], rows: string[][]): void {
+  const output = createCliContext().output;
   // Calculate the maximum width of each column
   const widths = headers.map((h, i) => {
     const maxRowWidth = Math.max(...rows.map(r => r[i]?.length || 0));
@@ -26,13 +28,13 @@ function printTable(headers: string[], rows: string[][]): void {
   const headerRow = headers.map((h, i) => h.padEnd(widths[i])).join(' | ');
   const separator = widths.map(w => '─'.repeat(w)).join('─┼─');
 
-  console.log(chalk.gray(headerRow));
-  console.log(chalk.gray(separator));
+  output.info(chalk.gray(headerRow));
+  output.info(chalk.gray(separator));
 
   // Print data lines
   for (const row of rows) {
     const paddedRow = row.map((cell, i) => (cell || '').padEnd(widths[i])).join(' | ');
-    console.log(paddedRow);
+    output.info(paddedRow);
   }
 }
 
@@ -42,6 +44,8 @@ interface UnlockOptions {
 }
 
 export async function unlockCommand(options: UnlockOptions = {}): Promise<void> {
+  const context = createCliContext();
+  const output = context.output;
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');
 
@@ -60,7 +64,7 @@ export async function unlockCommand(options: UnlockOptions = {}): Promise<void> 
   let dbKey: Buffer;
 
   if (needsPassword) {
-    console.log('\\nThe database is encrypted. Enter the password to unlock it.\\n');
+    output.info('\\nThe database is encrypted. Enter the password to unlock it.\\n');
     const password = await readPassword('Password: ');
 
     const salt = Buffer.from(config.salt, 'base64');
@@ -86,20 +90,20 @@ export async function unlockCommand(options: UnlockOptions = {}): Promise<void> 
   // Get all blocks
   const blocks = db.queryBlocks({ limit: options.limit || 100 });
 
-  console.log(chalk.green(`\\n✓ Found ${blocks.length} memories\\n`));
+  output.success(chalk.green(`\\n✓ Found ${blocks.length} memories\\n`));
 
   if (options.raw) {
     // raw output
     for (const block of blocks) {
-      console.log(chalk.white('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-      console.log(chalk.gray('ID:       ') + chalk.white(block.id));
-      console.log(chalk.gray('Content:   ') + chalk.white(block.content));
-      console.log(chalk.gray('Annotation:') + chalk.cyan(block.annotation));
-      console.log(chalk.gray('Source:    ') + chalk.yellow(block.source));
-      console.log(chalk.gray('Vitality:  ') + chalk.green(String(block.vitality)));
-      console.log(chalk.gray('Status:    ') + chalk.blue(block.status));
-      console.log(chalk.gray('Created at:') + chalk.gray(new Date(block.created_at * 1000).toLocaleString('en-US')));
-      console.log();
+      output.info(chalk.white('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+      output.info(chalk.gray('ID:       ') + chalk.white(block.id));
+      output.info(chalk.gray('Content:   ') + chalk.white(block.content));
+      output.info(chalk.gray('Annotation:') + chalk.cyan(block.annotation));
+      output.info(chalk.gray('Source:    ') + chalk.yellow(block.source));
+      output.info(chalk.gray('Vitality:  ') + chalk.green(String(block.vitality)));
+      output.info(chalk.gray('Status:    ') + chalk.blue(block.status));
+      output.info(chalk.gray('Created at:') + chalk.gray(new Date(block.created_at * 1000).toLocaleString('en-US')));
+      output.info('');
     }
   } else {
     // Table output
@@ -111,6 +115,6 @@ export async function unlockCommand(options: UnlockOptions = {}): Promise<void> 
       String(b.vitality),
     ]);
     printTable(headers, rows);
-    console.log();
+    output.info('');
   }
 }

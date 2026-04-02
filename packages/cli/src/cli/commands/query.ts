@@ -62,6 +62,7 @@ export async function runPromptQueryCommand(
 }
 
 export async function queryCommand(rawQuery: string | undefined, options: QueryOptions): Promise<void> {
+  const commandContext = createCliContext();
   const { query, prompt } = validateQueryInputs(rawQuery, options);
 
   if (prompt) {
@@ -73,7 +74,7 @@ export async function queryCommand(rawQuery: string | undefined, options: QueryO
     });
 
     if (output) {
-      console.log(output);
+      commandContext.output.info(output);
     }
     return;
   }

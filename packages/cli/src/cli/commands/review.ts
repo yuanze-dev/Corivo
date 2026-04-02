@@ -4,6 +4,7 @@ import { formatSurfaceItem } from '../../runtime/render.js';
 import { generateReview } from '../../runtime/review.js';
 import type { RuntimeCommandOptions } from './runtime-support.js';
 import { loadRuntimeDb } from './runtime-support.js';
+import { createCliContext } from '../context/create-context.js';
 
 export interface ReviewCommandOptions extends RuntimeCommandOptions {
   lastMessage?: string;
@@ -31,6 +32,7 @@ reviewCommand
   .option('-f, --format <type>', 'Output format: text | json | hook-text', 'text')
   .option('--no-password', 'Skip password prompt (development mode)')
   .action(async (options) => {
+    const context = createCliContext();
     const output = await runReviewCommand({
       password: options.password,
       format: options.format,
@@ -38,7 +40,7 @@ reviewCommand
     });
 
     if (output) {
-      console.log(output);
+      context.output.info(output);
     }
   });
 

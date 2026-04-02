@@ -8,6 +8,7 @@ import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { getConfigDir } from '@/storage/database';
+import { createCliContext } from '../context/create-context.js';
 
 const REMINDERS_FILE = 'reminders.json';
 
@@ -21,30 +22,32 @@ remindersCommand
   .option('-c, --cleanup', 'Clean up expired reminders')
   .option('-j, --json', 'Output as JSON (for scripts)')
   .action(async (options) => {
+    const context = createCliContext();
+    const output = context.output;
     try {
       const configDir = getConfigDir();
       const remindersPath = path.join(configDir, REMINDERS_FILE);
 
       // Handling ignore operations
       if (options.dismissAll) {
-        await dismissAll(remindersPath);
+        await dismissAll(remindersPath, context);
         return;
       }
 
       if (options.dismiss) {
-        await dismissReminder(remindersPath, options.dismiss);
+        await dismissReminder(remindersPath, options.dismiss, context);
         return;
       }
 
       if (options.cleanup) {
-        await cleanupReminders(remindersPath);
+        await cleanupReminders(remindersPath, context);
         return;
       }
 
       // Default: Show reminder list
-      await displayReminders(remindersPath, options);
+      await displayReminders(remindersPath, options, context);
     } catch (error) {
-      console.error(chalk.red('Error:'), error);
+      output.error(chalk.red('Error:'), error);
       process.exit(1);
     }
   });
@@ -54,8 +57,10 @@ remindersCommand
  */
 async function displayReminders(
   remindersPath: string,
-  options: { pending?: boolean; json?: boolean }
+  options: { pending?: boolean; json?: boolean },
+  context = createCliContext(),
 ): Promise<void> {
+  const output = context.output;
   const store = await loadStore(remindersPath);
   const now = Math.floor(Date.now() / 1000);
 
@@ -72,49 +77,50 @@ async function displayReminders(
 
   if (reminders.length === 0) {
     if (options.json) {
-      console.log(JSON.stringify({ reminders: [] }));
+      output.info(JSON.stringify({ reminders: [] }));
     } else {
-      console.log('');
-      console.log(chalk.gray('No pending reminders'));
-      console.log('');
+      output.info('');
+      output.info(chalk.gray('No pending reminders'));
+      output.info('');
     }
     return;
   }
 
   // JSON output
   if (options.json) {
-    console.log(JSON.stringify({ reminders }, null, 2));
+    output.info(JSON.stringify({ reminders }, null, 2));
     return;
   }
 
   // human readable output
-  console.log('');
-  console.log(chalk.cyan(`You have ${reminders.length} reminders:`));
-  console.log('');
+  output.info('');
+  output.info(chalk.cyan(`You have ${reminders.length} reminders:`));
+  output.info('');
 
   for (const reminder of reminders) {
-    console.log(formatReminder(reminder));
-    console.log('');
+    output.info(formatReminder(reminder));
+    output.info('');
   }
 
   // Tips on how to deal with
   if (options.pending) {
-    console.log(chalk.gray('Tip: run corivo reminders --dismiss-all to dismiss all reminders'));
-    console.log('');
+    output.info(chalk.gray('Tip: run corivo reminders --dismiss-all to dismiss all reminders'));
+    output.info('');
   }
 }
 
 /**
  * Ignore specific reminders
  */
-async function dismissReminder(remindersPath: string, id: string): Promise<void> {
+async function dismissReminder(remindersPath: string, id: string, context = createCliContext()): Promise<void> {
+  const output = context.output;
   const store = await loadStore(remindersPath);
   const reminder = store.reminders.find((r: any) => r.id === id);
 
   if (!reminder) {
-    console.log('');
-    console.log(chalk.yellow(`Reminder not found: ${id}`));
-    console.log('');
+    output.info('');
+    output.warn(chalk.yellow(`Reminder not found: ${id}`));
+    output.info('');
     return;
   }
 
@@ -123,15 +129,16 @@ async function dismissReminder(remindersPath: string, id: string): Promise<void>
 
   await saveStore(remindersPath, store);
 
-  console.log('');
-  console.log(chalk.green(`Dismissed reminder: ${reminder.title || id}`));
-  console.log('');
+  output.info('');
+  output.success(chalk.green(`Dismissed reminder: ${reminder.title || id}`));
+  output.info('');
 }
 
 /**
  * Ignore all reminders
  */
-async function dismissAll(remindersPath: string): Promise<void> {
+async function dismissAll(remindersPath: string, context = createCliContext()): Promise<void> {
+  const output = context.output;
   const store = await loadStore(remindersPath);
   let count = 0;
 
@@ -147,15 +154,16 @@ async function dismissAll(remindersPath: string): Promise<void> {
     await saveStore(remindersPath, store);
   }
 
-  console.log('');
-  console.log(chalk.green(`Dismissed ${count} reminders`));
-  console.log('');
+  output.info('');
+  output.success(chalk.green(`Dismissed ${count} reminders`));
+  output.info('');
 }
 
 /**
  * Clear expired reminders
  */
-async function cleanupReminders(remindersPath: string): Promise<void> {
+async function cleanupReminders(remindersPath: string, context = createCliContext()): Promise<void> {
+  const output = context.output;
   const store = await loadStore(remindersPath);
   const now = Math.floor(Date.now() / 1000);
   const retentionDays = 30;
@@ -178,9 +186,9 @@ async function cleanupReminders(remindersPath: string): Promise<void> {
     await saveStore(remindersPath, store);
   }
 
-  console.log('');
-  console.log(chalk.green(`Cleaned up ${cleanedCount} expired reminders`));
-  console.log('');
+  output.info('');
+  output.success(chalk.green(`Cleaned up ${cleanedCount} expired reminders`));
+  output.info('');
 }
 
 /**

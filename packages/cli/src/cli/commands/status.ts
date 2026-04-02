@@ -11,14 +11,16 @@ import { ContextPusher } from '@/push/context.js';
 import { getServiceManager } from '@/service/index.js';
 import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
 import { ConfigError } from '@/errors';
+import { createCliContext } from '../context/create-context.js';
 
 type StatusCommandOptions = {
   json?: boolean;
 };
 
 export const statusCommand = async (options: StatusCommandOptions) => {
+  const context = createCliContext();
   if (options.json) {
-    await jsonStatus();
+    await jsonStatus(context);
     return;
   }
   const { renderTui } = await import('@/tui/index.js');
@@ -26,7 +28,8 @@ export const statusCommand = async (options: StatusCommandOptions) => {
 };
 
 
-const jsonStatus = async () => {
+const jsonStatus = async (context = createCliContext()) => {
+  const output = context.output;
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');
 
@@ -60,7 +63,7 @@ const jsonStatus = async () => {
   const health = db.checkHealth();
   const encryption = db.getEncryptionInfo();
 
-  console.log(
+  output.info(
     JSON.stringify(
       {
         memory: {

@@ -7,6 +7,7 @@
 import { Command } from 'commander';
 import { runCarryOverCommand } from './carry-over.js';
 import { runReviewCommand } from './review.js';
+import { createCliContext } from '../context/create-context.js';
 
 export interface SuggestCommandOptions {
   context?: string;
@@ -63,6 +64,7 @@ suggestCommand
   .option('-m, --last-message <text>', "Claude's last response")
   .option('-f, --format <type>', 'Output format: text | json | hook-text', 'text')
   .action(async (options) => {
+    const context = createCliContext();
     const output = await runSuggestCommand({
       context: options.context,
       lastMessage: options.lastMessage,
@@ -70,7 +72,7 @@ suggestCommand
     });
 
     if (output) {
-      console.log(output);
+      context.output.info(output);
     }
   });
 

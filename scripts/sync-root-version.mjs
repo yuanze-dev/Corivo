@@ -7,11 +7,11 @@ const workspacePackagePaths = [
   "packages/cli/package.json",
   "packages/shared/package.json",
   "packages/solver/package.json",
-  "packages/plugins/hosts/codex/package.json",
-  "packages/plugins/hosts/claude-code/package.json",
-  "packages/plugins/hosts/cursor/package.json",
-  "packages/plugins/runtime/opencode/package.json",
-  "packages/plugins/runtime/openclaw/package.json",
+  "packages/plugins/codex/package.json",
+  "packages/plugins/claude-code/package.json",
+  "packages/plugins/cursor/package.json",
+  "packages/plugins/opencode/package.json",
+  "packages/plugins/openclaw/package.json",
 ].map((relativePath) => path.join(repoRoot, relativePath));
 
 const rootPackage = JSON.parse(fs.readFileSync(rootPackagePath, "utf8"));

@@ -42,9 +42,6 @@ export interface HostImportCommandDeps {
 }
 
 export function createHostImportCommand(deps: HostImportCommandDeps = {}): Command {
-  const writeStdout = deps.writeStdout ?? ((text: string) => console.log(text));
-  const writeStderr = deps.writeStderr ?? ((text: string) => console.error(text));
-
   return new Command('import')
     .description('Import history from a host integration')
     .argument('<host>', 'Host id')
@@ -54,6 +51,9 @@ export function createHostImportCommand(deps: HostImportCommandDeps = {}): Comma
     .option('--dry-run', 'Run import without persisting data')
     .option('-t, --target <path>', 'Target path')
     .action(async (host: HostId, options: HostImportCommandOptions) => {
+      const context = createCliContext();
+      const writeStdout = deps.writeStdout ?? ((text: string) => context.output.info(text));
+      const writeStderr = deps.writeStderr ?? ((text: string) => context.output.error(text));
       if (options.all && options.since) {
         throw new Error('Cannot use --all with --since.');
       }

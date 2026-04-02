@@ -86,12 +86,11 @@ Corivo keeps one installation control path: the local `corivo` CLI.
 
 - `scripts/install.sh` is the one-command bootstrap entry that installs and then delegates to CLI flows.
 - `corivo host install <host>` is the stable host install entry for Claude Code, Codex, Cursor, and OpenCode.
-- OpenCode install still uses the packaged runtime asset from `packages/plugins/runtime/opencode/assets/corivo.ts`.
-- Host packages under `packages/plugins/hosts/*` are host integration bundles consumed by the CLI installer where host assets are CLI-backed.
-- `packages/plugins/hosts/opencode` is currently a reserved host boundary and is not CLI asset-backed in this stage.
-- Runtime packages under `packages/plugins/runtime/*` are executable runtime plugins; they are not host installers.
+- OpenCode install uses the packaged plugin asset from `packages/plugins/opencode/assets/corivo.ts`.
+- `packages/plugins/<plugin>` is the primary repository layout for plugin code and plugin-facing assets.
+- Some plugin roots only contain host-facing assets today, while others contain executable runtime code or both.
 
-This boundary exists so install behavior stays centralized while host/runtime packaging evolves.
+This boundary keeps install behavior centralized while allowing each plugin root to carry the files it actually needs.
 ## Install by Host
 
 Corivo supports multiple AI coding agents. You can either use the one-command installer to auto-detect local hosts, or install a specific host adapter yourself.
@@ -247,23 +246,25 @@ Memory is modeled as blocks with vitality (`active -> cooling -> cold -> archive
 
 ## Plugin Directory Model
 
-Corivo uses a two-boundary plugin tree:
+Corivo organizes plugins by plugin name:
 
-- `packages/plugins/hosts/*`: packaged host integration bundles (hooks, skills, templates, assets, adapter scripts).
-- `packages/plugins/runtime/*`: executable runtime plugins (TypeScript code, runtime event adapters, build/testable packages).
+- `packages/plugins/claude-code`
+- `packages/plugins/codex`
+- `packages/plugins/cursor`
+- `packages/plugins/opencode`
+- `packages/plugins/openclaw`
 
-Host integration bundles define install surfaces for host environments. Runtime plugins define runtime behavior. They are complementary but distinct.
+Each plugin root contains the files that plugin needs. Some roots are asset-oriented today, some are code-oriented, and `opencode` currently contains both runtime source and packaged install assets.
 
 | Package | Description |
 |---------|-------------|
 | [`@corivo/cli`](packages/cli) | Core CLI, local database, heartbeat engine |
 | [`@corivo/solver`](packages/solver) | CRDT sync relay server (Fastify v5) |
-| [`@corivo/claude-code`](packages/plugins/hosts/claude-code) | Claude Code host integration bundle |
-| [`@corivo/cursor`](packages/plugins/hosts/cursor) | Cursor host integration bundle |
-| [`@corivo/codex`](packages/plugins/hosts/codex) | Codex host integration bundle |
-| [`hosts/opencode`](packages/plugins/hosts/opencode) | Reserved OpenCode host boundary (not CLI asset-backed in this stage) |
-| [`@corivo/opencode`](packages/plugins/runtime/opencode) | OpenCode executable runtime plugin |
-| [`@corivo/openclaw`](packages/plugins/runtime/openclaw) | OpenClaw executable runtime plugin |
+| [`@corivo/claude-code`](packages/plugins/claude-code) | Claude Code plugin root with host integration assets |
+| [`@corivo/cursor`](packages/plugins/cursor) | Cursor plugin root with host integration assets |
+| [`@corivo/codex`](packages/plugins/codex) | Codex plugin root with host integration assets |
+| [`@corivo/opencode`](packages/plugins/opencode) | OpenCode plugin root with packaged install asset and runtime code |
+| [`@corivo/openclaw`](packages/plugins/openclaw) | OpenClaw plugin root with runtime ingestion code |
 
 Each public-facing package now has its own README so contributors can orient themselves without reverse-engineering the tree.
 

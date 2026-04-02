@@ -7,37 +7,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '../../../..');
 const pluginsRoot = path.join(repoRoot, 'packages/plugins');
-const oldPluginPaths = [
-  'packages/plugins/claude-code',
-  'packages/plugins/codex',
-  'packages/plugins/cursor',
-  'packages/plugins/openclaw',
-  'packages/plugins/opencode',
-];
+const pluginRoots = ['claude-code', 'codex', 'cursor', 'openclaw', 'opencode'];
 
 describe('plugin package layout topology', () => {
-  it('keeps host asset directories under packages/plugins/hosts', () => {
-    const hostsRoot = path.join(pluginsRoot, 'hosts');
-    expect(existsSync(hostsRoot)).toBe(true);
-
-    for (const host of ['claude-code', 'codex', 'cursor', 'opencode']) {
-      expect(existsSync(path.join(hostsRoot, host))).toBe(true);
+  it('keeps plugin packages at packages/plugins/<plugin>', () => {
+    for (const pluginRoot of pluginRoots) {
+      expect(existsSync(path.join(pluginsRoot, pluginRoot))).toBe(true);
     }
   });
 
-  it('keeps runtime code plugins under packages/plugins/runtime', () => {
-    const runtimeRoot = path.join(pluginsRoot, 'runtime');
-    expect(existsSync(runtimeRoot)).toBe(true);
-
-    for (const runtimePlugin of ['openclaw', 'opencode']) {
-      expect(existsSync(path.join(runtimeRoot, runtimePlugin))).toBe(true);
-    }
-  });
-
-  it('does not keep runtime code plugins at packages/plugins top-level', () => {
-    for (const runtimePlugin of ['openclaw', 'opencode']) {
-      expect(existsSync(path.join(pluginsRoot, runtimePlugin))).toBe(false);
-    }
+  it('does not depend on hosts/runtime top-level buckets', () => {
+    expect(existsSync(path.join(pluginsRoot, 'hosts'))).toBe(false);
+    expect(existsSync(path.join(pluginsRoot, 'runtime'))).toBe(false);
   });
 
   it('keeps root tsconfig project references free of deleted plugin paths', () => {
@@ -47,8 +28,8 @@ describe('plugin package layout topology', () => {
     };
     const references = (tsconfig.references ?? []).map((entry) => entry.path);
 
-    for (const oldPath of oldPluginPaths) {
-      expect(references).not.toContain(`./${oldPath}`);
+    for (const pluginRoot of pluginRoots) {
+      expect(references).not.toContain(`./packages/plugins/${pluginRoot}`);
     }
   });
 
@@ -57,18 +38,17 @@ describe('plugin package layout topology', () => {
     const lockfile = readFileSync(lockfilePath, 'utf8');
 
     for (const importer of [
-      'packages/plugins/hosts/claude-code',
-      'packages/plugins/hosts/codex',
-      'packages/plugins/hosts/cursor',
-      'packages/plugins/runtime/openclaw',
-      'packages/plugins/runtime/opencode',
+      'packages/plugins/claude-code',
+      'packages/plugins/codex',
+      'packages/plugins/cursor',
+      'packages/plugins/openclaw',
+      'packages/plugins/opencode',
     ]) {
       expect(lockfile).toMatch(new RegExp(`\\n  ${escapeForRegex(importer)}:`));
     }
 
-    for (const oldPath of oldPluginPaths) {
-      expect(lockfile).not.toMatch(new RegExp(`\\n  ${escapeForRegex(oldPath)}:`));
-    }
+    expect(lockfile).not.toMatch(/\n  packages\/plugins\/hosts\//);
+    expect(lockfile).not.toMatch(/\n  packages\/plugins\/runtime\//);
   });
 });
 

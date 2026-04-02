@@ -4,13 +4,19 @@ const {
   readFile,
   getInstance,
   getServiceManager,
+  loadConfig,
   loadSolverConfig,
+  outputInfo,
+  saveSolverConfig,
   pushNeedsAttention,
 } = vi.hoisted(() => ({
   readFile: vi.fn(),
   getInstance: vi.fn(),
   getServiceManager: vi.fn(),
+  loadConfig: vi.fn(),
   loadSolverConfig: vi.fn(),
+  outputInfo: vi.fn(),
+  saveSolverConfig: vi.fn(),
   pushNeedsAttention: vi.fn(),
 }));
 
@@ -29,7 +35,9 @@ vi.mock('@/storage/database', () => ({
 }));
 
 vi.mock('@/config', () => ({
+  loadConfig,
   loadSolverConfig,
+  saveSolverConfig,
 }));
 
 vi.mock('@/service/index.js', () => ({
@@ -40,6 +48,17 @@ vi.mock('@/push/context.js', () => ({
   ContextPusher: class {
     pushNeedsAttention = pushNeedsAttention;
   },
+}));
+
+vi.mock('../../src/cli/context/create-context.js', () => ({
+  createCliContext: () => ({
+    output: {
+      info: outputInfo,
+      warn: vi.fn(),
+      error: vi.fn(),
+      success: vi.fn(),
+    },
+  }),
 }));
 
 describe('statusCommand', () => {
@@ -78,6 +97,7 @@ describe('statusCommand', () => {
         pid: 4321,
       }),
     });
+    loadConfig.mockResolvedValue({ version: '0.12.6' });
     loadSolverConfig.mockResolvedValue({
       server_url: 'https://solver.example.com',
       shared_secret: 'secret',
@@ -89,13 +109,12 @@ describe('statusCommand', () => {
   });
 
   it('prints legacy status data as structured json', async () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const { statusCommand } = await import('../../src/cli/commands/status.js');
 
     await statusCommand({ json: true });
 
-    expect(logSpy).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(logSpy.mock.calls[0]?.[0] as string)).toEqual({
+    expect(outputInfo).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(outputInfo.mock.calls[0]?.[0] as string)).toEqual({
       memory: {
         total: 5,
         byStatus: {
@@ -140,7 +159,5 @@ describe('statusCommand', () => {
         'corivo start | stop',
       ],
     });
-
-    logSpy.mockRestore();
   });
 });

@@ -11,8 +11,11 @@ import { printBanner } from '@/utils/banner';
 import { KeyManager } from '../../crypto/keys.js';
 import { ConfigError, ValidationError } from '../../errors/index.js';
 import { readPassword } from '../utils/password.js';
+import { createCliContext } from '../context/create-context.js';
 
 export async function recoverCommand(): Promise<void> {
+  const context = createCliContext();
+  const output = context.output;
   printBanner('Data Recovery Wizard', { width: 55 });
 
   // Check configuration file
@@ -27,61 +30,61 @@ export async function recoverCommand(): Promise<void> {
     throw new ConfigError('Config file does not exist. If this is your first time, run: corivo init');
   }
 
-  console.log('Choose a recovery method:\n');
-  console.log('  [1] Use a recovery key (24 words, BIP39 standard)');
-  console.log('  [2] Exit\n');
+  output.info('Choose a recovery method:\n');
+  output.info('  [1] Use a recovery key (24 words, BIP39 standard)');
+  output.info('  [2] Exit\n');
 
   const choice = await readPassword('Choose [1-2]: ');
 
   if (choice !== '1') {
-    console.log('Cancelled');
+    output.info('Cancelled');
     return;
   }
 
   // Enter recovery key
-  console.log('\nEnter your recovery key (24 words separated by spaces):\n');
+  output.info('\nEnter your recovery key (24 words separated by spaces):\n');
 
   const recoveryKey = await readPassword('Recovery key: ');
   const inputWords = recoveryKey.trim().split(/\s+/);
 
   if (inputWords.length !== 24) {
-    console.log('❌ Recovery key must contain 24 words');
+    output.error('❌ Recovery key must contain 24 words');
     return;
   }
 
   // Verify recovery key
-  console.log('\nVerifying recovery key...');
+  output.info('\nVerifying recovery key...');
 
   try {
     KeyManager.deriveFromRecoveryKey(recoveryKey);
   } catch (error) {
     if (error instanceof ValidationError) {
-      console.log(`❌ ${error.message}`);
+      output.error(`❌ ${error.message}`);
     } else {
-      console.log('❌ Recovery key verification failed');
+      output.error('❌ Recovery key verification failed');
     }
     return;
   }
 
-  console.log('✅ Recovery key verification passed');
+  output.success('✅ Recovery key verification passed');
 
   // Set new password
-  console.log('\nSet a new master password (at least 8 characters, including letters and numbers)\n');
+  output.info('\nSet a new master password (at least 8 characters, including letters and numbers)\n');
 
   const password1 = await readPassword('New password: ');
   if (!KeyManager.validatePasswordStrength(password1)) {
-    console.log('❌ Password is too weak');
+    output.error('❌ Password is too weak');
     return;
   }
 
   const password2 = await readPassword('Confirm new password: ');
   if (password1 !== password2) {
-    console.log('❌ Password entries do not match');
+    output.error('❌ Password entries do not match');
     return;
   }
 
   // Regenerate key
-  console.log('\nRegenerating key chain...');
+  output.info('\nRegenerating key chain...');
 
   const salt = KeyManager.generateSalt();
   const newMasterKey = KeyManager.deriveMasterKey(password1, salt);
@@ -105,32 +108,32 @@ export async function recoverCommand(): Promise<void> {
     const health = db.checkHealth();
 
     if (health.ok) {
-      console.log('✅ Database verification passed');
+      output.success('✅ Database verification passed');
       const stats = db.getStats();
-      console.log(`   Recovered ${stats.total} blocks`);
+      output.info(`   Recovered ${stats.total} blocks`);
     } else {
-      console.log('❌ Database verification failed');
-      console.log('   Please sync the latest data from another device');
+      output.error('❌ Database verification failed');
+      output.info('   Please sync the latest data from another device');
     }
   } catch {
-    console.log('⚠️  Unable to open database');
-    console.log('   Please sync the latest data from another device');
+    output.warn('⚠️  Unable to open database');
+    output.info('   Please sync the latest data from another device');
   }
 
   // Generate new recovery key
   const newRecoveryKey = KeyManager.generateRecoveryKey(newMasterKey);
   const recoveryWords = newRecoveryKey.split(' ');
 
-  console.log('\nKey chain updated!');
-  console.log('\n⚠️  Important: your new recovery key has been generated (24 words)\n');
+  output.success('\nKey chain updated!');
+  output.warn('\n⚠️  Important: your new recovery key has been generated (24 words)\n');
 
-  console.log(`  ${recoveryWords.slice(0, 6).join('  ')}`);
-  console.log(`  ${recoveryWords.slice(6, 12).join('  ')}`);
-  console.log(`  ${recoveryWords.slice(12, 18).join('  ')}`);
-  console.log(`  ${recoveryWords.slice(18, 24).join('  ')}`);
+  output.info(`  ${recoveryWords.slice(0, 6).join('  ')}`);
+  output.info(`  ${recoveryWords.slice(6, 12).join('  ')}`);
+  output.info(`  ${recoveryWords.slice(12, 18).join('  ')}`);
+  output.info(`  ${recoveryWords.slice(18, 24).join('  ')}`);
 
-  console.log('\n⚠️  The old recovery key is no longer valid. Please save the new recovery key');
+  output.warn('\n⚠️  The old recovery key is no longer valid. Please save the new recovery key');
 
-  console.log('\nNext steps:');
-  console.log('  Re-authorize on other devices (the device list has been reset)');
+  output.info('\nNext steps:');
+  output.info('  Re-authorize on other devices (the device list has been reset)');
 }

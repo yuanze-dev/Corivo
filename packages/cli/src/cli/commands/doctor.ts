@@ -9,9 +9,12 @@ import path from 'node:path';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 import { KeyManager } from '../../crypto/keys.js';
 import { readPassword } from '../utils/password.js';
+import { createCliContext } from '../context/create-context.js';
 
 export async function doctorCommand(): Promise<void> {
-  console.log('\nRunning Corivo health checks...\n');
+  const context = createCliContext();
+  const output = context.output;
+  output.info('\nRunning Corivo health checks...\n');
 
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');
@@ -21,12 +24,12 @@ export async function doctorCommand(): Promise<void> {
     const content = await fs.readFile(configPath, 'utf-8');
     config = JSON.parse(content);
   } catch {
-    console.log('❌ Config file not found');
-    console.log('   Please run: corivo init');
+    output.error('❌ Config file not found');
+    output.info('   Please run: corivo init');
     return;
   }
 
-  console.log('✅ Config file looks good');
+  output.success('✅ Config file looks good');
 
   // Check database
   const dbPath = getDefaultDatabasePath();
@@ -38,7 +41,7 @@ export async function doctorCommand(): Promise<void> {
   } catch {}
 
   if (dbExists) {
-    console.log('✅ Database file exists');
+    output.success('✅ Database file exists');
 
     // Try to open the database
     try {
@@ -52,23 +55,23 @@ export async function doctorCommand(): Promise<void> {
       const health = db.checkHealth();
 
       if (health.ok) {
-        console.log('✅ Database integrity check passed');
+        output.success('✅ Database integrity check passed');
 
         const stats = db.getStats();
-        console.log(`   Stored ${stats.total} blocks`);
+        output.info(`   Stored ${stats.total} blocks`);
       } else {
-        console.log('❌ Database integrity check failed');
+        output.error('❌ Database integrity check failed');
       }
     } catch (error) {
       if (error instanceof Error) {
-        console.log(`❌ Failed to open database: ${error.message}`);
+        output.error(`❌ Failed to open database: ${error.message}`);
       } else {
-        console.log('❌ Failed to open database');
+        output.error('❌ Failed to open database');
       }
     }
   } else {
-    console.log('⚠️  Database file does not exist');
-    console.log('   It will be created automatically on first use');
+    output.warn('⚠️  Database file does not exist');
+    output.info('   It will be created automatically on first use');
   }
 
   // Check daemon
@@ -77,10 +80,10 @@ export async function doctorCommand(): Promise<void> {
     const pidStr = await fs.readFile(pidPath, 'utf-8');
     const pid = parseInt(pidStr);
     process.kill(pid, 0);
-    console.log(`✅ Heartbeat daemon is running (PID: ${pid})`);
+    output.success(`✅ Heartbeat daemon is running (PID: ${pid})`);
   } catch {
-    console.log('⚪ Heartbeat daemon is not running');
+    output.info('⚪ Heartbeat daemon is not running');
   }
 
-  console.log('\nHealth check complete');
+  output.info('\nHealth check complete');
 }

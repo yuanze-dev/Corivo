@@ -9,6 +9,7 @@ import path from 'node:path';
 import { Command } from 'commander';
 import { getConfigDir } from '@/storage/database';
 import { PushQueue } from '../../engine/push-queue.js';
+import { createCliContext } from '../context/create-context.js';
 
 export const pushQueueCommand = new Command('push-queue');
 
@@ -20,6 +21,8 @@ pushQueueCommand
   .option('--clear', 'Clear the queue')
   .option('--json', 'Output as JSON')
   .action(async (options) => {
+    const context = createCliContext();
+    const output = context.output;
     try {
       const queue = new PushQueue();
       await queue.load();
@@ -27,21 +30,21 @@ pushQueueCommand
       // Handle clear
       if (options.clear) {
         await queue.clear();
-        console.log('Push queue cleared');
+        output.info('Push queue cleared');
         return;
       }
 
       // handle ignore all
       if (options.dismissAll) {
         await queue.markAllShown();
-        console.log('All pushes dismissed');
+        output.info('All pushes dismissed');
         return;
       }
 
       // Processing ignores single
       if (options.dismiss) {
         await queue.markShown(options.dismiss);
-        console.log(`Dismissed push ${options.dismiss}`);
+        output.info(`Dismissed push ${options.dismiss}`);
         return;
       }
 
@@ -50,7 +53,7 @@ pushQueueCommand
 
       if (pending.length === 0) {
         if (options.json) {
-          console.log(JSON.stringify({ items: [] }));
+          output.info(JSON.stringify({ items: [] }));
         } else {
           // Empty output
         }
@@ -59,23 +62,23 @@ pushQueueCommand
 
       // JSON output
       if (options.json) {
-        console.log(JSON.stringify({ items: pending }, null, 2));
+        output.info(JSON.stringify({ items: pending }, null, 2));
         return;
       }
 
       // human readable output
-      console.log('');
-      console.log(`📬 Pending notifications (${pending.length}):`);
-      console.log('');
+      output.info('');
+      output.info(`📬 Pending notifications (${pending.length}):`);
+      output.info('');
 
       for (const item of pending) {
         const icon = getIcon(item.type);
-        console.log(`  ${icon} ${item.title}`);
-        console.log(`     ${item.message}`);
-        console.log('');
+        output.info(`  ${icon} ${item.title}`);
+        output.info(`     ${item.message}`);
+        output.info('');
       }
     } catch (error) {
-      console.log('');
+      output.info('');
     }
   });
 

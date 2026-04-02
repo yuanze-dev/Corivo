@@ -3,6 +3,7 @@ import { generateCarryOver } from '@/runtime/carry-over';
 import { formatSurfaceItem } from '@/runtime/render';
 import type { RuntimeCommandOptions } from './runtime-support.js';
 import { loadRuntimeDb } from './runtime-support.js';
+import { createCliContext } from '../context/create-context.js';
 
 export async function runCarryOverCommand(
   options: RuntimeCommandOptions = {},
@@ -25,13 +26,14 @@ carryOverCommand
   .option('-f, --format <type>', 'Output format: text | json | hook-text', 'text')
   .option('--no-password', 'Skip password prompt (development mode)')
   .action(async (options) => {
+    const context = createCliContext();
     const output = await runCarryOverCommand({
       password: options.password,
       format: options.format,
     });
 
     if (output) {
-      console.log(output);
+      context.output.info(output);
     }
   });
 

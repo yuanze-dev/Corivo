@@ -24,7 +24,7 @@ describe('host assets loader', () => {
     expect(existsSync(root)).toBe(true);
   });
 
-  it('reads text assets from packages/plugins/hosts/<host>', async () => {
+  it('reads text assets from packages/plugins/<host>', async () => {
     const text = await readHostTemplateText('codex', 'templates/AGENTS.codex.md');
     expect(text).toContain('## Corivo 记忆层（Codex）');
   });

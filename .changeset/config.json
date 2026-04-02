@@ -1,0 +1,22 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [
+    [
+      "corivo",
+      "@corivo/shared",
+      "@corivo/solver",
+      "@corivo-ai/codex",
+      "@corivo-ai/claude-code",
+      "@corivo-ai/cursor",
+      "@corivo-ai/opencode",
+      "@corivo-ai/openclaw"
+    ]
+  ],
+  "linked": [],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": []
+}

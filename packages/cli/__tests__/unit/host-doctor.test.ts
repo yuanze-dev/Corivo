@@ -22,11 +22,6 @@ import {
   isClaudeCodeInstalled,
   uninstallClaudeCodeHost,
 } from '../../src/inject/claude-host.js';
-import {
-  installProjectClaudeHost,
-  isProjectClaudeInstalled,
-  uninstallProjectClaudeHost,
-} from '../../src/inject/claude-rules.js';
 
 function toCheckMap(checks: Array<{ label: string; ok: boolean }>): Record<string, boolean> {
   return Object.fromEntries(checks.map((item) => [item.label, item.ok]));
@@ -34,17 +29,14 @@ function toCheckMap(checks: Array<{ label: string; ok: boolean }>): Record<strin
 
 describe('host doctor reusable helpers', () => {
   let tempHome: string;
-  let tempProject: string;
 
   beforeEach(async () => {
     tempHome = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-host-doctor-home-'));
-    tempProject = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-host-doctor-project-'));
     await fs.mkdir(path.join(tempHome, '.claude'), { recursive: true });
   });
 
   afterEach(async () => {
     await fs.rm(tempHome, { recursive: true, force: true });
-    await fs.rm(tempProject, { recursive: true, force: true });
   });
 
   it('covers Codex install/doctor/uninstall checks', async () => {
@@ -291,24 +283,5 @@ describe('host doctor reusable helpers', () => {
     await expect(fs.readFile(path.join(hooksDir, 'session-carry-over.sh'), 'utf8')).rejects.toThrow();
     await expect(fs.readFile(path.join(hooksDir, 'prompt-recall.sh'), 'utf8')).rejects.toThrow();
     await expect(fs.readFile(path.join(hooksDir, 'stop-review.sh'), 'utf8')).rejects.toThrow();
-  });
-
-  it('covers project CLAUDE.md marker checks', async () => {
-    const before = await isProjectClaudeInstalled(tempProject);
-    expect(toCheckMap(before.checks)['CLAUDE.md']).toBe(false);
-
-    const installResult = await installProjectClaudeHost(tempProject);
-    expect(installResult.success).toBe(true);
-
-    const afterInstall = await isProjectClaudeInstalled(tempProject);
-    expect(afterInstall.ok).toBe(true);
-    expect(toCheckMap(afterInstall.checks)['CLAUDE.md']).toBe(true);
-
-    const uninstallResult = await uninstallProjectClaudeHost(tempProject);
-    expect(uninstallResult.success).toBe(true);
-
-    const afterUninstall = await isProjectClaudeInstalled(tempProject);
-    expect(afterUninstall.ok).toBe(false);
-    expect(toCheckMap(afterUninstall.checks)['CLAUDE.md']).toBe(false);
   });
 });

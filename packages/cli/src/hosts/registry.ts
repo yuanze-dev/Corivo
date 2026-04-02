@@ -3,7 +3,6 @@ import { claudeCodeHostAdapter } from './adapters/claude-code.js';
 import { codexHostAdapter } from './adapters/codex.js';
 import { cursorHostAdapter } from './adapters/cursor.js';
 import { opencodeHostAdapter } from './adapters/opencode.js';
-import { projectClaudeHostAdapter } from './adapters/project-claude.js';
 
 const adapters: HostAdapter[] = [];
 const adapterById = new Map<HostId, HostAdapter>();
@@ -30,7 +29,6 @@ function getHostAdapter(id: string): HostAdapter | null {
   codexHostAdapter,
   cursorHostAdapter,
   opencodeHostAdapter,
-  projectClaudeHostAdapter,
 ].forEach((adapter) => {
   registerHostAdapter(adapter);
 });

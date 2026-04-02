@@ -7,23 +7,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'os';
-import type { HostDoctorResult, HostInstallOptions, HostInstallResult } from '../hosts/types.js';
 
 const START_MARKER = '<!-- CORIVO START -->';
 const END_MARKER = '<!-- CORIVO END -->';
-
-export interface ProjectClaudePaths {
-  projectDir: string;
-  claudeMdPath: string;
-}
-
-export function getProjectClaudePaths(projectPath?: string): ProjectClaudePaths {
-  const projectDir = projectPath || process.cwd();
-  return {
-    projectDir,
-    claudeMdPath: path.join(projectDir, 'CLAUDE.md'),
-  };
-}
 
 /**
  * Standard rule template
@@ -184,81 +170,6 @@ export async function injectGlobalRules(options: {
 }
 
 /**
- * Inject into current project CLAUDE.md
- */
-export async function injectProjectRules(projectPath?: string): Promise<{ success: boolean; path?: string; error?: string }> {
-  const result = await installProjectClaudeHost(projectPath);
-  return {
-    success: result.success,
-    path: result.path,
-    error: result.error,
-  };
-}
-
-export async function installProjectClaudeHost(
-  projectPath?: string,
-  options: Pick<HostInstallOptions, 'force' | 'global' | 'target'> = {}
-): Promise<HostInstallResult> {
-  if (options.global) {
-    const globalResult = await injectGlobalRules({
-      force: options.force,
-      homeDir: options.target,
-    });
-    return {
-      success: globalResult.success,
-      host: 'project-claude',
-      path: globalResult.path,
-      summary: globalResult.success ? 'Project Claude rules installed' : 'Project Claude rules install failed',
-      error: globalResult.error,
-    };
-  }
-
-  const paths = getProjectClaudePaths(projectPath);
-  const result = await injectRules(paths.claudeMdPath, { force: options.force });
-  return {
-    success: result.success,
-    host: 'project-claude',
-    path: paths.claudeMdPath,
-    summary: result.success ? 'Project Claude rules installed' : 'Project Claude rules install failed',
-    error: result.error,
-  };
-}
-
-export async function isProjectClaudeInstalled(projectPath?: string): Promise<HostDoctorResult> {
-  const paths = getProjectClaudePaths(projectPath);
-  const hasRules = await hasCorivoRules(paths.claudeMdPath);
-  const checks = [
-    {
-      label: 'CLAUDE.md',
-      ok: hasRules,
-      detail: paths.claudeMdPath,
-    },
-  ];
-
-  return {
-    ok: checks.every((item) => item.ok),
-    host: 'project-claude',
-    checks,
-  };
-}
-
-export async function getProjectClaudeDoctorResult(projectPath?: string): Promise<HostDoctorResult> {
-  return isProjectClaudeInstalled(projectPath);
-}
-
-export async function uninstallProjectClaudeHost(projectPath?: string): Promise<HostInstallResult> {
-  const paths = getProjectClaudePaths(projectPath);
-  const result = await ejectRules(paths.claudeMdPath);
-  return {
-    success: result.success,
-    host: 'project-claude',
-    path: paths.claudeMdPath,
-    summary: result.success ? 'Project Claude rules uninstalled' : 'Project Claude rules uninstall failed',
-    error: result.error,
-  };
-}
-
-/**
  * Escape regular expression special characters
  */
 function escapeRegExp(string: string): string {
@@ -270,8 +181,4 @@ export default {
   injectRules,
   ejectRules,
   injectGlobalRules,
-  injectProjectRules,
-  installProjectClaudeHost,
-  isProjectClaudeInstalled,
-  uninstallProjectClaudeHost,
 };

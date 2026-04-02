@@ -14,7 +14,6 @@ const VALID_HOSTS = new Set([
   'codex',
   'cursor',
   'opencode',
-  'project-claude',
 ] as const);
 
 const VALID_ROLES = new Set([
@@ -127,7 +126,7 @@ function requireString(value: unknown, field: string): string {
 function requireHost(value: unknown): IngestRealtimeMessageRequest['host'] {
   const host = requireString(value, 'host');
   if (!VALID_HOSTS.has(host as IngestRealtimeMessageRequest['host'])) {
-    throw new Error('Invalid ingest-message payload: host must be one of claude-code, codex, cursor, opencode, project-claude.');
+    throw new Error('Invalid ingest-message payload: host must be one of claude-code, codex, cursor, opencode.');
   }
 
   return host as IngestRealtimeMessageRequest['host'];

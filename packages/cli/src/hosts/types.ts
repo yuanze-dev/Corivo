@@ -2,8 +2,7 @@ export type HostId =
   | 'claude-code'
   | 'codex'
   | 'cursor'
-  | 'opencode'
-  | 'project-claude';
+  | 'opencode';
 
 export type HostCapability =
   | 'global-install'

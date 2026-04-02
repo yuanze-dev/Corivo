@@ -4,4 +4,3 @@ export * from './adapters/claude-code.js';
 export * from './adapters/codex.js';
 export * from './adapters/cursor.js';
 export * from './adapters/opencode.js';
-export * from './adapters/project-claude.js';

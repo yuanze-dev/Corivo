@@ -16,11 +16,6 @@ const installOpencodeHost = vi.fn();
 const isOpencodeInstalled = vi.fn();
 const uninstallOpencodeHost = vi.fn();
 
-const installProjectClaudeHost = vi.fn();
-const isProjectClaudeInstalled = vi.fn();
-const getProjectClaudeDoctorResult = vi.fn();
-const uninstallProjectClaudeHost = vi.fn();
-
 vi.mock('../../src/inject/claude-host.js', () => ({
   installClaudeCodeHost,
   isClaudeCodeInstalled,
@@ -43,13 +38,6 @@ vi.mock('../../src/inject/opencode-plugin.js', () => ({
   installOpencodeHost,
   isOpencodeInstalled,
   uninstallOpencodeHost,
-}));
-
-vi.mock('../../src/inject/claude-rules.js', () => ({
-  installProjectClaudeHost,
-  isProjectClaudeInstalled,
-  getProjectClaudeDoctorResult,
-  uninstallProjectClaudeHost,
 }));
 
 const { getAllHostAdapters, getHostAdapter } = await import('../../src/hosts/registry.js');
@@ -120,27 +108,6 @@ beforeEach(() => {
     host: 'opencode',
     summary: 'OpenCode host uninstalled',
   });
-
-  installProjectClaudeHost.mockResolvedValue({
-    success: true,
-    host: 'project-claude',
-    summary: 'Project Claude rules installed',
-  });
-  isProjectClaudeInstalled.mockResolvedValue({
-    ok: true,
-    host: 'project-claude',
-    checks: [{ label: 'CLAUDE.md', ok: true, detail: '/tmp/project/CLAUDE.md' }],
-  });
-  getProjectClaudeDoctorResult.mockResolvedValue({
-    ok: true,
-    host: 'project-claude',
-    checks: [{ label: 'CLAUDE.md', ok: true, detail: '/tmp/project/CLAUDE.md' }],
-  });
-  uninstallProjectClaudeHost.mockResolvedValue({
-    success: true,
-    host: 'project-claude',
-    summary: 'Project Claude rules uninstalled',
-  });
 });
 
 describe('host registry', () => {
@@ -151,7 +118,6 @@ describe('host registry', () => {
       'codex',
       'cursor',
       'opencode',
-      'project-claude',
     ]);
   });
 
@@ -168,12 +134,8 @@ describe('host registry', () => {
       expect(adapter.capabilities.length).toBeGreaterThan(0);
     }
 
-    expect(getHostAdapter('project-claude')?.capabilities).toEqual([
-      'project-install',
-      'rules',
-      'doctor',
-      'uninstall',
-    ]);
+    expect(getHostAdapter('claude-code')?.capabilities).toContain('global-install');
+    expect(getHostAdapter('claude-code')?.capabilities).not.toContain('project-install');
   });
 
   it('delegates to inject helpers and returns unified install/doctor shape', async () => {
@@ -204,16 +166,5 @@ describe('host registry', () => {
     expect(isCursorInstalled).toHaveBeenCalledWith(target);
     expect(installOpencodeHost).toHaveBeenCalledWith(target);
     expect(isOpencodeInstalled).toHaveBeenCalledWith(target);
-    expect(installProjectClaudeHost).toHaveBeenCalledWith(target);
-    expect(isProjectClaudeInstalled).toHaveBeenCalledWith(target);
-    expect(getProjectClaudeDoctorResult).not.toHaveBeenCalled();
-  });
-
-  it('keeps project-claude scoped to project install capability only', () => {
-    const projectClaude = getHostAdapter('project-claude');
-
-    expect(projectClaude).not.toBeNull();
-    expect(projectClaude!.capabilities.includes('project-install')).toBe(true);
-    expect(projectClaude!.capabilities.includes('global-install')).toBe(false);
   });
 });

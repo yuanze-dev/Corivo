@@ -17,7 +17,6 @@ import { startCommand } from './commands/start.js';
 import { stopCommand } from './commands/stop.js';
 import { doctorCommand } from './commands/doctor.js';
 import { recoverCommand } from './commands/recover.js';
-import { injectCommand } from './commands/inject.js';
 import { hostCommand } from './commands/host.js';
 import { identityCommand } from './commands/identity.js';
 import { setupPasswordCommand } from './commands/setup-password.js';
@@ -92,19 +91,6 @@ program.command('stop').description('Stop the daemon').action(stopCommand);
 program.command('doctor').description('Run health checks').action(doctorCommand);
 
 program.command('recover').description('Recover keys').action(recoverCommand);
-
-program
-  .command('inject')
-  .description('Inject Corivo rules into a project')
-  .option('-t, --target <path>', 'Target project path')
-  .option('-g, --global', 'Inject into the global CLAUDE.md')
-  .option('--claude-code', 'Install the Claude Code proactive-memory adapter')
-  .option('--codex', 'Inject using the Codex rules template')
-  .option('--cursor', 'Inject using the Cursor rules template')
-  .option('--opencode', 'Install the OpenCode proactive-memory plugin')
-  .option('--eject', 'Remove injected rules')
-  .option('--force', 'Force-replace existing rules')
-  .action((options) => injectCommand(options));
 
 program
   .command('identity')

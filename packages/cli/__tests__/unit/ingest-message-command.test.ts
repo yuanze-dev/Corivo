@@ -10,7 +10,7 @@ describe('ingest-message command', () => {
         content: 'hello',
         ingestedFrom: 'test',
       }))).toThrow(
-      'Invalid ingest-message payload: host must be one of claude-code, codex, cursor, opencode, project-claude.',
+      'Invalid ingest-message payload: host must be one of claude-code, codex, cursor, opencode.',
     );
   });
 

@@ -97,6 +97,60 @@ Broken memory.
     ).toThrow(/Invalid raw memory frontmatter/);
   });
 
+  it('rejects traversal paths in FILE comments', () => {
+    expect(() =>
+      parseRawMemoryDocument(`<!-- FILE: ../user-short-prs.md -->
+\`\`\`markdown
+---
+name: User prefers short PRs
+description: User usually wants small reviewable pull requests
+type: user
+scope: private
+source_session: session-004
+---
+
+Keep PRs narrowly scoped and easy to review.
+\`\`\`
+`),
+    ).toThrow(/Invalid raw memory file path/);
+  });
+
+  it('rejects FILE path scope mismatches with frontmatter scope', () => {
+    expect(() =>
+      parseRawMemoryDocument(`<!-- FILE: team/user-short-prs.md -->
+\`\`\`markdown
+---
+name: User prefers short PRs
+description: User usually wants small reviewable pull requests
+type: user
+scope: private
+source_session: session-005
+---
+
+Keep PRs narrowly scoped and easy to review.
+\`\`\`
+`),
+    ).toThrow(/Invalid raw memory file path/);
+  });
+
+  it('rejects malformed FILE path shapes outside scope-filename contract', () => {
+    expect(() =>
+      parseRawMemoryDocument(`<!-- FILE: private/preferences/user-short-prs.md -->
+\`\`\`markdown
+---
+name: User prefers short PRs
+description: User usually wants small reviewable pull requests
+type: user
+scope: private
+source_session: session-006
+---
+
+Keep PRs narrowly scoped and easy to review.
+\`\`\`
+`),
+    ).toThrow(/Invalid raw memory file path/);
+  });
+
   it('renders MEMORY.md entries as one-line semantic hooks', () => {
     const rawMemory = renderRawMemoryDocument({
       filePath: 'private/user-short-prs.md',

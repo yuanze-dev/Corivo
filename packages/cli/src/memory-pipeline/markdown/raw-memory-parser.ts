@@ -10,6 +10,7 @@ import { MEMORY_TYPES, type MemoryType } from '../prompts/memory-types.js';
 const NO_MEMORIES_MARKER = '<!-- NO_MEMORIES -->';
 const FILE_BLOCK_PATTERN =
   /<!--\s*FILE:\s*([^\s].*?)\s*-->\s*```markdown\s*([\s\S]*?)\s*```/g;
+const FILE_PATH_PATTERN = /^(private|team)\/([A-Za-z0-9._-]+)\.md$/;
 
 export function parseRawMemoryDocument(markdown: string): ParsedRawMemoryDocument {
   const trimmed = markdown.trim();
@@ -36,9 +37,13 @@ export function parseRawMemoryDocument(markdown: string): ParsedRawMemoryDocumen
 
     matchedAny = true;
     cursor = matchEnd;
+    const normalizedFilePath = filePath.trim();
+    const parsedDocument = parseMarkdownBlock(blockBody);
+    validateFilePath(normalizedFilePath, parsedDocument.frontmatter.scope);
+
     documents.push({
-      filePath: filePath.trim(),
-      ...parseMarkdownBlock(blockBody),
+      filePath: normalizedFilePath,
+      ...parsedDocument,
     });
   }
 
@@ -145,4 +150,26 @@ function parseForgetValue(value: string): boolean | string {
   }
 
   return value.trim();
+}
+
+function validateFilePath(filePath: string, scope: MemoryScope): void {
+  const match = FILE_PATH_PATTERN.exec(filePath);
+
+  if (!match) {
+    throw new Error(
+      'Invalid raw memory file path: expected "{scope}/{filename}.md" with no traversal or extra directories.',
+    );
+  }
+
+  const [, pathScope, filename] = match;
+
+  if (pathScope !== scope) {
+    throw new Error(
+      `Invalid raw memory file path: FILE path scope "${pathScope}" does not match frontmatter.scope "${scope}".`,
+    );
+  }
+
+  if (filename === '.' || filename === '..') {
+    throw new Error('Invalid raw memory file path: traversal segments are not allowed.');
+  }
 }

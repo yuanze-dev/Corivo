@@ -1,5 +1,5 @@
-import { MemoryProcessingJobQueue } from '@/raw-memory/job-queue';
-import { RawMemoryRepository } from '@/raw-memory/repository';
+import { MemoryProcessingJobQueue } from '@/infrastructure/storage/repositories/memory-processing-job-queue';
+import { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-memory-repository';
 import { type CorivoDatabase } from '@/storage/database';
 import {
   DatabaseRawSessionJobSource,

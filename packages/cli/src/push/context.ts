@@ -5,8 +5,8 @@
  */
 
 import type { CorivoDatabase } from '@/storage/database';
-import type { Block, Association } from '../models/index.js';
-import { AssociationType } from '../models/association.js';
+import type { Block, Association } from '@/domain/memory/models/index.js';
+import { AssociationType } from '@/domain/memory/models/association.js';
 
 /**
  * Push configuration

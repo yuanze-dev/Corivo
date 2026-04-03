@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Association } from '../../src/models/association.js';
-import type { Block } from '../../src/models/block.js';
+import type { Association } from '../../src/domain/memory/models/association.js';
+import type { Block } from '../../src/domain/memory/models/block.js';
 import { createQueryPack } from '../../src/runtime/query-pack.js';
 import { generateReview } from '../../src/runtime/review.js';
 

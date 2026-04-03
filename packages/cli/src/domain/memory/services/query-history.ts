@@ -4,8 +4,8 @@
  * Record the user's query for "You have also checked similar queries before" reminder
  */
 
-import type { Block } from '../models/index.js';
-import { generateBlockId } from '../models/block.js';
+import type { Block } from '@/domain/memory/models/index.js';
+import { generateBlockId } from '@/domain/memory/models/block.js';
 import {
   buildSimilarQueryReminder,
   isSimilarQuery,

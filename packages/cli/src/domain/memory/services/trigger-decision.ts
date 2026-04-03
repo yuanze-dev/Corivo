@@ -5,7 +5,7 @@
  */
 
 import type { CorivoDatabase } from '@/storage/database';
-import type { Block } from '../models/block.js';
+import type { Block } from '@/domain/memory/models/block.js';
 import {
   collectAttentionBlocks,
   DEFAULT_TRIGGER_OUTPUT_POLICY,
@@ -24,7 +24,7 @@ import {
   type TriggerPushRenderPolicy,
 } from '@/runtime/trigger-decision-render.js';
 import { isDecisionBlock } from '@/runtime/scoring.js';
-import { generateBlockId } from '../models/block.js';
+import { generateBlockId } from '@/domain/memory/models/block.js';
 
 /**
  * Trigger decision input

@@ -1,4 +1,4 @@
-import type { Block, BlockFilter } from '../../models/block.js';
+import type { Block, BlockFilter } from '@/domain/memory/models/block.js';
 import type { WorkItem } from '../types.js';
 
 type DatabaseBlockRow = Omit<Block, 'created_at' | 'updated_at'> & {

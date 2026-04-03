@@ -4,7 +4,7 @@
  * Extracting technology selection decisions from natural language
  */
 
-import type { Pattern } from '../../models/pattern.js';
+import type { Pattern } from '@/domain/memory/models/pattern.js';
 import type { Rule } from './index.js';
 
 /**

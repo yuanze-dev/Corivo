@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import { CorivoDatabase } from '@/storage/database';
 import { KeyManager } from '../../src/crypto/keys.js';
-import { MemoryProcessingJobQueue } from '../../src/raw-memory/job-queue.js';
-import { RawMemoryRepository } from '../../src/raw-memory/repository.js';
+import { MemoryProcessingJobQueue } from '../../src/infrastructure/storage/repositories/memory-processing-job-queue.js';
+import { RawMemoryRepository } from '../../src/infrastructure/storage/repositories/raw-memory-repository.js';
 import { DatabaseRawSessionJobSource } from '../../src/memory-pipeline/sources/raw-session-job-source.js';
 
 describe('DatabaseRawSessionJobSource', () => {

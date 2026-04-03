@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Block } from '../../src/models/block.js';
+import type { Block } from '../../src/domain/memory/models/block.js';
 import { runCarryOverCommand } from '../../src/cli/commands/carry-over.js';
 import { runPromptQueryCommand } from '../../src/application/bootstrap/query-execution.js';
 import { runReviewCommand } from '../../src/cli/commands/review.js';

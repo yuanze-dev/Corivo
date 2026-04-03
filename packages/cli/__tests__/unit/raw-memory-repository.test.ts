@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs/promises';
 import { CorivoDatabase } from '@/storage/database';
 import { KeyManager } from '../../src/crypto/keys.js';
-import { RawMemoryRepository } from '../../src/raw-memory/repository.js';
-import { HostImportCursorStore } from '../../src/raw-memory/import-cursors.js';
+import { RawMemoryRepository } from '../../src/infrastructure/storage/repositories/raw-memory-repository.js';
+import { HostImportCursorStore } from '../../src/infrastructure/storage/repositories/host-import-cursor-store.js';
 
 describe('RawMemoryRepository', () => {
   let db: CorivoDatabase;

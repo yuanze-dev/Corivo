@@ -1,5 +1,5 @@
-import { AssociationType, type Association } from '../models/association.js';
-import type { Block } from '../models/block.js';
+import { AssociationType, type Association } from '@/domain/memory/models/association.js';
+import type { Block } from '@/domain/memory/models/block.js';
 import type { QueryPack } from './query-pack.js';
 
 export interface RuntimeDatabase {

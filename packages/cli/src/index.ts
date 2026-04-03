@@ -8,7 +8,7 @@
  * Root library entrypoint boundary:
  * keep public runtime/library exports here; CLI command wiring stays in `src/cli/*`.
  */
-export * from './models';
+export * from '@/domain/memory/models';
 export * from './errors';
 export * from './crypto/keys';
 export * from '@/storage/database';

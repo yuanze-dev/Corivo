@@ -7,7 +7,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { getConfigDir } from '@/storage/database';
-import type { PushItem } from '@/engine/trigger-decision.js';
+import type { PushItem } from '@/domain/memory/services/trigger-decision.js';
 
 /**
  * Push queue storage

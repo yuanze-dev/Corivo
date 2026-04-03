@@ -3,8 +3,8 @@ import fs from 'node:fs/promises';
 import { createHostImportUseCase, persistImportedSessions } from '../../src/application/hosts/import-host.js';
 import { KeyManager } from '../../src/crypto/keys.js';
 import { CorivoDatabase } from '@/storage/database';
-import { RawMemoryRepository } from '../../src/raw-memory/repository.js';
-import { MemoryProcessingJobQueue } from '../../src/raw-memory/job-queue.js';
+import { RawMemoryRepository } from '../../src/infrastructure/storage/repositories/raw-memory-repository.js';
+import { MemoryProcessingJobQueue } from '../../src/infrastructure/storage/repositories/memory-processing-job-queue.js';
 import { createEnqueueSessionExtractionUseCase } from '../../src/application/memory-ingest/enqueue-session-extraction.js';
 
 describe('host import use case', () => {

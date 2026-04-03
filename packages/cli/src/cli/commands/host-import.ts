@@ -8,9 +8,9 @@ import {
 import { createEnqueueSessionExtractionUseCase } from '@/application/memory-ingest/enqueue-session-extraction';
 import type { HostId, HostImportResult } from '@/hosts';
 import type { HostImportRequest } from '@/application/hosts/import-host';
-import { HostImportCursorStore } from '@/raw-memory/import-cursors';
-import { MemoryProcessingJobQueue } from '@/raw-memory/job-queue';
-import { RawMemoryRepository } from '@/raw-memory/repository';
+import { HostImportCursorStore } from '@/infrastructure/storage/repositories/host-import-cursor-store';
+import { MemoryProcessingJobQueue } from '@/infrastructure/storage/repositories/memory-processing-job-queue';
+import { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-memory-repository';
 import { loadRuntimeDb } from '@/runtime/runtime-support.js';
 import {
   createCliLogger,

@@ -1,5 +1,5 @@
-import type { MemoryProcessingJobQueue } from '../../raw-memory/job-queue.js';
-import type { RawMemoryRepository } from '../../raw-memory/repository.js';
+import type { MemoryProcessingJobQueue } from '@/infrastructure/storage/repositories/memory-processing-job-queue.js';
+import type { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-memory-repository.js';
 import type {
   MemoryProcessingJobRecord,
   RawMessageRecord,

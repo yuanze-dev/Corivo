@@ -12,8 +12,8 @@ import {
   inferDecayRate,
   NATURE_TYPES,
   DOMAIN_TYPES,
-} from '../../src/models/block.js';
-import { Pattern, validatePattern, DECISION_TYPES } from '../../src/models/pattern.js';
+} from '../../src/domain/memory/models/block.js';
+import { Pattern, validatePattern, DECISION_TYPES } from '../../src/domain/memory/models/pattern.js';
 import { isCorivoError, wrapError, ERROR_CODES } from '../../src/errors/index.js';
 import { KeyManager } from '../../src/crypto/keys.js';
 

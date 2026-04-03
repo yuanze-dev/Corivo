@@ -5,8 +5,8 @@ import {
   createIngestRealtimeMessageUseCase,
   type IngestRealtimeMessageRequest,
 } from '../../application/memory-ingest/ingest-realtime-message.js';
-import { MemoryProcessingJobQueue } from '../../raw-memory/job-queue.js';
-import { RawMemoryRepository } from '../../raw-memory/repository.js';
+import { MemoryProcessingJobQueue } from '@/infrastructure/storage/repositories/memory-processing-job-queue.js';
+import { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-memory-repository.js';
 import { loadRuntimeDb } from '@/runtime/runtime-support.js';
 
 const VALID_HOSTS = new Set([

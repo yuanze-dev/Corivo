@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import type { Block } from '@/models/block';
+import type { Block } from '@/domain/memory/models/block';
 import { ConfigError } from '@/errors';
 import { ContextPusher } from '@/push/context.js';
 import { createQueryPack } from '@/application/query/query-pack.js';

@@ -27,6 +27,8 @@ import type {
 const STAGE_ID = 'merge-final-memories';
 const RAW_STAGE_ID = 'extract-raw-memories';
 const MERGE_TIMEOUT_MS = 180_000;
+const LEGACY_RAW_FILE_BLOCK_PATTERN =
+  /<!--\s*FILE:\s*([^\s].*?)\s*-->\s*```markdown\s*[\s\S]*?```/g;
 
 interface MemoryRootArtifactStore extends MemoryPipelineArtifactStore {
   writeMemoryFile(relativePath: string, body: string): Promise<string>;
@@ -113,7 +115,7 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
       (relativePath) => !relativePath.endsWith('/MEMORY.md')
     );
     const rawDocuments = rawBatches.flatMap(({ batch }) =>
-      batch.documents ?? materializeRawMemoryDocuments(batch.items)
+      materializeRawMemoryDocuments(batch.items)
     );
 
     if (existingFinalDetailPaths.length === 0 && rawFiles.length === 1) {
@@ -125,6 +127,9 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
       rawFiles,
       existingFinalFiles,
     });
+    context.logger?.debug?.(
+      `[memory:pipeline:merge-final-memories] prompt diagnostics rawFileCount=${rawFiles.length} existingFinalFileCount=${existingFinalFiles.length} promptLength=${prompt.length}`,
+    );
     const result = await this.processor.process([prompt], { timeoutMs: MERGE_TIMEOUT_MS });
     const failure = this.getProcessorFailure(result);
     if (failure) {
@@ -207,7 +212,7 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
       return {
         sessionId: parsed.sessionId,
         items: document.items,
-        documents: document.documents,
+        documents: document.documents ?? recoverLegacyRawDocuments(parsed.markdown, document.items),
       };
     }
 
@@ -303,9 +308,61 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
       result.outputs.length === 0 &&
       (result.metadata?.status === 'error' || result.metadata?.status === 'timeout')
     ) {
-      return result.metadata.error ?? `final merge ${result.metadata.status}`;
+      return formatProcessorFailure(result.metadata);
     }
 
     return null;
   }
+}
+
+function formatProcessorFailure(
+  metadata: NonNullable<Awaited<ReturnType<ModelProcessor['process']>>['metadata']>,
+): string {
+  const base = metadata.error ?? `final merge ${metadata.status}`;
+  const diagnostics: string[] = [];
+
+  if (metadata.provider) {
+    diagnostics.push(`provider=${metadata.provider}`);
+  }
+
+  if (metadata.diagnostics?.timeoutMs !== undefined) {
+    diagnostics.push(`timeoutMs=${metadata.diagnostics.timeoutMs}`);
+  }
+
+  if (metadata.diagnostics?.exitCode !== undefined) {
+    diagnostics.push(`exitCode=${metadata.diagnostics.exitCode}`);
+  }
+
+  if (metadata.diagnostics?.stderr) {
+    diagnostics.push(`stderr=${singleLine(metadata.diagnostics.stderr)}`);
+  }
+
+  if (metadata.diagnostics?.stdout) {
+    diagnostics.push(`stdout=${singleLine(metadata.diagnostics.stdout)}`);
+  }
+
+  return diagnostics.length > 0 ? `${base} (${diagnostics.join(', ')})` : base;
+}
+
+function singleLine(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function recoverLegacyRawDocuments(
+  markdown: string,
+  items: RawMemoryBatchArtifact['items'],
+): RawMemoryDocument[] | undefined {
+  const filePaths = Array.from(markdown.matchAll(LEGACY_RAW_FILE_BLOCK_PATTERN)).map((match) =>
+    match[1]?.trim(),
+  ).filter((filePath): filePath is string => Boolean(filePath));
+
+  if (filePaths.length !== items.length || filePaths.length === 0) {
+    return undefined;
+  }
+
+  return items.map((item, index) => ({
+    filePath: filePaths[index],
+    frontmatter: item.frontmatter,
+    body: item.body,
+  }));
 }

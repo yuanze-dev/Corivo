@@ -5,7 +5,7 @@
  * Rule-based association discovery with zero LLM dependency.
  */
 
-import type { Block } from '../models/index.js';
+import type { Block } from '@/domain/memory/models/index.js';
 import {
   AssociationType,
   AssociationDirection,
@@ -13,7 +13,7 @@ import {
   type CreateAssociationInput,
   generateAssociationId,
   isBiDirectionalType,
-} from '../models/association.js';
+} from '@/domain/memory/models/association.js';
 
 /**
  * Association engine configuration

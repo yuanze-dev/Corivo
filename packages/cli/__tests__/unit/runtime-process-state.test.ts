@@ -74,16 +74,16 @@ describe('process runtime state', () => {
   it('keeps engine modules orchestration-oriented by delegating SQL and parsing rules to runtime', () => {
     const orchestratorFiles = [
       {
-        path: 'src/engine/query-history.ts',
-        expectedImport: /from ['"]@\/domain\/memory\/services\//,
+        path: 'src/domain/memory/services/query-history.ts',
+        expectedImport: /from ['"]@\/runtime\//,
       },
       {
-        path: 'src/engine/trigger-decision.ts',
-        expectedImport: /from ['"]@\/domain\/memory\/services\//,
+        path: 'src/domain/memory/services/trigger-decision.ts',
+        expectedImport: /from ['"]@\/runtime\//,
       },
       {
-        path: 'src/engine/follow-up.ts',
-        expectedImport: /from ['"]@\/domain\/memory\/services\//,
+        path: 'src/domain/memory/services/follow-up.ts',
+        expectedImport: /from ['"]@\/runtime\//,
       },
     ];
 
@@ -98,15 +98,15 @@ describe('process runtime state', () => {
 
   it('keeps trigger/follow-up/query-history business policy out of engine orchestration', () => {
     const triggerEngineContent = fs.readFileSync(
-      path.resolve(process.cwd(), 'src/engine/trigger-decision.ts'),
+      path.resolve(process.cwd(), 'src/domain/memory/services/trigger-decision.ts'),
       'utf8',
     );
     const followUpEngineContent = fs.readFileSync(
-      path.resolve(process.cwd(), 'src/engine/follow-up.ts'),
+      path.resolve(process.cwd(), 'src/domain/memory/services/follow-up.ts'),
       'utf8',
     );
     const queryHistoryEngineContent = fs.readFileSync(
-      path.resolve(process.cwd(), 'src/engine/query-history.ts'),
+      path.resolve(process.cwd(), 'src/domain/memory/services/query-history.ts'),
       'utf8',
     );
 

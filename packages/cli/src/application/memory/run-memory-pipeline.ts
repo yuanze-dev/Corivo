@@ -17,8 +17,8 @@ import {
 import type { Logger } from '@/utils/logging';
 import type { ExtractionProvider } from '@/infrastructure/llm/types';
 import { createLogger } from '@/utils/logging';
-import { MemoryProcessingJobQueue } from '@/raw-memory/job-queue';
-import { RawMemoryRepository } from '@/raw-memory/repository';
+import { MemoryProcessingJobQueue } from '@/infrastructure/storage/repositories/memory-processing-job-queue';
+import { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-memory-repository';
 import { readMemoryPipelineConfig } from './config.js';
 import { createMemoryPipelineArtifactStore, getMemoryPipelineRunRoot } from './runtime.js';
 import { createDatabaseRawSessionJobSource, createDatabaseSessionSource } from './sources.js';

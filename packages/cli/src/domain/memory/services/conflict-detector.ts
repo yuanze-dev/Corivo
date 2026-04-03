@@ -5,7 +5,7 @@
  * Remind like a friend: "But what you said before is..."
  */
 
-import type { Block } from '../models/index.js';
+import type { Block } from '@/domain/memory/models/index.js';
 
 /**
  * type of contradiction

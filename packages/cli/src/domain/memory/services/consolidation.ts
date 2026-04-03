@@ -5,8 +5,8 @@
  * Simulate the process of the human brain sorting out memories during sleep
  */
 
-import type { Block } from '../models/index.js';
-import { AssociationType, AssociationDirection } from '../models/association.js';
+import type { Block } from '@/domain/memory/models/index.js';
+import { AssociationType, AssociationDirection } from '@/domain/memory/models/association.js';
 
 /**
  * Integrate results

@@ -1,7 +1,7 @@
-import type { Block } from '../models/block.js';
+import type { Block } from '@/domain/memory/models/block.js';
 import type { RuntimeDatabase } from './retrieval.js';
 import { isDecisionBlock } from './scoring.js';
-import { AssociationType } from '../models/association.js';
+import { AssociationType } from '@/domain/memory/models/association.js';
 
 export interface TriggerPolicy {
   decisionReminderDays: number;

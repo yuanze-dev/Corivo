@@ -8,7 +8,7 @@
  */
 
 import type { CorivoDatabase } from '@/storage/database';
-import type { Block } from '../models/block.js';
+import type { Block } from '@/domain/memory/models/block.js';
 
 /**
  * Suggestion context

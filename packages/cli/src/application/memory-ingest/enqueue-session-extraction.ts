@@ -1,5 +1,5 @@
 import type { HostId } from '@/domain/host/contracts/types.js';
-import { MemoryProcessingJobQueue } from '../../raw-memory/job-queue.js';
+import { MemoryProcessingJobQueue } from '@/infrastructure/storage/repositories/memory-processing-job-queue.js';
 import type { MemoryProcessingJobRecord } from '../../raw-memory/types.js';
 
 export interface EnqueueSessionExtractionRequest {

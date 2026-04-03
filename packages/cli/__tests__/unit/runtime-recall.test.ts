@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { AssociationDirection, AssociationType, type Association } from '../../src/models/association.js';
-import type { Block } from '../../src/models/block.js';
+import { AssociationDirection, AssociationType, type Association } from '../../src/domain/memory/models/association.js';
+import type { Block } from '../../src/domain/memory/models/block.js';
 import { createQueryPack } from '../../src/runtime/query-pack.js';
 import { generateCarryOver } from '../../src/runtime/carry-over.js';
 import { generateRecall } from '../../src/runtime/recall.js';

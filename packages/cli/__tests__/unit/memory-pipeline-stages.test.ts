@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import type { Block, BlockFilter } from '../../src/models/block.js';
+import type { Block, BlockFilter } from '../../src/domain/memory/models/block.js';
 import type {
   ArtifactDescriptor,
   ArtifactWriteInput,
@@ -2571,7 +2571,7 @@ Keep PRs narrowly scoped and easy to review.
       inputCount: 1,
       outputCount: 0,
       artifactIds: [],
-      error,
+      error: expect.stringContaining(error),
     });
     await expect(
       readFile(path.join(tempRoot, 'memory', 'raw', 'session-001.memories.md'), 'utf8'),
@@ -2579,6 +2579,110 @@ Keep PRs narrowly scoped and easy to review.
     await expect(
       readFile(path.join(tempRoot, 'memory', 'final', 'private', 'user-short-prs.md'), 'utf8'),
     ).rejects.toThrow();
+  });
+
+  it('includes provider diagnostics in merge failure output', async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'corivo-merge-fail-diag-'));
+    const runRoot = path.join(tempRoot, 'memory-pipeline');
+    await mkdir(runRoot, { recursive: true });
+    const store = new ArtifactStore(runRoot);
+
+    await store.writeArtifact({
+      runId: 'run-merge-fail-diag',
+      kind: 'raw-memory-batch',
+      source: 'extract-raw-memories',
+      body: JSON.stringify({
+        sessionId: 'session-001',
+        items: buildRawMemoryItems({
+          name: 'User prefers short PRs',
+          description: 'User usually wants small reviewable pull requests',
+          type: 'user',
+          scope: 'private',
+          sourceSession: 'session-001',
+          body: 'Keep PRs narrowly scoped and easy to review.',
+        }),
+      }),
+    });
+
+    const stage = new MergeFinalMemoriesStage({
+      processor: {
+        process: vi.fn(async () => ({
+          outputs: [],
+          metadata: {
+            provider: 'codex',
+            status: 'timeout',
+            error: 'codex extraction timed out',
+            diagnostics: {
+              timeoutMs: 180000,
+              exitCode: null,
+              stderr: 'model stalled after planning',
+              stdout: '[codex] started merge',
+            },
+          },
+        })),
+      },
+    });
+
+    const result = await stage.run(createContext(store, 'run-merge-fail-diag'));
+
+    expect(result).toMatchObject({
+      stageId: 'merge-final-memories',
+      status: 'failed',
+      error: expect.stringContaining('codex extraction timed out'),
+    });
+    expect(result.error).toContain('provider=codex');
+    expect(result.error).toContain('timeoutMs=180000');
+    expect(result.error).toContain('stderr=model stalled after planning');
+    expect(result.error).toContain('stdout=[codex] started merge');
+  });
+
+  it('logs merge prompt diagnostics before invoking the merge processor', async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'corivo-merge-log-diag-'));
+    const runRoot = path.join(tempRoot, 'memory-pipeline');
+    await mkdir(runRoot, { recursive: true });
+    const store = new ArtifactStore(runRoot);
+
+    await store.writeArtifact({
+      runId: 'run-merge-log-diag',
+      kind: 'raw-memory-batch',
+      source: 'extract-raw-memories',
+      body: JSON.stringify({
+        sessionId: 'session-001',
+        items: buildRawMemoryItems({
+          name: 'User prefers short PRs',
+          description: 'User usually wants small reviewable pull requests',
+          type: 'user',
+          scope: 'private',
+          sourceSession: 'session-001',
+          body: 'Keep PRs narrowly scoped and easy to review.',
+        }),
+      }),
+    });
+
+    const debug = vi.fn();
+    const stage = new MergeFinalMemoriesStage({
+      processor: {
+        process: vi.fn(async () => ({
+          outputs: ['I merged the memory set.'],
+          metadata: { provider: 'codex', status: 'success' },
+        })),
+      },
+    });
+
+    await stage.run({
+      ...createContext(store, 'run-merge-log-diag'),
+      logger: {
+        log: vi.fn(),
+        error: vi.fn(),
+        debug,
+      },
+    });
+
+    expect(debug).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^\[memory:pipeline:merge-final-memories] prompt diagnostics rawFileCount=1 existingFinalFileCount=\d+ promptLength=\d+$/,
+      ),
+    );
   });
 
   it('falls back to deterministic final files when merge output is malformed and there are no existing final detail files', async () => {

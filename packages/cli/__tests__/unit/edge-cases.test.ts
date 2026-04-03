@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { CorivoDatabase } from '@/storage/database';
 import { KeyManager } from '../../src/crypto/keys.js';
-import { validateAnnotation } from '../../src/models/block.js';
+import { validateAnnotation } from '../../src/domain/memory/models/block.js';
 
 describe('Edge Cases', () => {
   let db: CorivoDatabase;

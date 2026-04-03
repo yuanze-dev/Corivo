@@ -5,7 +5,7 @@ import type {
   HostImportOptions,
   HostImportResult,
 } from '@/domain/host/contracts/types.js';
-import type { RawMemoryRepository } from '../../raw-memory/repository.js';
+import type { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-memory-repository.js';
 import type { RawMessageRole } from '../../raw-memory/types.js';
 import type { EnqueueSessionExtractionRequest } from '../memory-ingest/enqueue-session-extraction.js';
 import type { Logger } from '../../utils/logging.js';

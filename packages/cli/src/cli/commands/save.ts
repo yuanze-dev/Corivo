@@ -9,7 +9,7 @@ import path from 'node:path';
 import chalk from 'chalk';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 import { ConfigError, ValidationError } from '../../errors/index.js';
-import { validateAnnotation } from '../../models/index.js';
+import { validateAnnotation } from '@/domain/memory/models/index.js';
 import { detectConflictReminder } from '../../runtime/conflict-detection.js';
 import { getCliOutput } from '@/cli/runtime';
 

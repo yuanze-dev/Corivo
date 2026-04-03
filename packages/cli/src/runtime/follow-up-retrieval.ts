@@ -1,4 +1,4 @@
-import type { Block } from '../models/block.js';
+import type { Block } from '@/domain/memory/models/block.js';
 import type { RuntimeDatabase } from './retrieval.js';
 
 export interface FollowUpReminderItem {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { CorivoDatabase } from '@/storage/database';
-import type { Block } from '../../models/index.js';
+import type { Block } from '@/domain/memory/models/index.js';
 
 export interface DbStats {
   total: number;

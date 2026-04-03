@@ -4,7 +4,7 @@
  * Extract structured decision patterns from natural language content
  */
 
-import type { Pattern } from '../../models/pattern.js';
+import type { Pattern } from '@/domain/memory/models/pattern.js';
 
 /**
  * Rule interface

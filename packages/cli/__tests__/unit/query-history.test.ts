@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { QueryHistoryTracker } from '../../src/engine/query-history.js';
+import { QueryHistoryTracker } from '../../src/domain/memory/services/query-history.js';
 import type { QueryHistoryStore } from '../../src/runtime/query-history-store.js';
 import type { Logger } from '../../src/utils/logging.js';
 

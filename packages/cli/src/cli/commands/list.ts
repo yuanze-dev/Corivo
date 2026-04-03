@@ -10,7 +10,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 import { ConfigError } from '../../errors/index.js';
-import type { BlockFilter, BlockStatus } from '../../models/block.js';
+import type { BlockFilter, BlockStatus } from '@/domain/memory/models/block.js';
 import { getCliOutput } from '@/cli/runtime';
 
 const VALID_STATUSES: BlockStatus[] = ['active', 'cooling', 'cold', 'archived'];

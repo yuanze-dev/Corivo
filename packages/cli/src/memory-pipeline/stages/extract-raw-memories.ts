@@ -73,9 +73,7 @@ export const createExtractRawMemoriesStage = (
             upstreamIds: [artifact.id],
             body: JSON.stringify({
               sessionId: session.sessionId,
-              ...(items.length === 0
-                ? { markdown: '<!-- NO_MEMORIES -->' }
-                : { items }),
+              items,
             }),
           });
           recordExtractedRawMemory(context.state, {

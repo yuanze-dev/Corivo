@@ -5,7 +5,7 @@
  */
 
 import type { CorivoDatabase } from '@/storage/database';
-import type { Block } from '../models/index.js';
+import type { Block } from '@/domain/memory/models/index.js';
 import {
   collectFollowUpReminderItems,
   DEFAULT_FOLLOW_UP_RETRIEVAL_POLICY,

@@ -1,4 +1,4 @@
-import type { Block } from '../models/block.js';
+import type { Block } from '@/domain/memory/models/block.js';
 import type { QueryPack } from './query-pack.js';
 
 const CHANGE_PATTERNS = /(replace|switch|migrate|move|change|drop|swap|改|换|迁移|替换)/i;

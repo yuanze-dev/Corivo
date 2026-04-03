@@ -4,31 +4,32 @@ import type {
   PipelineStageResult,
 } from '../types.js';
 
-const STAGE_ID = 'consolidate-session-summaries';
+export const CONSOLIDATE_SESSION_SUMMARIES_STAGE_ID = 'consolidate-session-summaries';
 
-export class ConsolidateSessionSummariesStage implements MemoryPipelineStage {
-  readonly id = STAGE_ID;
+export const createConsolidateSessionSummariesStage = (): MemoryPipelineStage => {
+  return {
+    id: CONSOLIDATE_SESSION_SUMMARIES_STAGE_ID,
+    async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {
+      const payload = {
+        runId: context.runId,
+        stage: CONSOLIDATE_SESSION_SUMMARIES_STAGE_ID,
+        consolidated: [],
+      };
 
-  async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {
-    const payload = {
-      runId: context.runId,
-      stage: this.id,
-      consolidated: [],
-    };
+      const descriptor = await context.artifactStore.writeArtifact({
+        runId: context.runId,
+        kind: 'summary',
+        source: CONSOLIDATE_SESSION_SUMMARIES_STAGE_ID,
+        body: JSON.stringify(payload),
+      });
 
-    const descriptor = await context.artifactStore.writeArtifact({
-      runId: context.runId,
-      kind: 'summary',
-      source: this.id,
-      body: JSON.stringify(payload),
-    });
-
-    return {
-      stageId: STAGE_ID,
-      status: 'success',
-      inputCount: 0,
-      outputCount: 1,
-      artifactIds: [descriptor.id],
-    };
-  }
-}
+      return {
+        stageId: CONSOLIDATE_SESSION_SUMMARIES_STAGE_ID,
+        status: 'success',
+        inputCount: 0,
+        outputCount: 1,
+        artifactIds: [descriptor.id],
+      };
+    },
+  };
+};

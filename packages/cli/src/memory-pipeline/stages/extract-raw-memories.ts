@@ -10,7 +10,7 @@ import type {
   WorkItem,
 } from '../types.js';
 
-const STAGE_ID = 'extract-raw-memories';
+export const EXTRACT_RAW_MEMORIES_STAGE_ID = 'extract-raw-memories';
 const COLLECT_STAGE_ID = 'collect-claude-sessions';
 const NO_MEMORIES_MARKER = '<!-- NO_MEMORIES -->';
 const INVALID_SESSION_PAYLOAD_ERROR =
@@ -27,136 +27,139 @@ export interface ExtractRawMemoriesStageOptions {
   processor: ModelProcessor;
 }
 
-export class ExtractRawMemoriesStage implements MemoryPipelineStage {
-  readonly id = STAGE_ID;
-  private readonly processor: ModelProcessor;
-
-  constructor(options: ExtractRawMemoriesStageOptions) {
-    if (!options?.processor || typeof options.processor.process !== 'function') {
-      throw new Error('ExtractRawMemoriesStage requires a ModelProcessor capability');
-    }
-    this.processor = options.processor;
+export const createExtractRawMemoriesStage = (
+  options: ExtractRawMemoriesStageOptions,
+): MemoryPipelineStage => {
+  if (!options?.processor || typeof options.processor.process !== 'function') {
+    throw new Error('ExtractRawMemoriesStage requires a ModelProcessor capability');
   }
 
-  async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {
-    const collectedArtifacts = await context.artifactStore.listArtifacts({
-      runId: context.runId,
-      kind: 'work-item',
-      source: COLLECT_STAGE_ID,
-    });
+  const processor = options.processor;
 
-    const artifactIds: string[] = [];
-    let inputCount = 0;
-    const failures: string[] = [];
+  return {
+    id: EXTRACT_RAW_MEMORIES_STAGE_ID,
+    async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {
+      const collectedArtifacts = await context.artifactStore.listArtifacts({
+        runId: context.runId,
+        kind: 'work-item',
+        source: COLLECT_STAGE_ID,
+      });
 
-    for (const artifact of collectedArtifacts) {
-      const workItems = await this.readSessionWorkItems(context, artifact);
-      for (const workItem of workItems) {
-        inputCount += 1;
-        const session = this.getValidatedSession(workItem);
-        const prompt = buildRawExtractionPrompt({
-          sessionFilename: `${session.sessionId}.md`,
-          sessionTranscript: this.renderSessionTranscript(session),
-        });
-        const result = await this.processor.process([prompt]);
-        const failure = this.getProcessorFailure(result);
-        if (failure) {
-          failures.push(failure);
-          continue;
-        }
-        const markdown = this.resolveMarkdown(result.outputs);
-        const descriptor = await context.artifactStore.writeArtifact({
-          runId: context.runId,
-          kind: 'raw-memory-batch',
-          source: this.id,
-          upstreamIds: [artifact.id],
-          body: JSON.stringify({
+      const artifactIds: string[] = [];
+      let inputCount = 0;
+      const failures: string[] = [];
+
+      for (const artifact of collectedArtifacts) {
+        const workItems = await readSessionWorkItems(context, artifact);
+        for (const workItem of workItems) {
+          inputCount += 1;
+          const session = getValidatedSession(workItem);
+          const prompt = buildRawExtractionPrompt({
+            sessionFilename: `${session.sessionId}.md`,
+            sessionTranscript: renderSessionTranscript(session),
+          });
+          const result = await processor.process([prompt]);
+          const failure = getProcessorFailure(result);
+          if (failure) {
+            failures.push(failure);
+            continue;
+          }
+          const markdown = resolveMarkdown(result.outputs);
+          const descriptor = await context.artifactStore.writeArtifact({
+            runId: context.runId,
+            kind: 'raw-memory-batch',
+            source: EXTRACT_RAW_MEMORIES_STAGE_ID,
+            upstreamIds: [artifact.id],
+            body: JSON.stringify({
+              sessionId: session.sessionId,
+              markdown,
+            }),
+          });
+          recordExtractedRawMemory(context.state, {
             sessionId: session.sessionId,
-            markdown,
-          }),
-        });
-        recordExtractedRawMemory(context.state, {
-          sessionId: session.sessionId,
-          artifactId: descriptor.id,
-        });
-        artifactIds.push(descriptor.id);
+            artifactId: descriptor.id,
+          });
+          artifactIds.push(descriptor.id);
+        }
       }
-    }
 
-    const status =
-      failures.length === 0 ? 'success' : artifactIds.length === 0 ? 'failed' : 'partial';
+      const status =
+        failures.length === 0 ? 'success' : artifactIds.length === 0 ? 'failed' : 'partial';
 
-    return {
-      stageId: this.id,
-      status,
-      inputCount,
-      outputCount: artifactIds.length,
-      artifactIds,
-      ...(failures.length > 0 ? { error: failures.join('; ') } : {}),
-    };
+      return {
+        stageId: EXTRACT_RAW_MEMORIES_STAGE_ID,
+        status,
+        inputCount,
+        outputCount: artifactIds.length,
+        artifactIds,
+        ...(failures.length > 0 ? { error: failures.join('; ') } : {}),
+      };
+    },
+  };
+};
+
+const readSessionWorkItems = async (
+  context: MemoryPipelineContext,
+  artifact: ArtifactDescriptor,
+): Promise<SessionWorkItem[]> => {
+  const body = await context.artifactStore.readArtifact(artifact.id);
+  const parsed = JSON.parse(body) as WorkItem[];
+  return parsed.filter((item): item is SessionWorkItem => item.kind === 'session');
+};
+
+const renderSessionTranscript = (session: SessionRecord): string => {
+  return session.messages
+    .map((message) => `${normalizeRole(message.role)}: ${message.content}`)
+    .join('\n\n');
+};
+
+const normalizeRole = (role: string): string => {
+  if (!role) {
+    return 'Unknown';
   }
 
-  private async readSessionWorkItems(
-    context: MemoryPipelineContext,
-    artifact: ArtifactDescriptor,
-  ): Promise<SessionWorkItem[]> {
-    const body = await context.artifactStore.readArtifact(artifact.id);
-    const parsed = JSON.parse(body) as WorkItem[];
-    return parsed.filter((item): item is SessionWorkItem => item.kind === 'session');
+  return role.charAt(0).toUpperCase() + role.slice(1);
+};
+
+const resolveMarkdown = (outputs: string[]): string => {
+  const firstOutput = outputs.find((output) => output.trim().length > 0);
+  return firstOutput ?? NO_MEMORIES_MARKER;
+};
+
+const getValidatedSession = (workItem: SessionWorkItem): SessionRecord => {
+  const session = workItem.metadata?.session;
+  if (!session || typeof session.sessionId !== 'string' || session.sessionId.trim().length === 0) {
+    throw new Error(INVALID_SESSION_PAYLOAD_ERROR);
   }
 
-  private renderSessionTranscript(session: SessionRecord): string {
-    return session.messages
-      .map((message) => `${this.normalizeRole(message.role)}: ${message.content}`)
-      .join('\n\n');
+  if (!Array.isArray(session.messages) || session.messages.length === 0) {
+    throw new Error(INVALID_SESSION_PAYLOAD_ERROR);
   }
 
-  private normalizeRole(role: string): string {
-    if (!role) {
-      return 'Unknown';
-    }
+  const hasUsableMessage = session.messages.some(
+    (message) =>
+      typeof message?.role === 'string' &&
+      message.role.trim().length > 0 &&
+      typeof message?.content === 'string' &&
+      message.content.trim().length > 0,
+  );
 
-    return role.charAt(0).toUpperCase() + role.slice(1);
+  if (!hasUsableMessage) {
+    throw new Error(INVALID_SESSION_PAYLOAD_ERROR);
   }
 
-  private resolveMarkdown(outputs: string[]): string {
-    const firstOutput = outputs.find((output) => output.trim().length > 0);
-    return firstOutput ?? NO_MEMORIES_MARKER;
+  return session;
+};
+
+const getProcessorFailure = (
+  result: Awaited<ReturnType<ModelProcessor['process']>>,
+): string | null => {
+  if (
+    result.outputs.length === 0 &&
+    (result.metadata?.status === 'error' || result.metadata?.status === 'timeout')
+  ) {
+    return result.metadata.error ?? `raw extraction ${result.metadata.status}`;
   }
 
-  private getValidatedSession(workItem: SessionWorkItem): SessionRecord {
-    const session = workItem.metadata?.session;
-    if (!session || typeof session.sessionId !== 'string' || session.sessionId.trim().length === 0) {
-      throw new Error(INVALID_SESSION_PAYLOAD_ERROR);
-    }
-
-    if (!Array.isArray(session.messages) || session.messages.length === 0) {
-      throw new Error(INVALID_SESSION_PAYLOAD_ERROR);
-    }
-
-    const hasUsableMessage = session.messages.some(
-      (message) =>
-        typeof message?.role === 'string' &&
-        message.role.trim().length > 0 &&
-        typeof message?.content === 'string' &&
-        message.content.trim().length > 0,
-    );
-
-    if (!hasUsableMessage) {
-      throw new Error(INVALID_SESSION_PAYLOAD_ERROR);
-    }
-
-    return session;
-  }
-
-  private getProcessorFailure(result: Awaited<ReturnType<ModelProcessor['process']>>): string | null {
-    if (
-      result.outputs.length === 0 &&
-      (result.metadata?.status === 'error' || result.metadata?.status === 'timeout')
-    ) {
-      return result.metadata.error ?? `raw extraction ${result.metadata.status}`;
-    }
-
-    return null;
-  }
-}
+  return null;
+};

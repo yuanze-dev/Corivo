@@ -1,10 +1,10 @@
-import { AppendDetailRecordsStage } from '../stages/append-detail-records.js';
-import { CollectClaudeSessionsStage } from '../stages/collect-claude-sessions.js';
-import { ConsolidateSessionSummariesStage } from '../stages/consolidate-session-summaries.js';
-import { ExtractRawMemoriesStage } from '../stages/extract-raw-memories.js';
+import { createAppendDetailRecordsStage } from '../stages/append-detail-records.js';
+import { createCollectClaudeSessionsStage } from '../stages/collect-claude-sessions.js';
+import { createConsolidateSessionSummariesStage } from '../stages/consolidate-session-summaries.js';
+import { createExtractRawMemoriesStage } from '../stages/extract-raw-memories.js';
 import { MergeFinalMemoriesStage } from '../stages/merge-final-memories.js';
-import { RebuildMemoryIndexStage } from '../stages/rebuild-memory-index.js';
-import { SummarizeSessionBatchStage } from '../stages/summarize-session-batch.js';
+import { createRebuildMemoryIndexStage } from '../stages/rebuild-memory-index.js';
+import { createSummarizeSessionBatchStage } from '../stages/summarize-session-batch.js';
 import { ExtractionBackedModelProcessor, type ModelProcessor } from '../processors/model-processor.js';
 import type { ClaudeSessionSource } from '../sources/claude-session-source.js';
 import type { MemoryPipelineDefinition } from '../types.js';
@@ -32,13 +32,13 @@ export const createInitMemoryPipeline = ({
   return {
     id: 'init-memory-pipeline',
     stages: [
-      new CollectClaudeSessionsStage({ source: sessionSource }),
-      new ExtractRawMemoriesStage({ processor: rawExtractionProcessor }),
+      createCollectClaudeSessionsStage({ source: sessionSource }),
+      createExtractRawMemoriesStage({ processor: rawExtractionProcessor }),
       new MergeFinalMemoriesStage({ processor: finalMergeProcessor }),
-      new SummarizeSessionBatchStage({ processor: sessionSummaryProcessor }),
-      new ConsolidateSessionSummariesStage(),
-      new AppendDetailRecordsStage(),
-      new RebuildMemoryIndexStage(),
+      createSummarizeSessionBatchStage({ processor: sessionSummaryProcessor }),
+      createConsolidateSessionSummariesStage(),
+      createAppendDetailRecordsStage(),
+      createRebuildMemoryIndexStage(),
     ],
   };
 };

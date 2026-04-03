@@ -10,26 +10,26 @@ import type {
   MemoryPipelineContext,
 } from '../../src/memory-pipeline/types.js';
 import {
-  AppendDetailRecordsStage,
   ArtifactStore,
   BlockWorkItem,
   ClaudeSessionSource,
   CompleteRawSessionJobsStage,
-  CollectClaudeSessionsStage,
-  CollectRawSessionJobsStage,
-  CollectStaleBlocksStage,
-  ConsolidateSessionSummariesStage,
   DatabaseRawSessionJobSource,
   DatabaseStaleBlockSource,
-  ExtractRawMemoriesStage,
   ExtractionBackedModelProcessor,
   ModelProcessor,
   NoopModelProcessor,
-  RebuildMemoryIndexStage,
-  RefreshMemoryIndexStage,
   StubClaudeSessionSource,
-  SummarizeBlockBatchStage,
-  SummarizeSessionBatchStage,
+  createAppendDetailRecordsStage,
+  createCollectClaudeSessionsStage,
+  createCollectRawSessionJobsStage,
+  createCollectStaleBlocksStage,
+  createConsolidateSessionSummariesStage,
+  createExtractRawMemoriesStage,
+  createRebuildMemoryIndexStage,
+  createRefreshMemoryIndexStage,
+  createSummarizeBlockBatchStage,
+  createSummarizeSessionBatchStage,
   createInitMemoryPipeline,
   createScheduledMemoryPipeline,
 } from '../../src/memory-pipeline/index.js';
@@ -350,10 +350,10 @@ describe('memory pipeline extension points', () => {
     expect(() => createScheduledMemoryPipeline({} as unknown as { rawSessionJobSource: RawSessionJobSource })).toThrow(
       'RawSessionJobSource is required to build scheduled memory pipeline',
     );
-    expect(() => new CollectRawSessionJobsStage(undefined as unknown as RawSessionJobSource)).toThrow(
+    expect(() => createCollectRawSessionJobsStage(undefined as unknown as RawSessionJobSource)).toThrow(
       'RawSessionJobSource is required',
     );
-    expect(() => new CollectStaleBlocksStage(undefined as unknown as StaleBlockSource)).toThrow(
+    expect(() => createCollectStaleBlocksStage(undefined as unknown as StaleBlockSource)).toThrow(
       'StaleBlockSource is required',
     );
   });
@@ -385,7 +385,7 @@ describe('memory pipeline extension points', () => {
       mode: 'full',
     });
     const store = new RecordingArtifactStore();
-    const stage = new CollectClaudeSessionsStage(sessionSource);
+    const stage = createCollectClaudeSessionsStage(sessionSource);
     const context = createContext(store, 'run-collect');
 
     const result = await stage.run(context);
@@ -458,7 +458,7 @@ describe('memory pipeline extension points', () => {
       ]),
     };
     const store = new RecordingArtifactStore();
-    const stage = new CollectClaudeSessionsStage(sessionSource);
+    const stage = createCollectClaudeSessionsStage(sessionSource);
     const context = createContext(store, 'run-reject');
 
     await expect(stage.run(context)).rejects.toThrow(
@@ -471,7 +471,7 @@ describe('memory pipeline extension points', () => {
     expect(() => createInitMemoryPipeline({} as unknown as { sessionSource: ClaudeSessionSource })).toThrow(
       'ClaudeSessionSource is required to build init memory pipeline',
     );
-    expect(() => new CollectClaudeSessionsStage(undefined as unknown as ClaudeSessionSource)).toThrow(
+    expect(() => createCollectClaudeSessionsStage(undefined as unknown as ClaudeSessionSource)).toThrow(
       'ClaudeSessionSource is required',
     );
   });
@@ -495,7 +495,7 @@ Prefer small, reviewable pull requests by default.
       'final/private/MEMORY.md',
       '- [User prefers short PRs](user-short-prs.md) — Small, reviewable PRs are the default expectation.\n',
     );
-    const stage = new AppendDetailRecordsStage();
+    const stage = createAppendDetailRecordsStage();
     const context = createContext(store, 'run-detail');
 
     const result = await stage.run(context);
@@ -531,7 +531,7 @@ Prefer small, reviewable pull requests by default.
       'final/team/MEMORY.md',
       '- [Release check cadence](release-checks.md) — Post-release verification is a standing team habit.\n',
     );
-    const stage = new RefreshMemoryIndexStage();
+    const stage = createRefreshMemoryIndexStage();
     const context = createContext(store, 'run-refresh-index');
     context.state.mergedFinalOutputs.files = [
       'memory/final/private/MEMORY.md',
@@ -571,7 +571,7 @@ Prefer small, reviewable pull requests by default.
       'final/private/MEMORY.md',
       '- [User prefers short PRs](user-short-prs.md) — Small, reviewable PRs are the default expectation.\n',
     );
-    const stage = new RebuildMemoryIndexStage();
+    const stage = createRebuildMemoryIndexStage();
     const context = createContext(store, 'run-rebuild-index');
     context.state.mergedFinalOutputs.files = ['memory/final/private/MEMORY.md'];
     const result = await stage.run(context);
@@ -603,7 +603,7 @@ Prefer small, reviewable pull requests by default.
       collect: vi.fn(async () => blocks),
     };
     const store = new RecordingArtifactStore();
-    const stage = new CollectStaleBlocksStage(staleSource);
+    const stage = createCollectStaleBlocksStage(staleSource);
     const context = createContext(store, 'run-stale');
 
     const result = await stage.run(context);
@@ -667,7 +667,7 @@ Prefer small, reviewable pull requests by default.
       markFailed: vi.fn(async () => {}),
     };
     const store = new RecordingArtifactStore();
-    const stage = new CollectRawSessionJobsStage(source);
+    const stage = createCollectRawSessionJobsStage(source);
     const context = createContext(store, 'run-session-jobs');
 
     const result = await stage.run(context);
@@ -698,7 +698,7 @@ Prefer small, reviewable pull requests by default.
         metadata: { provider: 'claude', status: 'success' },
       })),
     };
-    const stage = new SummarizeBlockBatchStage({ processor });
+    const stage = createSummarizeBlockBatchStage({ processor });
     const context = createContext(store, 'run-session-job-summary');
     setClaimedRawSessionJobs(context.state, {
       source: undefined,
@@ -804,7 +804,7 @@ Prefer small, reviewable pull requests by default.
         metadata: { provider: 'claude', status: 'success' },
       })),
     };
-    const stage = new SummarizeBlockBatchStage({ processor });
+    const stage = createSummarizeBlockBatchStage({ processor });
     const context = createContext(store, 'run-session-job-summary-multi');
     setClaimedRawSessionJobs(context.state, {
       source: undefined,
@@ -945,7 +945,7 @@ Prefer small, reviewable pull requests by default.
       metadata: { provider: 'codex', status: 'success' as const },
     }));
     const processor: ModelProcessor = { process };
-    const stage = new SummarizeBlockBatchStage({ processor });
+    const stage = createSummarizeBlockBatchStage({ processor });
     const context = createContext(store, 'run-session-job-summary-timeout');
     const longUser = 'u'.repeat(1100);
     const longAssistant = 'a'.repeat(900);
@@ -1029,7 +1029,7 @@ Prefer small, reviewable pull requests by default.
       metadata: { provider: 'codex', status: 'success' as const },
     }));
     const processor: ModelProcessor = { process };
-    const stage = new SummarizeBlockBatchStage({ processor });
+    const stage = createSummarizeBlockBatchStage({ processor });
     const context = createContext(store, 'run-session-job-summary-timeout-long-assistant');
     const longAssistant = 'a'.repeat(4500);
     setClaimedRawSessionJobs(context.state, {
@@ -1113,7 +1113,7 @@ Prefer small, reviewable pull requests by default.
         metadata: { provider: 'claude', status: 'error', error: 'model overloaded' },
       })),
     };
-    const stage = new SummarizeBlockBatchStage({ processor });
+    const stage = createSummarizeBlockBatchStage({ processor });
     const context = createContext(store, 'run-session-job-summary-fail');
     setClaimedRawSessionJobs(context.state, {
       source: undefined,
@@ -1346,7 +1346,7 @@ Prefer small, reviewable pull requests by default.
         metadata: { provider: 'claude', status: 'success' },
       })),
     };
-    const stage = new SummarizeSessionBatchStage({
+    const stage = createSummarizeSessionBatchStage({
       processor,
       sessionContents,
     });
@@ -1431,7 +1431,7 @@ Prefer small, reviewable pull requests by default.
           metadata: { provider: 'claude', status: 'success' },
         }),
     };
-    const stage = new ExtractRawMemoriesStage({ processor });
+    const stage = createExtractRawMemoriesStage({ processor });
     const context = createContext(store, 'run-extract');
     const result = await stage.run(context);
 
@@ -1529,7 +1529,7 @@ Prefer small, reviewable pull requests by default.
           metadata: { provider: 'claude', status: 'timeout', error: 'timed out' },
         }),
     };
-    const stage = new ExtractRawMemoriesStage({ processor });
+    const stage = createExtractRawMemoriesStage({ processor });
 
     const result = await stage.run(createContext(store, 'run-extract-partial'));
 
@@ -1575,7 +1575,7 @@ Prefer small, reviewable pull requests by default.
         outputs: ['should not run'],
       })),
     };
-    const stage = new ExtractRawMemoriesStage({ processor });
+    const stage = createExtractRawMemoriesStage({ processor });
 
     await expect(stage.run(createContext(store, 'run-extract-invalid-session'))).rejects.toThrow(
       'ExtractRawMemoriesStage requires a valid session payload with at least one usable message',
@@ -2144,7 +2144,7 @@ not valid final memory content
         metadata: { provider: 'claude', status: 'timeout', error: 'timed out' },
       })),
     };
-    const stage = new SummarizeSessionBatchStage({
+    const stage = createSummarizeSessionBatchStage({
       processor,
       sessionContents: ['session-timeout'],
     });
@@ -2170,7 +2170,7 @@ not valid final memory content
 
   it('runs consolidate session summaries stage', async () => {
     const store = new RecordingArtifactStore();
-    const stage = new ConsolidateSessionSummariesStage();
+    const stage = createConsolidateSessionSummariesStage();
     const context = createContext(store, 'run-consolidate');
 
     const result = await stage.run(context);
@@ -2199,7 +2199,7 @@ not valid final memory content
         metadata: { provider: 'codex', status: 'success' },
       })),
     };
-    const stage = new SummarizeBlockBatchStage({
+    const stage = createSummarizeBlockBatchStage({
       processor,
       blockContents,
     });
@@ -2233,7 +2233,7 @@ not valid final memory content
         metadata: { provider: 'codex', status: 'error', error: 'provider failed' },
       })),
     };
-    const stage = new SummarizeBlockBatchStage({
+    const stage = createSummarizeBlockBatchStage({
       processor,
       blockContents: ['block-timeout'],
     });
@@ -2263,7 +2263,7 @@ not valid final memory content
       'final/private/MEMORY.md',
       '- [User prefers short PRs](user-short-prs.md) — Small, reviewable PRs are the default expectation.\n',
     );
-    const stage = new RefreshMemoryIndexStage();
+    const stage = createRefreshMemoryIndexStage();
     const context = createContext(store, 'run-refresh');
     context.state.mergedFinalOutputs.files = ['memory/final/private/MEMORY.md'];
 
@@ -2298,7 +2298,7 @@ not valid final memory content
       'final/team/MEMORY.md',
       '- [Release check cadence](release-checks.md) — Post-release verification is a standing team habit.\n',
     );
-    const stage = new RebuildMemoryIndexStage();
+    const stage = createRebuildMemoryIndexStage();
     const context = createContext(store, 'run-index');
     context.state.mergedFinalOutputs.files = ['memory/final/team/MEMORY.md'];
 

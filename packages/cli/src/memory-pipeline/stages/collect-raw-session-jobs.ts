@@ -6,53 +6,66 @@ import type {
 import { setClaimedRawSessionJobs } from '../pipeline-state.js';
 import type { RawSessionJobSource } from '../sources/raw-session-job-source.js';
 
-const STAGE_ID = 'collect-raw-session-jobs';
+export const COLLECT_RAW_SESSION_JOBS_STAGE_ID = 'collect-raw-session-jobs';
 
 export interface CollectRawSessionJobsStageOptions {
   source: RawSessionJobSource;
   jobCompletionHook?: Pick<RawSessionJobSource, 'markSucceeded' | 'markFailed'>;
 }
 
-export class CollectRawSessionJobsStage implements MemoryPipelineStage {
-  readonly id = STAGE_ID;
-  private readonly source: RawSessionJobSource;
-  private readonly jobCompletionHook?: Pick<RawSessionJobSource, 'markSucceeded' | 'markFailed'>;
+export const createCollectRawSessionJobsStage = (
+  sourceOrOptions: RawSessionJobSource | CollectRawSessionJobsStageOptions,
+): MemoryPipelineStage => {
+  const { source, jobCompletionHook } = resolveCollectRawSessionJobsOptions(sourceOrOptions);
 
-  constructor(sourceOrOptions: RawSessionJobSource | CollectRawSessionJobsStageOptions) {
-    if (typeof (sourceOrOptions as RawSessionJobSource)?.collect === 'function') {
-      this.source = sourceOrOptions as RawSessionJobSource;
-      this.jobCompletionHook = sourceOrOptions as RawSessionJobSource;
-    } else {
-      const options = sourceOrOptions as CollectRawSessionJobsStageOptions;
-      this.source = options?.source;
-      this.jobCompletionHook = options?.jobCompletionHook ?? options?.source;
-    }
+  return {
+    id: COLLECT_RAW_SESSION_JOBS_STAGE_ID,
+    async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {
+      const jobs = await source.collect();
+      setClaimedRawSessionJobs(context.state, {
+        jobs,
+        source: jobCompletionHook,
+      });
+      const descriptor = await context.artifactStore.writeArtifact({
+        runId: context.runId,
+        kind: 'work-item',
+        source: COLLECT_RAW_SESSION_JOBS_STAGE_ID,
+        body: JSON.stringify(jobs),
+      });
 
-    const source = this.source;
-    if (!source || typeof source.collect !== 'function') {
-      throw new Error('RawSessionJobSource is required');
-    }
-  }
+      return {
+        stageId: COLLECT_RAW_SESSION_JOBS_STAGE_ID,
+        status: 'success',
+        inputCount: jobs.length,
+        outputCount: jobs.length,
+        artifactIds: [descriptor.id],
+      };
+    },
+  };
+};
 
-  async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {
-    const jobs = await this.source.collect();
-    setClaimedRawSessionJobs(context.state, {
-      jobs,
-      source: this.jobCompletionHook,
-    });
-    const descriptor = await context.artifactStore.writeArtifact({
-      runId: context.runId,
-      kind: 'work-item',
-      source: this.id,
-      body: JSON.stringify(jobs),
-    });
-
+const resolveCollectRawSessionJobsOptions = (
+  sourceOrOptions: RawSessionJobSource | CollectRawSessionJobsStageOptions,
+): {
+  source: RawSessionJobSource;
+  jobCompletionHook?: Pick<RawSessionJobSource, 'markSucceeded' | 'markFailed'>;
+} => {
+  if (typeof (sourceOrOptions as RawSessionJobSource)?.collect === 'function') {
+    const source = sourceOrOptions as RawSessionJobSource;
     return {
-      stageId: STAGE_ID,
-      status: 'success',
-      inputCount: jobs.length,
-      outputCount: jobs.length,
-      artifactIds: [descriptor.id],
+      source,
+      jobCompletionHook: source,
     };
   }
-}
+
+  const options = sourceOrOptions as CollectRawSessionJobsStageOptions;
+  const source = options?.source;
+  if (!source || typeof source.collect !== 'function') {
+    throw new Error('RawSessionJobSource is required');
+  }
+
+  return {
+    source,
+    jobCompletionHook: options.jobCompletionHook ?? source,
+  };
+};

@@ -1,20 +1,19 @@
-import { buildFinalMergePrompt } from '../prompts/final-merge-prompt.js';
-import type { ModelProcessor } from '../processors/model-processor.js';
-import {
-  parseFinalMemoryFileBlocks,
-  renderFinalMemoryDocument,
-  renderMarkdownFileBlock,
-  renderMemoryIndex,
-  validateFinalMemoryFileBlocks,
-} from '../markdown/memory-writer.js';
-import { parseRawMemoryDocument } from '../markdown/raw-memory-parser.js';
-import { setMergedFinalOutputs } from '../pipeline-state.js';
 import type {
-  FinalMemoryFileBlock,
   FinalMemoryBatchArtifact,
+  FinalMemoryFileBlock,
+  ModelProcessor,
   RawMemoryBatchArtifact,
   RawMemoryDocument,
-} from '../contracts/memory-documents.js';
+} from '@/memory-pipeline';
+import {
+  buildFinalMergePrompt,
+  parseFinalMemoryFileBlocks,
+  parseRawMemoryDocument,
+  renderFinalMemoryDocument,
+  renderMemoryIndex,
+  validateFinalMemoryFileBlocks,
+} from '@/memory-pipeline';
+import { setMergedFinalOutputs } from '../pipeline-state.js';
 import type {
   ArtifactDescriptor,
   MemoryPipelineArtifactStore,
@@ -60,7 +59,7 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
       rawArtifacts.map(async (artifact) => ({
         artifact,
         batch: await this.readRawBatch(context, artifact),
-      })),
+      }))
     );
 
     if (rawBatches.length === 0) {
@@ -77,10 +76,10 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
       rawBatches
         .filter(({ batch }) => !parseRawMemoryDocument(batch.markdown).noMemories)
         .map(async ({ batch }) => {
-        const relativePath = `raw/${batch.sessionId}.memories.md`;
-        await artifactStore.writeMemoryFile(relativePath, batch.markdown);
-        return this.renderPromptInputFile(relativePath, batch.markdown);
-        }),
+          const relativePath = `raw/${batch.sessionId}.memories.md`;
+          await artifactStore.writeMemoryFile(relativePath, batch.markdown);
+          return this.renderPromptInputFile(relativePath, batch.markdown);
+        })
     );
 
     if (rawFiles.length === 0) {
@@ -96,12 +95,16 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
     const existingFinalPaths = await artifactStore.listMemoryFiles('final');
     const existingFinalFiles = await Promise.all(
       existingFinalPaths.map(async (relativePath) =>
-        this.renderPromptInputFile(relativePath, await artifactStore.readMemoryFile(relativePath)),
-      ),
+        this.renderPromptInputFile(relativePath, await artifactStore.readMemoryFile(relativePath))
+      )
     );
 
-    const existingFinalDetailPaths = existingFinalPaths.filter((relativePath) => !relativePath.endsWith('/MEMORY.md'));
-    const rawDocuments = rawBatches.flatMap(({ batch }) => parseRawMemoryDocument(batch.markdown).documents);
+    const existingFinalDetailPaths = existingFinalPaths.filter(
+      (relativePath) => !relativePath.endsWith('/MEMORY.md')
+    );
+    const rawDocuments = rawBatches.flatMap(
+      ({ batch }) => parseRawMemoryDocument(batch.markdown).documents
+    );
 
     if (existingFinalDetailPaths.length === 0 && rawFiles.length === 1) {
       const files = this.buildDeterministicFinalFiles(rawDocuments);
@@ -144,7 +147,8 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
       if (
         rawDocuments.length > 0 &&
         error instanceof Error &&
-        error.message === 'Malformed final memory output: expected FILE comments followed by fenced markdown blocks.'
+        error.message ===
+          'Malformed final memory output: expected FILE comments followed by fenced markdown blocks.'
       ) {
         files = this.buildDeterministicFinalFiles(rawDocuments);
       } else {
@@ -160,7 +164,9 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
       typeof (artifactStore as Partial<MemoryRootArtifactStore>).readMemoryFile !== 'function' ||
       typeof (artifactStore as Partial<MemoryRootArtifactStore>).listMemoryFiles !== 'function'
     ) {
-      throw new Error('MergeFinalMemoriesStage requires an artifact store with memory root file access');
+      throw new Error(
+        'MergeFinalMemoriesStage requires an artifact store with memory root file access'
+      );
     }
 
     return artifactStore as MemoryRootArtifactStore;
@@ -168,7 +174,7 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
 
   private async readRawBatch(
     context: MemoryPipelineContext,
-    artifact: ArtifactDescriptor,
+    artifact: ArtifactDescriptor
   ): Promise<RawMemoryBatchArtifact> {
     const body = await context.artifactStore.readArtifact(artifact.id);
     const parsed = JSON.parse(body) as Partial<RawMemoryBatchArtifact>;
@@ -178,7 +184,9 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
       parsed.sessionId.trim().length === 0 ||
       typeof parsed.markdown !== 'string'
     ) {
-      throw new Error('MergeFinalMemoriesStage requires raw-memory-batch artifacts with sessionId and markdown');
+      throw new Error(
+        'MergeFinalMemoriesStage requires raw-memory-batch artifacts with sessionId and markdown'
+      );
     }
 
     return {
@@ -237,11 +245,11 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
   private async persistFinalFiles(
     context: MemoryPipelineContext,
     rawArtifacts: ArtifactDescriptor[],
-    files: FinalMemoryFileBlock[],
+    files: FinalMemoryFileBlock[]
   ): Promise<PipelineStageResult> {
     const artifactStore = this.getMemoryStore(context.artifactStore);
     const writtenFiles = await Promise.all(
-      files.map((file) => artifactStore.writeMemoryFile(file.filePath, file.content)),
+      files.map((file) => artifactStore.writeMemoryFile(file.filePath, file.content))
     );
 
     const descriptor = await context.artifactStore.writeArtifact({
@@ -267,7 +275,9 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
     };
   }
 
-  private getProcessorFailure(result: Awaited<ReturnType<ModelProcessor['process']>>): string | null {
+  private getProcessorFailure(
+    result: Awaited<ReturnType<ModelProcessor['process']>>
+  ): string | null {
     if (
       result.outputs.length === 0 &&
       (result.metadata?.status === 'error' || result.metadata?.status === 'timeout')

@@ -1,63 +1,58 @@
-import type {
-  MemoryPipelineContext,
-  MemoryPipelineStage,
-  PipelineStageResult,
-} from '../types.js';
-import type { ModelProcessor } from '../processors/model-processor.js';
+import type { MemoryPipelineContext, MemoryPipelineStage, PipelineStageResult } from '../types.js';
+import type { ModelProcessor } from '@/memory-pipeline';
 
-const STAGE_ID = 'summarize-session-batch';
+export const SUMMARIZE_SESSION_BATCH_STAGE_ID = 'summarize-session-batch';
 
 export interface SummarizeSessionBatchStageOptions {
   processor: ModelProcessor;
   sessionContents?: string[];
 }
 
-export class SummarizeSessionBatchStage implements MemoryPipelineStage {
-  readonly id = STAGE_ID;
-  private readonly processor: ModelProcessor;
-  private readonly sessionContents: string[];
-
-  constructor(options: SummarizeSessionBatchStageOptions) {
-    if (!options?.processor || typeof options.processor.process !== 'function') {
-      throw new Error('SummarizeSessionBatchStage requires a ModelProcessor capability');
-    }
-    this.processor = options.processor;
-    this.sessionContents = options.sessionContents ?? [];
+export const createSummarizeSessionBatchStage = (
+  options: SummarizeSessionBatchStageOptions
+): MemoryPipelineStage => {
+  if (!options?.processor || typeof options.processor.process !== 'function') {
+    throw new Error('SummarizeSessionBatchStage requires a ModelProcessor capability');
   }
 
-  async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {
-    const result = await this.processor.process(this.sessionContents);
-    const payload: Record<string, unknown> = {
-      runId: context.runId,
-      stage: this.id,
-      items: this.sessionContents,
-      summaries: result.outputs,
-    };
+  const { processor, sessionContents = [] } = options;
 
-    if (result.metadata) {
-      payload.metadata = result.metadata;
-    }
+  return {
+    id: SUMMARIZE_SESSION_BATCH_STAGE_ID,
+    async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {
+      const result = await processor.process(sessionContents);
+      const payload: Record<string, unknown> = {
+        runId: context.runId,
+        stage: SUMMARIZE_SESSION_BATCH_STAGE_ID,
+        items: sessionContents,
+        summaries: result.outputs,
+      };
 
-    const descriptor = await context.artifactStore.writeArtifact({
-      runId: context.runId,
-      kind: 'summary',
-      source: this.id,
-      body: JSON.stringify(payload),
-    });
+      if (result.metadata) {
+        payload.metadata = result.metadata;
+      }
 
-    const failureStatus =
-      result.outputs.length === 0 &&
-      (result.metadata?.status === 'error' || result.metadata?.status === 'timeout');
+      const descriptor = await context.artifactStore.writeArtifact({
+        runId: context.runId,
+        kind: 'summary',
+        source: SUMMARIZE_SESSION_BATCH_STAGE_ID,
+        body: JSON.stringify(payload),
+      });
 
-    return {
-      stageId: STAGE_ID,
-      status: failureStatus ? 'failed' : 'success',
-      inputCount: this.sessionContents.length,
-      outputCount: result.outputs.length,
-      artifactIds: [descriptor.id],
-      ...(failureStatus && typeof result.metadata?.error === 'string'
-        ? { error: result.metadata.error }
-        : {}),
-    };
-  }
-}
+      const failureStatus =
+        result.outputs.length === 0 &&
+        (result.metadata?.status === 'error' || result.metadata?.status === 'timeout');
+
+      return {
+        stageId: SUMMARIZE_SESSION_BATCH_STAGE_ID,
+        status: failureStatus ? 'failed' : 'success',
+        inputCount: sessionContents.length,
+        outputCount: result.outputs.length,
+        artifactIds: [descriptor.id],
+        ...(failureStatus && typeof result.metadata?.error === 'string'
+          ? { error: result.metadata.error }
+          : {}),
+      };
+    },
+  };
+};

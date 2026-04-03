@@ -1,10 +1,10 @@
-import { AppendDetailRecordsStage } from '../stages/append-detail-records.js';
+import { createAppendDetailRecordsStage } from '../stages/append-detail-records.js';
 import { type RawSessionJobSource } from '../sources/raw-session-job-source.js';
 import { CompleteRawSessionJobsStage } from '../stages/complete-raw-session-jobs.js';
-import { CollectRawSessionJobsStage } from '../stages/collect-raw-session-jobs.js';
+import { createCollectRawSessionJobsStage } from '../stages/collect-raw-session-jobs.js';
 import { MergeFinalMemoriesStage } from '../stages/merge-final-memories.js';
-import { RefreshMemoryIndexStage } from '../stages/refresh-memory-index.js';
-import { SummarizeBlockBatchStage } from '../stages/summarize-block-batch.js';
+import { createRefreshMemoryIndexStage } from '../stages/refresh-memory-index.js';
+import { createSummarizeBlockBatchStage } from '../stages/summarize-block-batch.js';
 import { ExtractionBackedModelProcessor, type ModelProcessor } from '../processors/model-processor.js';
 import type { MemoryPipelineDefinition } from '../types.js';
 import type { ExtractionProvider } from '@/service/extraction/types.js';
@@ -29,14 +29,14 @@ export const createScheduledMemoryPipeline = ({
   return {
     id: 'scheduled-memory-pipeline',
     stages: [
-      new CollectRawSessionJobsStage({
+      createCollectRawSessionJobsStage({
         source: rawSessionJobSource,
         jobCompletionHook: rawSessionJobSource,
       }),
-      new SummarizeBlockBatchStage({ processor: blockSummaryProcessor }),
+      createSummarizeBlockBatchStage({ processor: blockSummaryProcessor }),
       new MergeFinalMemoriesStage({ processor: finalMergeProcessor }),
-      new AppendDetailRecordsStage(),
-      new RefreshMemoryIndexStage(),
+      createAppendDetailRecordsStage(),
+      createRefreshMemoryIndexStage(),
       new CompleteRawSessionJobsStage({
         jobCompletionHook: rawSessionJobSource,
       }),

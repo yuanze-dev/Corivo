@@ -6,46 +6,45 @@ import type {
   PipelineStageResult,
 } from '../types.js';
 
-const STAGE_ID = 'collect-claude-sessions';
+export const COLLECT_CLAUDE_SESSIONS_STAGE_ID = 'collect-claude-sessions';
 
-export class CollectClaudeSessionsStage implements MemoryPipelineStage {
-  readonly id = STAGE_ID;
-  private readonly source: ClaudeSessionSource;
+export const createCollectClaudeSessionsStage = (
+  sourceOrOptions: ClaudeSessionSource | { source: ClaudeSessionSource },
+): MemoryPipelineStage => {
+  const source =
+    typeof (sourceOrOptions as ClaudeSessionSource)?.collect === 'function'
+      ? (sourceOrOptions as ClaudeSessionSource)
+      : (sourceOrOptions as { source: ClaudeSessionSource })?.source;
 
-  constructor(sourceOrOptions: ClaudeSessionSource | { source: ClaudeSessionSource }) {
-    this.source =
-      typeof (sourceOrOptions as ClaudeSessionSource)?.collect === 'function'
-        ? (sourceOrOptions as ClaudeSessionSource)
-        : (sourceOrOptions as { source: ClaudeSessionSource })?.source;
-
-    const source = this.source;
-    if (!source || typeof source.collect !== 'function') {
-      throw new Error('ClaudeSessionSource is required');
-    }
+  if (!source || typeof source.collect !== 'function') {
+    throw new Error('ClaudeSessionSource is required');
   }
 
-  async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {
-    const workItems = await this.source.collect();
-    for (const workItem of workItems) {
-      if (workItem.metadata?.session?.kind !== 'claude-session') {
-        throw new Error('CollectClaudeSessionsStage only accepts claude-session work items');
+  return {
+    id: COLLECT_CLAUDE_SESSIONS_STAGE_ID,
+    async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {
+      const workItems = await source.collect();
+      for (const workItem of workItems) {
+        if (workItem.metadata?.session?.kind !== 'claude-session') {
+          throw new Error('CollectClaudeSessionsStage only accepts claude-session work items');
+        }
       }
-    }
-    setCollectedSessions(context.state, workItems);
+      setCollectedSessions(context.state, workItems);
 
-    const descriptor = await context.artifactStore.writeArtifact({
-      runId: context.runId,
-      kind: 'work-item',
-      source: this.id,
-      body: JSON.stringify(workItems),
-    });
+      const descriptor = await context.artifactStore.writeArtifact({
+        runId: context.runId,
+        kind: 'work-item',
+        source: COLLECT_CLAUDE_SESSIONS_STAGE_ID,
+        body: JSON.stringify(workItems),
+      });
 
-    return {
-      stageId: STAGE_ID,
-      status: 'success',
-      inputCount: workItems.length,
-      outputCount: workItems.length,
-      artifactIds: [descriptor.id],
-    };
-  }
-}
+      return {
+        stageId: COLLECT_CLAUDE_SESSIONS_STAGE_ID,
+        status: 'success',
+        inputCount: workItems.length,
+        outputCount: workItems.length,
+        artifactIds: [descriptor.id],
+      };
+    },
+  };
+};

@@ -1,5 +1,5 @@
-import type { ExtractionInput, ExtractionResult } from '../types.js';
-import { DEFAULT_TIMEOUT_MS, mapExecutionResult, normalizePrompt, runProviderCommand } from '../shared.js';
+import type { ExtractionInput, ExtractionResult } from '../types';
+import { DEFAULT_TIMEOUT_MS, mapExecutionResult, normalizePrompt, runProviderCommand } from '../shared';
 
 export async function extractWithClaude(
   input: Omit<ExtractionInput, 'provider'> & { provider?: 'claude' }

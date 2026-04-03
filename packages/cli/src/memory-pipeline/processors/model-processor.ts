@@ -2,8 +2,8 @@ import type {
   ExtractionInput,
   ExtractionProvider,
   ExtractionResult,
-} from '../../extraction/types.js';
-import { extractWithProvider } from '../../extraction/index.js';
+} from '@/service/extraction/types.js';
+import { extractWithProvider } from '@/service/extraction/index.js';
 
 export interface ModelProcessorMetadata {
   provider?: ExtractionProvider;

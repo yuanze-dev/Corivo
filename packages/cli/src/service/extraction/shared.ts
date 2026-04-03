@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import type { ExtractionPrompt, ExtractionProvider, ExtractionResult } from './types.js';
+import type { ExtractionPrompt, ExtractionProvider, ExtractionResult } from './types';
 
 export const DEFAULT_TIMEOUT_MS = 60_000;
 

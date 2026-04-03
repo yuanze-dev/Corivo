@@ -4,7 +4,7 @@ import type {
   ExtractionInput,
   ExtractionResult,
   ExtractionStatus,
-} from '../../src/extraction/types.js';
+} from '../../src/service/extraction/types.js';
 
 const { spawnMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -76,7 +76,7 @@ function mockSpawnTimeout() {
   });
 }
 
-const extractionModule = await import('../../src/extraction/index.js');
+const extractionModule = await import('../../src/service/extraction/index.js');
 const {
   extractWithClaude,
   extractWithCodex,

@@ -15,7 +15,7 @@ import {
   type RawSessionJobSource,
 } from '@/memory-pipeline';
 import type { Logger } from '@/utils/logging';
-import type { ExtractionProvider } from '@/extraction/types';
+import type { ExtractionProvider } from '@/service/extraction/types';
 import { createLogger } from '@/utils/logging';
 import { MemoryProcessingJobQueue } from '@/raw-memory/job-queue';
 import { RawMemoryRepository } from '@/raw-memory/repository';

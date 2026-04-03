@@ -1,8 +1,8 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import type { ExtractionInput, ExtractionResult } from '../types.js';
-import { DEFAULT_TIMEOUT_MS, normalizePrompt, runProviderCommand } from '../shared.js';
+import type { ExtractionInput, ExtractionResult } from '../types';
+import { DEFAULT_TIMEOUT_MS, normalizePrompt, runProviderCommand } from '../shared';
 
 export async function extractWithCodex(
   input: Omit<ExtractionInput, 'provider'> & { provider?: 'codex' }

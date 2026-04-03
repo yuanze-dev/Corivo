@@ -5,7 +5,7 @@ import type { HostInstallRequest } from '@/application/hosts/install-host';
 import type { HostUninstallRequest } from '@/application/hosts/uninstall-host';
 import type { QueryOptions, PromptQueryCommandOptions, SearchQueryCommandInput } from '@/application/bootstrap/query-execution';
 import type { MemoryPipelineMode } from '@/application/memory/run-memory-pipeline';
-import type { ExtractionProvider } from '@/extraction/types';
+import type { ExtractionProvider } from '@/service/extraction/types';
 import type { MemoryPipelineRunResult } from '@/memory-pipeline';
 import type { Logger } from '@/utils/logging';
 

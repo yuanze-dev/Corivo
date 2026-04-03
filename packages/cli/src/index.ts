@@ -19,7 +19,7 @@ export type {
   ExtractionProvider,
   ExtractionResult,
   ExtractionStatus,
-} from './extraction/types.js';
-export { extractWithClaude, extractWithCodex, extractWithProvider } from './extraction/index.js';
+} from '@/service/extraction/types.js';
+export { extractWithClaude, extractWithCodex, extractWithProvider } from '@/service/extraction/index.js';
 export type { RealtimeCollector, CorivoPlugin } from './ingestors/index.js';
 export * from './memory-pipeline/index.js';

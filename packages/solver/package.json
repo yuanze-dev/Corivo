@@ -1,6 +1,7 @@
 {
   "name": "@corivo/solver",
   "version": "0.12.7",
+  "private": "true",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

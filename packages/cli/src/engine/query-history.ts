@@ -4,10 +4,21 @@
  * Record the user's query for "You have also checked similar queries before" reminder
  */
 
-import type { CorivoDatabase } from '../storage/database.js';
 import type { Block } from '../models/index.js';
 import { generateBlockId } from '../models/block.js';
-import { createLogger, type Logger } from '../utils/logging.js';
+import {
+  buildSimilarQueryReminder,
+  isSimilarQuery,
+  type SimilarQueryRecord,
+} from '../runtime/query-pack.js';
+import {
+  DEFAULT_QUERY_HISTORY_POLICY,
+  type QueryHistoryPolicy,
+} from '../runtime/query-history-policy.js';
+import {
+  type QueryHistoryStore,
+} from '../runtime/query-history-store.js';
+import type { Logger } from '../utils/logging.js';
 
 interface QueryHistoryRuntime {
   logger: Pick<Logger, 'debug'>;
@@ -31,23 +42,32 @@ export interface QueryRecord {
 export interface SimilarQueryReminder {
   hasSimilar: boolean;
   message: string;
-  similarQueries: Array<{ query: string; timestamp: number }>;
+  similarQueries: SimilarQueryRecord[];
 }
 
 /**
  * Query history tracker
  */
 export class QueryHistoryTracker {
+  private static readonly NOOP_DEBUG_LOGGER: Pick<Logger, 'debug'> = {
+    debug: () => undefined,
+  };
+
   private readonly runtime: QueryHistoryRuntime;
+  private readonly policy: QueryHistoryPolicy;
 
   constructor(
-    private db: CorivoDatabase,
-    runtime?: Partial<QueryHistoryRuntime>
+    private readonly store: QueryHistoryStore,
+    runtime?: Partial<QueryHistoryRuntime>,
+    policy?: Partial<QueryHistoryPolicy>,
   ) {
-    const fallbackLogger = createLogger();
     this.runtime = {
-      logger: runtime?.logger ?? fallbackLogger,
+      logger: runtime?.logger ?? QueryHistoryTracker.NOOP_DEBUG_LOGGER,
       clock: runtime?.clock ?? { now: () => Date.now() },
+    };
+    this.policy = {
+      ...DEFAULT_QUERY_HISTORY_POLICY,
+      ...policy,
     };
   }
 
@@ -65,12 +85,7 @@ export class QueryHistoryTracker {
 
     // Save to database
     try {
-      const stmt = (this.db as any).db.prepare(`
-        INSERT INTO query_logs (id, timestamp, query, result_count)
-        VALUES (?, ?, ?, ?)
-      `);
-
-      stmt.run(record.id, record.timestamp, record.query, record.resultCount);
+      this.store.save(record);
     } catch (error) {
       // The table may not exist yet, failing silently
       this.runtime.logger.debug(
@@ -87,26 +102,21 @@ export class QueryHistoryTracker {
    */
   findSimilarQueries(currentQuery: string): SimilarQueryReminder {
     try {
-      // Get query records for the last 7 days
-      const stmt = (this.db as any).db.prepare(`
-        SELECT query, timestamp FROM query_logs
-        WHERE timestamp > ?
-        ORDER BY timestamp DESC
-        LIMIT 50
-      `);
-
-      const sevenDaysAgo = this.runtime.clock.now() - 7 * 24 * 60 * 60 * 1000;
-      const rows = stmt.all(sevenDaysAgo) as Array<{ query: string; timestamp: number }>;
+      const sevenDaysAgo = this.runtime.clock.now() - this.policy.similarityWindowMs;
+      const rows = this.store.listRecent({
+        sinceTimestamp: sevenDaysAgo,
+        limit: this.policy.recentQueryLimit,
+      }) as SimilarQueryRecord[];
 
       if (rows.length === 0) {
         return { hasSimilar: false, message: '', similarQueries: [] };
       }
 
       // Find similar queries
-      const similar: Array<{ query: string; timestamp: number }> = [];
+      const similar: SimilarQueryRecord[] = [];
 
       for (const row of rows) {
-        if (this.isSimilarQuery(currentQuery, row.query)) {
+        if (isSimilarQuery(currentQuery, row.query)) {
           similar.push(row);
         }
       }
@@ -116,12 +126,12 @@ export class QueryHistoryTracker {
       }
 
       // Generate reminder
-      const message = this.generateReminderMessage(similar);
+      const message = buildSimilarQueryReminder(similar);
 
       return {
         hasSimilar: true,
         message,
-        similarQueries: similar.slice(0, 3), // Returns up to 3
+        similarQueries: similar.slice(0, this.policy.reminderOutputLimit),
       };
     } catch (error) {
       return { hasSimilar: false, message: '', similarQueries: [] };
@@ -129,67 +139,12 @@ export class QueryHistoryTracker {
   }
 
   /**
-   * Determine whether two queries are similar
-   */
-  private isSimilarQuery(query1: string, query2: string): boolean {
-    // exactly the same
-    if (query1 === query2) {
-      return false; // The same query is not considered "similar" but is a duplicate
-    }
-
-    // Calculate similarity
-    const words1 = new Set(this.extractWords(query1));
-    const words2 = new Set(this.extractWords(query2));
-
-    if (words1.size === 0 || words2.size === 0) {
-      return false;
-    }
-
-    const intersection = new Set([...words1].filter((x) => words2.has(x)));
-    const union = new Set([...words1, ...words2]);
-
-    const similarity = intersection.size / union.size;
-
-    return similarity > 0.4; // 40% similarity
-  }
-
-  /**
-   * Extract words
-   */
-  private extractWords(text: string): string[] {
-    const chinese = text.match(/[\u4e00-\u9fa5]/g) || [];
-    const english = text.toLowerCase().match(/[a-z]{2,}/g) || [];
-    return [...chinese, ...english];
-  }
-
-  /**
-   * Generate friendly reminders
-   */
-  private generateReminderMessage(similarQueries: Array<{ query: string; timestamp: number }>): string {
-    if (similarQueries.length === 1) {
-      const q = similarQueries[0].query;
-      const preview = q.length > 20 ? q.slice(0, 20) + '...' : q;
-      return `[corivo] 你之前也查过类似的："${preview}"`;
-    }
-
-    const previews = similarQueries
-      .slice(0, 2)
-      .map((s) => {
-        const q = s.query;
-        return q.length > 15 ? q.slice(0, 15) + '...' : q;
-      });
-
-    return `[corivo] 你之前也查过类似的：${previews.join('、')}`;
-  }
-
-  /**
    * Clean up old records (retain the last 30 days)
    */
   cleanupOldRecords(): void {
     try {
-      const thirtyDaysAgo = this.runtime.clock.now() - 30 * 24 * 60 * 60 * 1000;
-      const stmt = (this.db as any).db.prepare('DELETE FROM query_logs WHERE timestamp < ?');
-      stmt.run(thirtyDaysAgo);
+      const thirtyDaysAgo = this.runtime.clock.now() - this.policy.retentionWindowMs;
+      this.store.purgeBefore(thirtyDaysAgo);
     } catch (error) {
       // Silently fails
     }

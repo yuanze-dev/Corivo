@@ -16,6 +16,24 @@ export function isDecisionBlock(block: Block): boolean {
   return block.annotation.includes('决策');
 }
 
+export function extractKeywords(content: string): string[] {
+  const words = content.toLowerCase().match(/[a-z]{2,}|[\u4e00-\u9fa5]{2,}/g) ?? [];
+  return [...new Set(words)].slice(0, 10);
+}
+
+export function extractDecisionLabel(block: Block): string {
+  if (block.pattern && typeof block.pattern === 'object' && 'decision' in block.pattern) {
+    return (block.pattern as { decision: string }).decision;
+  }
+
+  const parts = block.annotation.split(' · ');
+  if (parts.length >= 3) {
+    return parts[2];
+  }
+
+  return block.content.slice(0, 20);
+}
+
 export function hasChangeIntent(queryPack: QueryPack): boolean {
   return CHANGE_PATTERNS.test(queryPack.anchorText);
 }

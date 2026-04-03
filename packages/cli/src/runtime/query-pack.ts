@@ -18,6 +18,11 @@ export interface QueryPack {
   anchorTerms: string[];
 }
 
+export interface SimilarQueryRecord {
+  query: string;
+  timestamp: number;
+}
+
 const STOP_WORDS = new Set([
   'a',
   'an',
@@ -69,6 +74,12 @@ function extractHanTerms(value: string): string[] {
   return terms;
 }
 
+function extractQueryHistoryTerms(value: string): string[] {
+  const hanChars = value.match(/[\u4e00-\u9fa5]/g) ?? [];
+  const englishWords = value.toLowerCase().match(/[a-z]{2,}/g) ?? [];
+  return dedupeStrings([...hanChars, ...englishWords]);
+}
+
 function extractAnchorTerms(value: string): string[] {
   const asciiMatches = value.toLowerCase().match(/[a-z0-9_]+/g) ?? [];
   const hanMatches = extractHanTerms(value);
@@ -79,6 +90,35 @@ function extractAnchorTerms(value: string): string[] {
       ...hanMatches,
     ],
   );
+}
+
+export function isSimilarQuery(query1: string, query2: string): boolean {
+  if (query1 === query2) {
+    return false;
+  }
+
+  const words1 = new Set(extractQueryHistoryTerms(query1));
+  const words2 = new Set(extractQueryHistoryTerms(query2));
+
+  if (words1.size === 0 || words2.size === 0) {
+    return false;
+  }
+
+  const intersection = new Set([...words1].filter((word) => words2.has(word)));
+  const union = new Set([...words1, ...words2]);
+  return intersection.size / union.size > 0.4;
+}
+
+export function buildSimilarQueryReminder(similarQueries: SimilarQueryRecord[]): string {
+  if (similarQueries.length === 1) {
+    const preview = similarQueries[0].query;
+    return `[corivo] 你之前也查过类似的："${preview.length > 20 ? `${preview.slice(0, 20)}...` : preview}"`;
+  }
+
+  const previews = similarQueries
+    .slice(0, 2)
+    .map(({ query }) => (query.length > 15 ? `${query.slice(0, 15)}...` : query));
+  return `[corivo] 你之前也查过类似的：${previews.join('、')}`;
 }
 
 export function createQueryPack(input: QueryPackInput): QueryPack {

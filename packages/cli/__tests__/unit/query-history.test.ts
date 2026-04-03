@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { QueryHistoryTracker } from '../../src/engine/query-history.js';
+import type { QueryHistoryStore } from '../../src/runtime/query-history-store.js';
 import type { Logger } from '../../src/utils/logging.js';
 
 function createMockLogger(): Logger {
@@ -17,15 +18,15 @@ function createMockLogger(): Logger {
 describe('QueryHistoryTracker', () => {
   it('logs query persistence failures through the injected logger facade', () => {
     const logger = createMockLogger();
-    const db = {
-      db: {
-        prepare: vi.fn(() => {
-          throw new Error('missing query_logs table');
-        }),
-      },
-    } as unknown as import('../../src/storage/database.js').CorivoDatabase;
+    const store: QueryHistoryStore = {
+      save: vi.fn(() => {
+        throw new Error('missing query_logs table');
+      }),
+      listRecent: vi.fn(() => []),
+      purgeBefore: vi.fn(),
+    };
 
-    const tracker = new QueryHistoryTracker(db, {
+    const tracker = new QueryHistoryTracker(store, {
       logger,
       clock: { now: () => 1234567890 },
     });

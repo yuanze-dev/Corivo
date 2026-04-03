@@ -1,5 +1,13 @@
 # @corivo-ai/openclaw
 
+## 0.12.10
+
+### Patch Changes
+
+- agentic memory base markdown
+- Updated dependencies
+  - corivo@0.12.10
+
 ## 0.12.9
 
 ### Patch Changes

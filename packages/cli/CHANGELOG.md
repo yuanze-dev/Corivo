@@ -1,5 +1,11 @@
 # corivo
 
+## 0.12.10
+
+### Patch Changes
+
+- agentic memory base markdown
+
 ## 0.12.9
 
 ### Patch Changes

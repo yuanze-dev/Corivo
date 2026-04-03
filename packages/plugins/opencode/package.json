@@ -1,6 +1,6 @@
 {
   "name": "@corivo-ai/opencode",
-  "version": "0.12.9",
+  "version": "0.12.10",
   "description": "Corivo OpenCode executable runtime plugin",
   "type": "module",
   "main": "dist/index.js",

@@ -115,6 +115,32 @@ export async function parseCodexSessionFile(
 }
 
 function normalizeCodexMessage(input: Record<string, unknown>): ImportedMessageRecord | null {
+  return normalizeUserEventMessage(input) ?? normalizeAssistantFinalAnswer(input);
+}
+
+function normalizeUserEventMessage(input: Record<string, unknown>): ImportedMessageRecord | null {
+  if (getString(input.type) !== 'event_msg') {
+    return null;
+  }
+
+  const payload = isRecord(input.payload) ? input.payload : null;
+  if (!payload || getString(payload.type) !== 'user_message') {
+    return null;
+  }
+
+  const content = getString(payload.message);
+  if (!content) {
+    return null;
+  }
+
+  return {
+    role: 'user',
+    content,
+    createdAt: toTimestamp(input.timestamp),
+  };
+}
+
+function normalizeAssistantFinalAnswer(input: Record<string, unknown>): ImportedMessageRecord | null {
   if (getString(input.type) !== 'response_item') {
     return null;
   }
@@ -124,16 +150,18 @@ function normalizeCodexMessage(input: Record<string, unknown>): ImportedMessageR
     return null;
   }
 
-  const role = normalizeRole(payload.role);
-  const content = flattenCodexContent(payload.content);
+  if (normalizeRole(payload.role) !== 'assistant' || getString(payload.phase) !== 'final_answer') {
+    return null;
+  }
 
-  if (!role || !content) {
+  const content = flattenCodexContent(payload.content);
+  if (!content) {
     return null;
   }
 
   return {
     externalMessageId: getString(payload.id),
-    role,
+    role: 'assistant',
     content,
     createdAt: toTimestamp(input.timestamp),
   };

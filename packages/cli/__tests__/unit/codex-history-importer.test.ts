@@ -6,6 +6,182 @@ import { codexHostAdapter } from '../../src/hosts/adapters/codex.js';
 import { importCodexHistory } from '../../src/hosts/importers/codex-history.js';
 
 describe('Codex history importer', () => {
+  it('imports only user event messages and assistant final answers', async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-codex-history-filtered-'));
+    const sessionsDir = path.join(tempDir, 'sessions');
+    const sessionPath = path.join(sessionsDir, 'rollout-2026-04-02.jsonl');
+    await fs.mkdir(sessionsDir, { recursive: true });
+
+    await fs.writeFile(
+      sessionPath,
+      [
+        JSON.stringify({
+          timestamp: '2026-04-02T17:32:30.000Z',
+          type: 'session_meta',
+          payload: {
+            id: 'codex-session-filtered',
+            timestamp: '2026-04-02T17:32:30.000Z',
+          },
+        }),
+        JSON.stringify({
+          timestamp: '2026-04-02T17:32:32.337Z',
+          type: 'event_msg',
+          payload: {
+            type: 'user_message',
+            message: '你好你好你好你好 是 我',
+            images: [],
+            local_images: [],
+            text_elements: [],
+          },
+        }),
+        JSON.stringify({
+          timestamp: '2026-04-02T17:32:35.334Z',
+          type: 'event_msg',
+          payload: {
+            type: 'agent_message',
+            message: '你好，我在。你想让我帮你做什么？',
+            phase: 'final_answer',
+            memory_citation: null,
+          },
+        }),
+        JSON.stringify({
+          timestamp: '2026-04-02T17:32:35.334Z',
+          type: 'response_item',
+          payload: {
+            type: 'message',
+            role: 'assistant',
+            content: [
+              {
+                type: 'output_text',
+                text: '你好，我在。你想让我帮你做什么？',
+              },
+            ],
+            phase: 'final_answer',
+          },
+        }),
+      ].join('\n'),
+      'utf8',
+    );
+
+    try {
+      const result = await importCodexHistory({ all: true, target: sessionsDir });
+
+      expect(result).toMatchObject({
+        success: true,
+        importedSessionCount: 1,
+        importedMessageCount: 2,
+      });
+      expect(result.sessions[0]?.messages).toEqual([
+        {
+          role: 'user',
+          content: '你好你好你好你好 是 我',
+          createdAt: Date.parse('2026-04-02T17:32:32.337Z'),
+        },
+        {
+          role: 'assistant',
+          content: '你好，我在。你想让我帮你做什么？',
+          createdAt: Date.parse('2026-04-02T17:32:35.334Z'),
+        },
+      ]);
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores non-final assistant responses and event agent duplicates', async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-codex-history-non-final-'));
+    const sessionsDir = path.join(tempDir, 'sessions');
+    const sessionPath = path.join(sessionsDir, 'rollout-2026-04-03.jsonl');
+    await fs.mkdir(sessionsDir, { recursive: true });
+
+    await fs.writeFile(
+      sessionPath,
+      [
+        JSON.stringify({
+          timestamp: '2026-04-03T09:00:00.000Z',
+          type: 'session_meta',
+          payload: {
+            id: 'codex-session-non-final',
+            timestamp: '2026-04-03T09:00:00.000Z',
+          },
+        }),
+        JSON.stringify({
+          timestamp: '2026-04-03T09:00:02.000Z',
+          type: 'event_msg',
+          payload: {
+            type: 'user_message',
+            message: '给我一句最终答复',
+          },
+        }),
+        JSON.stringify({
+          timestamp: '2026-04-03T09:00:03.000Z',
+          type: 'response_item',
+          payload: {
+            type: 'message',
+            role: 'assistant',
+            phase: 'analysis',
+            content: [
+              {
+                type: 'output_text',
+                text: '这是中间分析，不该被导入。',
+              },
+            ],
+          },
+        }),
+        JSON.stringify({
+          timestamp: '2026-04-03T09:00:04.000Z',
+          type: 'event_msg',
+          payload: {
+            type: 'agent_message',
+            phase: 'final_answer',
+            message: '这是重复包装，不该被导入。',
+          },
+        }),
+        JSON.stringify({
+          timestamp: '2026-04-03T09:00:05.000Z',
+          type: 'response_item',
+          payload: {
+            type: 'message',
+            role: 'assistant',
+            phase: 'final_answer',
+            content: [
+              {
+                type: 'output_text',
+                text: '这是最终答复。',
+              },
+            ],
+          },
+        }),
+      ].join('\n'),
+      'utf8',
+    );
+
+    try {
+      const result = await importCodexHistory({ all: true, target: sessionsDir });
+
+      expect(result).toMatchObject({
+        success: true,
+        importedSessionCount: 1,
+        importedMessageCount: 2,
+      });
+      expect(result.sessions[0]?.messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+      }))).toEqual([
+        {
+          role: 'user',
+          content: '给我一句最终答复',
+        },
+        {
+          role: 'assistant',
+          content: '这是最终答复。',
+        },
+      ]);
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('parses Codex JSONL history into imported sessions', async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-codex-history-'));
     const sessionsDir = path.join(tempDir, 'sessions');
@@ -25,16 +201,10 @@ describe('Codex history importer', () => {
         }),
         JSON.stringify({
           timestamp: '2026-04-02T01:00:05.000Z',
-          type: 'response_item',
+          type: 'event_msg',
           payload: {
-            type: 'message',
-            role: 'user',
-            content: [
-              {
-                type: 'input_text',
-                text: 'Summarize the rollout notes.',
-              },
-            ],
+            type: 'user_message',
+            message: 'Summarize the rollout notes.',
           },
         }),
         JSON.stringify({
@@ -49,6 +219,7 @@ describe('Codex history importer', () => {
                 text: 'Here is the rollout summary.',
               },
             ],
+            phase: 'final_answer',
           },
         }),
       ].join('\n'),
@@ -121,11 +292,10 @@ describe('Codex history importer', () => {
         }),
         JSON.stringify({
           timestamp: '2026-04-02T02:00:05.000Z',
-          type: 'response_item',
+          type: 'event_msg',
           payload: {
-            type: 'message',
-            role: 'user',
-            content: [{ type: 'input_text', text: 'Only import host history' }],
+            type: 'user_message',
+            message: 'Only import host history',
           },
         }),
       ].join('\n'),
@@ -213,6 +383,7 @@ describe('Codex history importer', () => {
             type: 'message',
             role: 'assistant',
             content: [{ type: 'output_text', text: 'Valid later session' }],
+            phase: 'final_answer',
           },
         }),
       ].join('\n'),

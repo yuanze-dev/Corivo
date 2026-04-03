@@ -16,16 +16,16 @@ describe('host command', () => {
   });
 
   it('routes install requests through the install use case', async () => {
-    const run = vi.fn().mockResolvedValue({
+    const installHost = vi.fn().mockResolvedValue({
       success: true,
       host: 'codex',
       summary: 'ok',
     });
-    const useCase = createHostInstallUseCase({ run });
+    const useCase = createHostInstallUseCase({ installHost });
 
     await useCase({ host: 'codex' });
 
-    expect(run).toHaveBeenCalledWith({ host: 'codex' });
+    expect(installHost).toHaveBeenCalledWith({ host: 'codex' });
   });
 
   it('routes doctor requests through the doctor use case', async () => {

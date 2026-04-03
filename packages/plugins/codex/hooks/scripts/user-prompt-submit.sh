@@ -33,12 +33,7 @@ fi
 
 printf '%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "user-prompt-submit" "$(printf '%s' "$PROMPT" | head -c 200)" >> "$LOG_FILE"
 
-STATUS="$(corivo status 2>&1 || true)"
-if printf '%s' "$STATUS" | grep -qi "未初始化"; then
-  exit 0
-fi
-
-RESULTS="$(corivo query --prompt "$PROMPT" --format hook-text 2>/dev/null || true)"
+RESULTS="$(corivo recall --prompt "$PROMPT" --format hook-text 2>/dev/null || true)"
 
 if [ -z "$RESULTS" ]; then
   exit 0

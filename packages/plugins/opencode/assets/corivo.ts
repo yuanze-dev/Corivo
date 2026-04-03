@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import { execFile } from 'node:child_process';
 
 export interface OpencodeAdapterDeps {
-  runCorivo(command: 'carry-over' | 'query' | 'review', args: string[]): Promise<string>;
+  runCorivo(command: 'carry-over' | 'recall' | 'review', args: string[]): Promise<string>;
   getLatestAssistantMessage?(sessionID: string): Promise<string | null>;
 }
 
@@ -23,10 +23,17 @@ export interface OpencodeCorivoHooks {
 
 interface SessionMemoryState {
   carryOver?: string;
-  query?: string;
+  recall?: string;
   review?: string;
   lastReviewedMessage?: string;
 }
+
+const BRIDGE_ARGS = {
+  carryOver: ['--format', 'hook-text'] as const,
+  reviewPrefix: ['--last-message'] as const,
+  recallPrefix: ['--prompt'] as const,
+  formatSuffix: ['--format', 'hook-text'] as const,
+};
 
 function getTextFromParts(parts: Array<{ type?: string; text?: string }>): string {
   return parts
@@ -56,7 +63,7 @@ export function createOpencodeCorivoHooks(
         if (!sessionID) {
           return;
         }
-        const output = await deps.runCorivo('carry-over', ['--format', 'hook-text']);
+        const output = await deps.runCorivo('carry-over', [...BRIDGE_ARGS.carryOver]);
         if (output) {
           getState(sessionID).carryOver = output;
         }
@@ -83,10 +90,9 @@ export function createOpencodeCorivoHooks(
         }
 
         const output = await deps.runCorivo('review', [
-          '--last-message',
+          ...BRIDGE_ARGS.reviewPrefix,
           lastAssistantMessage,
-          '--format',
-          'hook-text',
+          ...BRIDGE_ARGS.formatSuffix,
         ]);
 
         if (output) {
@@ -106,15 +112,14 @@ export function createOpencodeCorivoHooks(
         return;
       }
 
-      const query = await deps.runCorivo('query', [
-        '--prompt',
+      const recall = await deps.runCorivo('recall', [
+        ...BRIDGE_ARGS.recallPrefix,
         prompt,
-        '--format',
-        'hook-text',
+        ...BRIDGE_ARGS.formatSuffix,
       ]);
 
-      if (query) {
-        getState(input.sessionID).query = query;
+      if (recall) {
+        getState(input.sessionID).recall = recall;
       }
     },
 
@@ -129,14 +134,14 @@ export function createOpencodeCorivoHooks(
         return;
       }
 
-      for (const value of [state.carryOver, state.query, state.review]) {
+      for (const value of [state.carryOver, state.recall, state.review]) {
         if (value) {
           output.system.push(value);
         }
       }
 
       state.carryOver = undefined;
-      state.query = undefined;
+      state.recall = undefined;
       state.review = undefined;
     },
   };
@@ -145,7 +150,7 @@ export function createOpencodeCorivoHooks(
 const execFileAsync = promisify(execFile);
 
 async function runCorivo(
-  command: 'carry-over' | 'query' | 'review',
+  command: 'carry-over' | 'recall' | 'review',
   args: string[],
 ): Promise<string> {
   try {

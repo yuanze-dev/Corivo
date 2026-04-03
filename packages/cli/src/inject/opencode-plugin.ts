@@ -12,7 +12,7 @@ import type { HostDoctorResult, HostInstallResult } from '../hosts/types.js';
 
 const ASSET_ROOT_OVERRIDE_ENV = 'CORIVO_HOST_ASSETS_ROOT';
 const OPENCODE_RUNTIME_PACKAGE_NAME = '@corivo-ai/opencode';
-const OPENCODE_RUNTIME_REPO_ROOT = path.join('..', 'plugins', 'runtime', 'opencode', 'assets');
+const OPENCODE_RUNTIME_REPO_ROOT = path.join('..', 'plugins', 'opencode', 'assets');
 const OPENCODE_RUNTIME_ASSET_FILE = 'corivo.ts';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -136,7 +136,7 @@ export async function isOpencodeInstalled(homeDir?: string): Promise<HostDoctorR
   const checks = [
     {
       label: 'corivo.ts',
-      ok: content.includes("runCorivo('query'"),
+      ok: content.includes("runCorivo('recall'") || content.includes("runCorivo('query'"),
       detail: paths.pluginPath,
     },
   ];

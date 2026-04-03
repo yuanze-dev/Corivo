@@ -49,7 +49,7 @@ describe('install host use case', () => {
     const getAdapter = vi.fn(() => createAdapter('cursor', ['history-import']));
 
     const run = createHostInstallUseCase({
-      install,
+      installHost: install,
       getAdapter,
       confirmImport,
       isInteractive: () => true,
@@ -75,7 +75,7 @@ describe('install host use case', () => {
     const logger = createLogger();
 
     const run = createHostInstallUseCase({
-      install,
+      installHost: install,
       getAdapter,
       confirmImport,
       isInteractive: () => true,
@@ -105,7 +105,7 @@ describe('install host use case', () => {
     const getAdapter = vi.fn(() => createAdapter('cursor', ['hooks']));
 
     const run = createHostInstallUseCase({
-      install,
+      installHost: install,
       getAdapter,
       confirmImport,
       isInteractive: () => true,
@@ -132,7 +132,7 @@ describe('install host use case', () => {
     const getAdapter = vi.fn(() => createAdapter('codex', ['history-import']));
 
     const run = createHostInstallUseCase({
-      install,
+      installHost: install,
       getAdapter,
       confirmImport,
       isInteractive: () => false,
@@ -165,7 +165,7 @@ describe('install host use case', () => {
     const getAdapter = vi.fn(() => createAdapter('claude-code', ['history-import']));
 
     const run = createHostInstallUseCase({
-      install,
+      installHost: install,
       getAdapter,
       confirmImport,
       isInteractive: () => true,
@@ -192,7 +192,7 @@ describe('install host use case', () => {
     const getAdapter = vi.fn(() => createAdapter('codex', ['history-import']));
 
     const run = createHostInstallUseCase({
-      install,
+      installHost: install,
       getAdapter,
       confirmImport,
       isInteractive: () => true,
@@ -220,7 +220,7 @@ describe('install host use case', () => {
     const getAdapter = vi.fn(() => createAdapter('claude-code', ['history-import']));
 
     const run = createHostInstallUseCase({
-      install,
+      installHost: install,
       getAdapter,
       confirmImport,
       isInteractive: () => true,

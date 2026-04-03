@@ -3,14 +3,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { generateOpencodePluginAsset } from '../../../plugins/runtime/opencode/scripts/sync-asset.mjs';
+import { generateOpencodePluginAsset } from '../../../plugins/opencode/scripts/sync-asset.mjs';
 import {
   injectGlobalOpencodePlugin,
   resolvePackagedOpencodePluginAssetPath,
 } from '../../src/inject/opencode-plugin.js';
 
 const PACKAGED_OPENCODE_PLUGIN_ASSET = fileURLToPath(
-  new URL('../../../plugins/runtime/opencode/assets/corivo.ts', import.meta.url),
+  new URL('../../../plugins/opencode/assets/corivo.ts', import.meta.url),
 );
 
 describe('OpenCode Corivo integration', () => {
@@ -39,7 +39,7 @@ describe('OpenCode Corivo integration', () => {
     expect(result.path).toBe(pluginPath);
     expect(content).toBe(packagedPlugin);
     expect(content).toContain('experimental.chat.system.transform');
-    expect(content).toContain("runCorivo('query'");
+    expect(content).toContain("runCorivo('recall'");
   });
 
   it('prefers an overridden packaged OpenCode asset root when provided', async () => {
@@ -86,7 +86,7 @@ describe('OpenCode Corivo integration', () => {
 
   it('uses the repo runtime asset only when no bundled dist root exists', async () => {
     const packageRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-opencode-package-root-'));
-    const repoAssetPath = path.join(packageRoot, '..', 'plugins', 'runtime', 'opencode', 'assets', 'corivo.ts');
+    const repoAssetPath = path.join(packageRoot, '..', 'plugins', 'opencode', 'assets', 'corivo.ts');
 
     try {
       await fs.writeFile(path.join(packageRoot, 'package.json'), '{"name":"test-cli"}\n', 'utf8');
@@ -131,7 +131,7 @@ describe('OpenCode Corivo integration', () => {
   it('fails when an installed @corivo-ai/opencode package exists but its asset is missing', async () => {
     const packageRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-opencode-installed-root-'));
     const installedRoot = path.join(packageRoot, 'node_modules', '@corivo-ai', 'opencode');
-    const repoAssetPath = path.join(packageRoot, '..', 'plugins', 'runtime', 'opencode', 'assets', 'corivo.ts');
+    const repoAssetPath = path.join(packageRoot, '..', 'plugins', 'opencode', 'assets', 'corivo.ts');
 
     try {
       await fs.writeFile(path.join(packageRoot, 'package.json'), '{"name":"test-cli"}\n', 'utf8');

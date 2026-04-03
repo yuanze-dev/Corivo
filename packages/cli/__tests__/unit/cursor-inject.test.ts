@@ -3,10 +3,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const CURSOR_TEMPLATE_PATH = path.resolve('../plugins/hosts/cursor/templates/corivo.mdc');
-const CURSOR_SESSION_CARRY_OVER_PATH = path.resolve('../plugins/hosts/cursor/hooks/scripts/session-carry-over.sh');
-const CURSOR_PROMPT_RECALL_PATH = path.resolve('../plugins/hosts/cursor/hooks/scripts/prompt-recall.sh');
-const CURSOR_STOP_REVIEW_PATH = path.resolve('../plugins/hosts/cursor/hooks/scripts/stop-review.sh');
+const CURSOR_TEMPLATE_PATH = path.resolve('../plugins/cursor/templates/corivo.mdc');
+const CURSOR_SESSION_CARRY_OVER_PATH = path.resolve('../plugins/cursor/hooks/scripts/session-carry-over.sh');
+const CURSOR_PROMPT_RECALL_PATH = path.resolve('../plugins/cursor/hooks/scripts/prompt-recall.sh');
+const CURSOR_STOP_REVIEW_PATH = path.resolve('../plugins/cursor/hooks/scripts/stop-review.sh');
 const CURSOR_RULES_MODULE_PATH = '../../src/inject/cursor-rules.js';
 
 describe('Cursor Corivo integration', () => {

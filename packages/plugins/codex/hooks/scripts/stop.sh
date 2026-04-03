@@ -5,6 +5,11 @@ LOG_DIR="$HOME/.corivo/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/hooks-codex-ingest.log"
 
+if ! command -v corivo >/dev/null 2>&1; then
+  printf '%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "stop: corivo missing" >> "$LOG_FILE"
+  exit 0
+fi
+
 PAYLOAD="$(cat || true)"
 
 MESSAGE="$(
@@ -22,16 +27,16 @@ MESSAGE="$(
   '
 )"
 
+if [ -z "$MESSAGE" ]; then
+  exit 0
+fi
+
 printf '%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "stop" "$(printf '%s' "$MESSAGE" | head -c 200)" >> "$LOG_FILE"
 
-if printf '%s' "$MESSAGE" | grep -Eqi '\[corivo\]'; then
-  printf '%s\n' '{"continue":true}'
+RESULTS="$(corivo review --last-message "$MESSAGE" --format hook-text 2>/dev/null || true)"
+
+if [ -z "$RESULTS" ]; then
   exit 0
 fi
 
-if printf '%s' "$MESSAGE" | grep -Eqi "I('| wi)ll remember|记住这个|我会记住|不要忘了"; then
-  printf '%s\n' '{"decision":"block","reason":"You promised to remember something. If it should persist, save it to Corivo now or explain why it should not be stored."}'
-  exit 0
-fi
-
-printf '%s\n' '{"continue":true}'
+RESULTS="$RESULTS" node -e 'console.log(JSON.stringify({hookSpecificOutput:{hookEventName:"Stop",additionalContext:process.env.RESULTS || ""}}))'

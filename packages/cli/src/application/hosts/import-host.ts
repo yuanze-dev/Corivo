@@ -12,6 +12,10 @@ import type { Logger } from '../../utils/logging.js';
 
 export type HostImportRequest = HostImportOptions & { host: HostId };
 type HostImportLogger = Pick<Logger, 'debug'>;
+type GetHostAdapter = (host: HostId) => HostAdapter | null;
+type GetHostImportCursor = (host: HostId) => Promise<string | undefined> | string | undefined;
+type SaveHostImportCursor = (host: HostId, cursor: string) => Promise<void> | void;
+type PersistHostImportResult = (result: HostImportResult) => Promise<void> | void;
 
 interface ImportedMessageLike {
   externalMessageId?: string;
@@ -36,19 +40,16 @@ export interface PersistImportedSessionsDeps {
   ) => unknown;
 }
 
-export function createHostImportUseCase(deps?: {
-  run?: (input: HostImportRequest) => Promise<HostImportResult>;
-  getAdapter?: (host: HostId) => HostAdapter | null;
-  getLastCursor?: (host: HostId) => Promise<string | undefined> | string | undefined;
-  saveLastCursor?: (host: HostId, cursor: string) => Promise<void> | void;
-  persistImportResult?: (result: HostImportResult) => Promise<void> | void;
+export interface HostImportUseCaseDependencies {
   logger?: HostImportLogger;
-}) {
-  return async (input: HostImportRequest): Promise<HostImportResult> => {
-    if (deps?.run) {
-      return deps.run(input);
-    }
+  getAdapter?: GetHostAdapter;
+  getLastCursor?: GetHostImportCursor;
+  saveLastCursor?: SaveHostImportCursor;
+  persistImportResult?: PersistHostImportResult;
+}
 
+export function createHostImportUseCase(deps?: HostImportUseCaseDependencies) {
+  return async (input: HostImportRequest): Promise<HostImportResult> => {
     const logger = deps?.logger;
     const getAdapter = deps?.getAdapter ?? ((host: HostId) => getHostAdapter(host));
     const getLastCursor = deps?.getLastCursor ?? (() => undefined);

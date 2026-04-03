@@ -30,45 +30,7 @@ LOG_FILE="$LOG_DIR/hooks-claude-ingest.log"
 # 保持日志文件大小
 tail -n 100 "$LOG_FILE" > "${LOG_FILE}.tmp" && mv "${LOG_FILE}.tmp" "$LOG_FILE"
 
-CONTENT=""
 NORMALIZED_PAYLOAD=""
-
-extract_field() {
-  local field_name="$1"
-  printf '%s' "$INPUT" | FIELD_NAME="$field_name" node -e '
-    let input = "";
-    process.stdin.on("data", (chunk) => (input += chunk));
-    process.stdin.on("end", () => {
-      try {
-        const payload = JSON.parse(input || "{}");
-        const field = process.env.FIELD_NAME;
-        process.stdout.write(typeof payload[field] === "string" ? payload[field] : "");
-      } catch {
-        process.stdout.write("");
-      }
-    });
-  '
-}
-
-extract_content() {
-  printf '%s' "$INPUT" | ROLE="$ROLE" node -e '
-    let input = "";
-    process.stdin.on("data", (chunk) => (input += chunk));
-    process.stdin.on("end", () => {
-      try {
-        const payload = JSON.parse(input || "{}");
-        const role = process.env.ROLE;
-        const firstString = (...values) => values.find((value) => typeof value === "string" && value.length > 0) || "";
-        const content = role === "user"
-          ? firstString(payload.prompt, payload.user_prompt, payload.message)
-          : firstString(payload.last_assistant_message, payload.assistant_message, payload.message);
-        process.stdout.write(content);
-      } catch {
-        process.stdout.write("");
-      }
-    });
-  '
-}
 
 normalize_payload() {
   printf '%s' "$INPUT" | ROLE="$ROLE" PROJECT_IDENTITY="${PWD:-}" node -e '
@@ -117,21 +79,8 @@ normalize_payload() {
   '
 }
 
-if [ "$ROLE" = "user" ]; then
-  # UserPromptSubmit 事件: .prompt 字段包含用户输入
-  CONTENT="$(extract_content)"
-
-elif [ "$ROLE" = "assistant" ]; then
-  # Stop 事件: .last_assistant_message 字段包含 Claude 最后的回复
-  CONTENT="$(extract_content)"
-else
+if [ "$ROLE" != "user" ] && [ "$ROLE" != "assistant" ]; then
   echo "Unknown role: $ROLE" >> "$LOG_FILE"
-  exit 0
-fi
-
-# 内容验证：非空且长度大于 5 个字符
-if [ -z "$CONTENT" ] || [ ${#CONTENT} -le 5 ]; then
-  echo "Content too short or empty, skipping" >> "$LOG_FILE"
   exit 0
 fi
 
@@ -148,7 +97,7 @@ if [ -z "$NORMALIZED_PAYLOAD" ]; then
 fi
 
 if printf '%s' "$NORMALIZED_PAYLOAD" | corivo ingest-message >> "$LOG_FILE" 2>&1; then
-  echo "✓ Ingested [$ROLE] turn into raw memory (${#CONTENT} chars)" >> "$LOG_FILE"
+  echo "✓ Ingested [$ROLE] turn into raw memory" >> "$LOG_FILE"
 else
   echo "✗ Failed to ingest [$ROLE] turn into raw memory" >> "$LOG_FILE"
 fi

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import hooksConfig from '../../../plugins/hosts/claude-code/hooks/hooks.json';
+import hooksConfig from '../../../plugins/claude-code/hooks/hooks.json';
 
 describe('Claude Code hook wiring', () => {
   it('wires SessionStart to init and carry-over hooks', () => {

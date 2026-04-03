@@ -3,8 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const CODEX_TEMPLATE_PATH = path.resolve('../plugins/hosts/codex/templates/AGENTS.codex.md');
-const CODEX_REVIEW_ADAPTER_PATH = path.resolve('../plugins/hosts/codex/adapters/notify-review.sh');
+const CODEX_TEMPLATE_PATH = path.resolve('../plugins/codex/templates/AGENTS.codex.md');
+const CODEX_REVIEW_ADAPTER_PATH = path.resolve('../plugins/codex/adapters/notify-review.sh');
 const CODEX_RULES_MODULE_PATH = '../../src/inject/codex-rules.js';
 
 describe('Codex Corivo integration', () => {
@@ -126,9 +126,10 @@ describe('Codex Corivo integration', () => {
       expect(sessionInitContent).toContain('hookEventName:"SessionStart"');
       expect(ingestTurnContent).toContain('corivo ingest-message');
       expect(userPromptSubmitContent).toContain('hookEventName:"UserPromptSubmit"');
-      expect(userPromptSubmitContent).toContain('corivo query --prompt "$PROMPT" --format hook-text');
+      expect(userPromptSubmitContent).toContain('corivo recall --prompt "$PROMPT" --format hook-text');
       expect(userPromptSubmitContent).not.toContain('corivo list --annotation');
-      expect(stopContent).toContain('"decision":"block"');
+      expect(stopContent).toContain('hookEventName:"Stop"');
+      expect(stopContent).toContain('corivo review --last-message "$MESSAGE" --format hook-text');
       expect(hooksConfig).toContain(sessionInitPath);
       expect(hooksConfig).toContain(ingestTurnPath);
       expect(hooksConfig).toContain(userPromptSubmitPath);

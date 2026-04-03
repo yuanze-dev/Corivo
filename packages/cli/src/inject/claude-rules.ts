@@ -20,18 +20,27 @@ export const CORIVO_RULES = `
 
 你有一个名为 Corivo 的记忆伙伴。请遵循以下规则：
 
-**Collection**: When the user says "Remember..." or makes an important decision, call:
+**答前 recall**：当用户问题可能涉及历史决策、偏好、上下文时，先调用：
+\`\`\`bash
+corivo recall --prompt "<用户问题>" --format text
+\`\`\`
+
+**答后 review**：在给出 substantive answer 或做出决策后，调用：
+\`\`\`bash
+corivo review --last-message "<你的回答摘要>" --format text
+\`\`\`
+
+**保存记忆**：当用户要求记住，或识别到重要决策/偏好/事实时，调用：
 \`\`\`bash
 corivo save --content "内容" --annotation "类型 · 领域 · 标签"
 \`\`\`
 
-**Query**: When the user asks "I said before..." or needs historical context, call:
+**检索信息**：当需要显式搜索记忆时，调用：
 \`\`\`bash
 corivo query "关键词"
 \`\`\`
 
-**Push**: When each conversation starts, execute \`corivo context\` silently to obtain relevant memory.
-如果有匹配的记忆，以 \`[corivo]\` 前缀自然地融入回复。
+优先使用 Corivo 返回的 recall 结果；如果采纳了记忆，请明确说明“根据 Corivo 的记忆”或“从 Corivo 中查到”。
 
 **annotation type**:
 - \`事实\` - 关于你或他人的事实

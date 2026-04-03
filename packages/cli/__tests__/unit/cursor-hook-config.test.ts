@@ -13,13 +13,13 @@ type CursorHooksConfig = {
   hooks: Record<string, HookGroup[]>;
 };
 
-const hooksConfigPath = new URL('../../../plugins/hosts/cursor/hooks/hooks.json', import.meta.url);
+const hooksConfigPath = new URL('../../../plugins/cursor/hooks/hooks.json', import.meta.url);
 const promptRecallScriptPath = new URL(
-  '../../../plugins/hosts/cursor/hooks/scripts/prompt-recall.sh',
+  '../../../plugins/cursor/hooks/scripts/prompt-recall.sh',
   import.meta.url
 );
 const stopReviewScriptPath = new URL(
-  '../../../plugins/hosts/cursor/hooks/scripts/stop-review.sh',
+  '../../../plugins/cursor/hooks/scripts/stop-review.sh',
   import.meta.url
 );
 
@@ -49,9 +49,9 @@ describe('Cursor hook wiring', () => {
     );
   });
 
-  it('uses corivo query --format hook-text in the prompt recall script', () => {
+  it('uses corivo recall --format hook-text in the prompt recall script', () => {
     const script = readFileSync(promptRecallScriptPath, 'utf8');
-    expect(script).toContain('corivo query --prompt "$PROMPT" --format hook-text');
+    expect(script).toContain('corivo recall --prompt "$PROMPT" --format hook-text');
   });
 
   it('uses corivo review --format hook-text in the stop review script', () => {

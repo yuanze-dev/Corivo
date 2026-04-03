@@ -1,4 +1,7 @@
-import type { HostAdapter, HostId } from './types.js';
+import type {
+  HostAdapter,
+  HostId,
+} from './types.js';
 import { claudeCodeHostAdapter } from './adapters/claude-code.js';
 import { codexHostAdapter } from './adapters/codex.js';
 import { cursorHostAdapter } from './adapters/cursor.js';

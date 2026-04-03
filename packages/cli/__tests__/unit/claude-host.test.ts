@@ -4,10 +4,10 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { injectGlobalClaudeCodeHost } from '../../src/inject/claude-host.js';
 
-const CLAUDE_SESSION_INIT_PATH = path.resolve('../plugins/hosts/claude-code/hooks/scripts/session-init.sh');
-const CLAUDE_INGEST_TURN_PATH = path.resolve('../plugins/hosts/claude-code/hooks/scripts/ingest-turn.sh');
-const CLAUDE_QUERY_SKILL_PATH = path.resolve('../plugins/hosts/claude-code/skills/corivo-query/skill.md');
-const CLAUDE_SAVE_SKILL_PATH = path.resolve('../plugins/hosts/claude-code/skills/corivo-save/skill.md');
+const CLAUDE_SESSION_INIT_PATH = path.resolve('../plugins/claude-code/hooks/scripts/session-init.sh');
+const CLAUDE_INGEST_TURN_PATH = path.resolve('../plugins/claude-code/hooks/scripts/ingest-turn.sh');
+const CLAUDE_QUERY_SKILL_PATH = path.resolve('../plugins/claude-code/skills/corivo-query/skill.md');
+const CLAUDE_SAVE_SKILL_PATH = path.resolve('../plugins/claude-code/skills/corivo-save/skill.md');
 
 describe('Claude Code host installer', () => {
   let tempHome: string;

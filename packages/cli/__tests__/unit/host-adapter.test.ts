@@ -27,7 +27,7 @@ describe('createHostAdapterPayload', () => {
     expectedCommand: HostAdapterLifecyclePayload['runtimeCommand'];
   }> = [
     { event: 'session-start', expectedCommand: 'carry-over' },
-    { event: 'prompt-submit', expectedCommand: 'query' },
+    { event: 'prompt-submit', expectedCommand: 'recall' },
     { event: 'response-done', expectedCommand: 'review' },
   ];
 

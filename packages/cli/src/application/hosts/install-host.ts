@@ -1,5 +1,4 @@
 import { createHostImportUseCase, type HostImportRequest } from './import-host.js';
-import { readConfirmIfTTY, isInteractiveTTY } from '../../cli/utils/password.js';
 import { getHostAdapter } from '../../hosts/registry.js';
 import type { HostAdapter, HostId, HostInstallOptions, HostInstallResult } from '../../hosts/types.js';
 import type { Logger } from '../../utils/logging.js';
@@ -7,31 +6,30 @@ import type { Logger } from '../../utils/logging.js';
 export type HostInstallRequest = HostInstallOptions & { host: HostId };
 type HostInstallLogger = Pick<Logger, 'debug'>;
 
-export function createHostInstallUseCase(deps?: {
-  run?: (input: HostInstallRequest) => Promise<HostInstallResult>;
-  install?: (input: HostInstallRequest) => Promise<HostInstallResult>;
+export interface HostInstallUseCaseDependencies {
+  logger?: HostInstallLogger;
+  getAdapter?: (host: HostId) => HostAdapter | null;
+  installHost?: (input: HostInstallRequest) => Promise<HostInstallResult>;
   importHistory?: (input: HostImportRequest) => Promise<{
     success: boolean;
     summary: string;
     error?: string;
   }>;
-  confirmImport?: (prompt: string) => Promise<boolean>;
   isInteractive?: () => boolean;
-  getAdapter?: (host: HostId) => HostAdapter | null;
-  logger?: HostInstallLogger;
-}) {
-  return async (input: HostInstallRequest): Promise<HostInstallResult> => {
-    if (deps?.run) {
-      return deps.run(input);
-    }
+  confirmImport?: (prompt: string) => Promise<boolean>;
+}
 
+export function createHostInstallUseCase(deps?: HostInstallUseCaseDependencies) {
+  return async (input: HostInstallRequest): Promise<HostInstallResult> => {
     const logger = deps?.logger;
     logger?.debug(
       `[host:install] start host=${input.host} target=${input.target ?? '<default>'}`
     );
 
     const getAdapter = deps?.getAdapter ?? ((host: HostId) => getHostAdapter(host));
-    const install = deps?.install ?? (async (request: HostInstallRequest) => {
+    const installHost =
+      deps?.installHost
+      ?? (async (request: HostInstallRequest) => {
       const adapter = getAdapter(request.host);
       if (!adapter) {
         return {
@@ -45,7 +43,7 @@ export function createHostInstallUseCase(deps?: {
       return adapter.install(request);
     });
 
-    const result = await install(input);
+    const result = await installHost(input);
     const adapter = getAdapter(input.host);
     const canImportHistory = Boolean(adapter?.capabilities.includes('history-import'));
     logger?.debug(
@@ -56,14 +54,13 @@ export function createHostInstallUseCase(deps?: {
       return result;
     }
 
-    const isInteractive = deps?.isInteractive ?? isInteractiveTTY;
+    const isInteractive = deps?.isInteractive ?? (() => false);
     if (!isInteractive()) {
       logger?.debug(`[host:install] auto-import skipped host=${input.host} reason=non-interactive`);
       return result;
     }
 
-    const confirmImport = deps?.confirmImport
-      ?? ((prompt: string) => readConfirmIfTTY(prompt, true));
+    const confirmImport = deps?.confirmImport ?? (async () => false);
     const confirmed = await confirmImport('Import existing conversation history now?');
     if (!confirmed) {
       logger?.debug(`[host:install] auto-import declined host=${input.host}`);

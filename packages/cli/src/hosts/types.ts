@@ -15,6 +15,25 @@ export type HostCapability =
   | 'uninstall'
   | 'history-import';
 
+export type HostBridgeEvent =
+  | 'session-start'
+  | 'prompt-submit'
+  | 'response-done'
+  | 'realtime-ingest';
+
+export type HostBridgeCommandName =
+  | 'carry-over'
+  | 'recall'
+  | 'review'
+  | 'ingest-message';
+
+export interface HostBridgeCommand {
+  host: HostId;
+  event: HostBridgeEvent;
+  command: HostBridgeCommandName;
+  format: 'text' | 'hook-text' | 'json';
+}
+
 export interface HostInstallOptions {
   target?: string;
   force?: boolean;

@@ -4,17 +4,15 @@ import type {
   HostLifecycleEvent,
 } from './types.js';
 import type { RuntimeOutputFormat } from './render.js';
-
-const EVENT_TO_COMMAND: Record<HostLifecycleEvent, HostAdapterLifecyclePayload['runtimeCommand']> = {
-  'session-start': 'carry-over',
-  'prompt-submit': 'query',
-  'response-done': 'review',
-};
+import {
+  resolveHostBridgeOutputFormat,
+  resolveHostBridgeRuntimeCommand,
+} from './host-bridge-policy.js';
 
 export function getHostAdapterOutputFormat(
   capability: HostAdapterCapability,
 ): RuntimeOutputFormat {
-  return capability === 'instruction-driven' ? 'text' : 'hook-text';
+  return resolveHostBridgeOutputFormat(capability);
 }
 
 export function createHostAdapterPayload(
@@ -24,7 +22,7 @@ export function createHostAdapterPayload(
   return {
     capability,
     event,
-    runtimeCommand: EVENT_TO_COMMAND[event],
+    runtimeCommand: resolveHostBridgeRuntimeCommand(event),
     outputFormat: getHostAdapterOutputFormat(capability),
   };
 }

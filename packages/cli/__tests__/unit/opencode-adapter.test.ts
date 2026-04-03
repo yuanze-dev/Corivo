@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createOpencodeCorivoHooks,
   type OpencodeAdapterDeps,
-} from '../../../plugins/runtime/opencode/src/adapter.js';
-import opencodePlugin from '../../../plugins/runtime/opencode/src/index.js';
+} from '../../../plugins/opencode/src/adapter.js';
+import opencodePlugin from '../../../plugins/opencode/src/index.js';
 
 describe('OpenCode Corivo adapter', () => {
   let deps: OpencodeAdapterDeps;
@@ -15,8 +15,8 @@ describe('OpenCode Corivo adapter', () => {
       if (command === 'carry-over') {
         return '[corivo] carry-over context';
       }
-      if (command === 'query') {
-        return '[corivo] query context';
+      if (command === 'recall') {
+        return '[corivo] recall context';
       }
       if (command === 'review') {
         return '[corivo] review context';
@@ -99,7 +99,7 @@ describe('OpenCode Corivo adapter', () => {
     expect(secondOutput.system).not.toContain('[corivo] carry-over context');
   });
 
-  it('stores query on chat.message and appends it to later system transform', async () => {
+  it('stores recall on chat.message and appends it to later system transform', async () => {
     const hooks = createOpencodeCorivoHooks(deps);
 
     await hooks['chat.message']?.(
@@ -128,13 +128,13 @@ describe('OpenCode Corivo adapter', () => {
       output,
     );
 
-    expect(runCorivo).toHaveBeenCalledWith('query', [
+    expect(runCorivo).toHaveBeenCalledWith('recall', [
       '--prompt',
       'Should we keep Redis?',
       '--format',
       'hook-text',
     ]);
-    expect(output.system).toContain('[corivo] query context');
+    expect(output.system).toContain('[corivo] recall context');
   });
 
   it('runs review on session.idle using the latest assistant message', async () => {
@@ -217,8 +217,8 @@ describe('OpenCode Corivo adapter', () => {
       if (command === 'carry-over') {
         return '[corivo] carry-over context';
       }
-      if (command === 'query') {
-        return '[corivo] query context';
+      if (command === 'recall') {
+        return '[corivo] recall context';
       }
       if (command === 'review') {
         reviewAttempts += 1;

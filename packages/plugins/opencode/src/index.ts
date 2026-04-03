@@ -5,7 +5,7 @@ import { createOpencodeCorivoHooks } from './adapter.js';
 const execFileAsync = promisify(execFile);
 
 async function runCorivo(
-  command: 'carry-over' | 'query' | 'review',
+  command: 'carry-over' | 'recall' | 'review',
   args: string[],
 ): Promise<string> {
   try {

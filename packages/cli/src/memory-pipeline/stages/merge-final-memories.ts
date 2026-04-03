@@ -26,7 +26,7 @@ import type {
 
 const STAGE_ID = 'merge-final-memories';
 const RAW_STAGE_ID = 'extract-raw-memories';
-const MERGE_TIMEOUT_MS = 180_000;
+const MERGE_TIMEOUT_MS = 600_000;
 const LEGACY_RAW_FILE_BLOCK_PATTERN =
   /<!--\s*FILE:\s*([^\s].*?)\s*-->\s*```markdown\s*[\s\S]*?```/g;
 

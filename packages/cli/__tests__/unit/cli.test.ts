@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { CorivoDatabase } from '../../src/storage/database.js';
+import { CorivoDatabase } from '@/storage/database';
 import { KeyManager } from '../../src/crypto/keys.js';
 
 describe('CLI Commands', () => {

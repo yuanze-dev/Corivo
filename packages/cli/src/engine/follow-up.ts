@@ -4,7 +4,7 @@
  * Provide gentle progress reminders for pending decisions: "What happened to that xxx?"
  */
 
-import type { CorivoDatabase } from '../storage/database.js';
+import type { CorivoDatabase } from '@/storage/database';
 import type { Block } from '../models/index.js';
 import {
   collectFollowUpReminderItems,

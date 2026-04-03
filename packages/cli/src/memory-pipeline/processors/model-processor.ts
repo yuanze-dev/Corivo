@@ -2,8 +2,8 @@ import type {
   ExtractionInput,
   ExtractionProvider,
   ExtractionResult,
-} from '@/service/extraction/types.js';
-import { extractWithProvider } from '@/service/extraction/index.js';
+} from '@/infrastructure/llm/types.js';
+import { extractWithProvider } from '@/infrastructure/llm/index.js';
 
 export interface ModelProcessorMetadata {
   provider?: ExtractionProvider;

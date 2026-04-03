@@ -4,7 +4,7 @@
  * Send a short summary every Monday: "3 decisions made last week"
  */
 
-import type { CorivoDatabase } from '../storage/database.js';
+import type { CorivoDatabase } from '@/storage/database';
 
 /**
  * Weekly Statistics

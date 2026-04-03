@@ -52,7 +52,7 @@ import { generateBlockId } from '../models/block.js';
 import { generateAssociationId, AssociationType } from '../models/association.js';
 import { KeyManager } from '../crypto/keys.js';
 import { randomUUID } from 'node:crypto';
-import type { HostId } from '../hosts/types.js';
+import type { HostId } from '@/domain/host/contracts/types.js';
 import type {
   EnsureExtractSessionJobInput,
   MemoryProcessingJobRecord,

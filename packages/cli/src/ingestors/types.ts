@@ -5,7 +5,7 @@
  * through the `plugins` field in `config.json`.
  * `RealtimeCollector` is one plugin capability, and we can add more capabilities over time.
  */
-import type { CorivoDatabase } from '../storage/database.js';
+import type { CorivoDatabase } from '@/storage/database';
 
 /** Real-time collection capability interface */
 export interface RealtimeCollector {

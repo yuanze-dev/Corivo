@@ -72,6 +72,18 @@ Composition roots:
 
 The cleanup pass intentionally removes pseudo-modules (pure 1:1 forwarding wrappers) where they do not add semantics, while keeping real boundaries that carry policy, contracts, or composition responsibilities.
 
+## Target Boundary Direction
+
+The current package is being migrated toward a second-generation split:
+
+- `src/cli/*`: command adapters, Commander wiring, presenters, terminal-facing output only
+- `src/application/*`: use-cases and orchestration flow for one user action
+- `src/domain/*`: core business logic, durable models, rules, and contracts
+- `src/infrastructure/*`: SQLite, config/filesystem, platform services, host implementations, LLM/provider adapters
+- `src/runtime/*`: daemon lifecycle, scheduling, and runtime policy glue
+
+When adding or moving code, prefer the target split above over older catch-all directories such as `service`, `engine`, or `type`.
+
 ## Memory Pipeline
 
 ### Host history import

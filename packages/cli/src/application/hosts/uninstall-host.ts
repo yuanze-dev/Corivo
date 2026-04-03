@@ -1,5 +1,5 @@
-import { getHostAdapter } from '../../hosts/registry.js';
-import type { HostId, HostInstallOptions, HostInstallResult } from '../../hosts/types.js';
+import { getHostAdapter } from '@/infrastructure/hosts/registry.js';
+import type { HostId, HostInstallOptions, HostInstallResult } from '@/domain/host/contracts/types.js';
 
 export type HostUninstallRequest = HostInstallOptions & { host: HostId };
 

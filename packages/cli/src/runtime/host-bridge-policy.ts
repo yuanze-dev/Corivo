@@ -3,7 +3,7 @@ import type {
   HostAdapterLifecyclePayload,
   HostLifecycleEvent,
 } from './types.js';
-import type { HostBridgeCommand, HostBridgeEvent, HostId } from '../hosts/types.js';
+import type { HostBridgeCommand, HostBridgeEvent, HostId } from '@/domain/host/contracts/types.js';
 
 const HOST_RUNTIME_COMMAND_BY_EVENT: Record<HostLifecycleEvent, HostAdapterLifecyclePayload['runtimeCommand']> = {
   'session-start': 'carry-over',

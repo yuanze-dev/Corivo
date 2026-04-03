@@ -1,4 +1,4 @@
-import type { HostId } from '../../hosts/types.js';
+import type { HostId } from '@/domain/host/contracts/types.js';
 import type { RawMessageRole } from '../../raw-memory/types.js';
 import type { RawMemoryRepository } from '../../raw-memory/repository.js';
 import type {

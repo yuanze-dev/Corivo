@@ -4,7 +4,7 @@
  * Stops the heartbeat daemon process.
  */
 
-import { getServiceManager } from '../../service/index.js'
+import { getServiceManager } from '@/infrastructure/platform/index.js'
 import { createCliContext } from '../context/create-context.js'
 
 export async function stopCommand(): Promise<void> {

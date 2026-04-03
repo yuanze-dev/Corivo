@@ -1,5 +1,5 @@
-import type { HostId } from '../hosts/types.js';
-import type { CorivoDatabase } from '../storage/database.js';
+import type { HostId } from '@/domain/host/contracts/types.js';
+import type { CorivoDatabase } from '@/storage/database';
 
 export class HostImportCursorStore {
   constructor(private readonly db: CorivoDatabase) {}

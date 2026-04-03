@@ -1,11 +1,11 @@
 import type { Command } from 'commander';
-import type { HostAdapter, HostDoctorResult, HostId, HostInstallResult } from '@/hosts';
+import type { HostAdapter, HostDoctorResult, HostId, HostInstallResult } from '@/infrastructure/hosts';
 import type { HostDoctorRequest } from '@/application/hosts/doctor-host';
 import type { HostInstallRequest } from '@/application/hosts/install-host';
 import type { HostUninstallRequest } from '@/application/hosts/uninstall-host';
 import type { QueryOptions, PromptQueryCommandOptions, SearchQueryCommandInput } from '@/application/bootstrap/query-execution';
 import type { MemoryPipelineMode } from '@/application/memory/run-memory-pipeline';
-import type { ExtractionProvider } from '@/service/extraction/types';
+import type { ExtractionProvider } from '@/infrastructure/llm/types';
 import type { MemoryPipelineRunResult } from '@/memory-pipeline';
 import type { Logger } from '@/utils/logging';
 

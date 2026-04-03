@@ -1,10 +1,10 @@
-import { getHostAdapter } from '../../hosts/registry.js';
+import { getHostAdapter } from '@/infrastructure/hosts/registry.js';
 import type {
   HostAdapter,
   HostId,
   HostImportOptions,
   HostImportResult,
-} from '../../hosts/types.js';
+} from '@/domain/host/contracts/types.js';
 import type { RawMemoryRepository } from '../../raw-memory/repository.js';
 import type { RawMessageRole } from '../../raw-memory/types.js';
 import type { EnqueueSessionExtractionRequest } from '../memory-ingest/enqueue-session-extraction.js';

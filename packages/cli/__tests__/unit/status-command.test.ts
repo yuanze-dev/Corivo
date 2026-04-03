@@ -41,7 +41,7 @@ vi.mock('@/config', () => ({
   saveSolverConfig,
 }));
 
-vi.mock('@/service/index.js', () => ({
+vi.mock('@/infrastructure/platform/index.js', () => ({
   getServiceManager,
 }));
 

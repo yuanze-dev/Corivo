@@ -4,7 +4,7 @@
  * Let Corivo decide when it needs to tell the user what
  */
 
-import type { CorivoDatabase } from '../storage/database.js';
+import type { CorivoDatabase } from '@/storage/database';
 import type { Block } from '../models/block.js';
 import {
   collectAttentionBlocks,

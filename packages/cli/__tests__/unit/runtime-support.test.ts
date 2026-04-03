@@ -8,7 +8,7 @@ import {
   getConfigDir,
   getDefaultDatabasePath,
   getPidFilePath,
-} from '../../src/storage/database.js';
+} from '@/storage/database';
 
 describe('loadRuntimeDb', () => {
   let tempHome: string;

@@ -11,7 +11,7 @@
 export * from './models';
 export * from './errors';
 export * from './crypto/keys';
-export * from './storage/database';
+export * from '@/storage/database';
 export * from './engine/rules';
 export type {
   ExtractionInput,
@@ -19,7 +19,7 @@ export type {
   ExtractionProvider,
   ExtractionResult,
   ExtractionStatus,
-} from '@/service/extraction/types.js';
-export { extractWithClaude, extractWithCodex, extractWithProvider } from '@/service/extraction/index.js';
+} from '@/infrastructure/llm/types.js';
+export { extractWithClaude, extractWithCodex, extractWithProvider } from '@/infrastructure/llm/index.js';
 export type { RealtimeCollector, CorivoPlugin } from './ingestors/index.js';
 export * from './memory-pipeline/index.js';

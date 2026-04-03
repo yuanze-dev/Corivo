@@ -1,6 +1,6 @@
 import { Command } from 'commander';
-import { generateCarryOver } from '@/runtime/carry-over';
-import { formatSurfaceItem } from '@/runtime/render';
+import { generateCarryOver } from '@/application/carry-over/run-carry-over';
+import { formatSurfaceItem } from '@/cli/presenters/query-renderer';
 import type { RuntimeCommandOptions } from '@/runtime/runtime-support.js';
 import { loadRuntimeDb } from '@/runtime/runtime-support.js';
 import { createCliContext } from '../context/create-context.js';

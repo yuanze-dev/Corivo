@@ -33,7 +33,7 @@ const mockDb = {
   queryBlocks: vi.fn().mockReturnValue([]),
   getBlock: vi.fn(),
   upsertBlock: vi.fn(),
-} as unknown as import('../../src/storage/database.js').CorivoDatabase;
+} as unknown as import('@/storage/database').CorivoDatabase;
 
 const defaultConfig = {
   version: '1',

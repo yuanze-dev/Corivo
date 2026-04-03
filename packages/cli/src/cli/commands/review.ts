@@ -1,7 +1,7 @@
 import { Command } from 'commander';
-import { createQueryPack } from '../../runtime/query-pack.js';
-import { formatSurfaceItem } from '../../runtime/render.js';
-import { generateReview } from '../../runtime/review.js';
+import { createQueryPack } from '@/application/query/query-pack.js';
+import { formatSurfaceItem } from '@/cli/presenters/query-renderer.js';
+import { generateReview } from '@/application/review/run-review.js';
 import type { RuntimeCommandOptions } from '@/runtime/runtime-support.js';
 import { loadRuntimeDb } from '@/runtime/runtime-support.js';
 import { createCliContext } from '../context/create-context.js';

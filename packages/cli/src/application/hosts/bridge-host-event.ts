@@ -1,4 +1,4 @@
-import type { HostBridgeEvent, HostId } from '../../hosts/types.js';
+import type { HostBridgeEvent, HostId } from '@/domain/host/contracts/types.js';
 import { resolveHostBridgeCommand } from '../../runtime/host-bridge-policy.js';
 
 interface HostBridgePayload {

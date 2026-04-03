@@ -14,7 +14,7 @@ import { createHostInstallUseCase } from '@/application/hosts/install-host';
 import { createHostDoctorUseCase } from '@/application/hosts/doctor-host';
 import { createHostUninstallUseCase } from '@/application/hosts/uninstall-host';
 import { runPromptQueryCommand, runSearchQueryCommand } from '@/application/bootstrap/query-execution';
-import { getAllHostAdapters } from '@/hosts';
+import { getAllHostAdapters } from '@/infrastructure/hosts';
 import type {
   CliApp,
   DaemonCommandCapabilities,

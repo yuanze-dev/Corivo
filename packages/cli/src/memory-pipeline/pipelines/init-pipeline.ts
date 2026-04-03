@@ -8,7 +8,7 @@ import { createSummarizeSessionBatchStage } from '../stages/summarize-session-ba
 import { ExtractionBackedModelProcessor, type ModelProcessor } from '../processors/model-processor.js';
 import type { ClaudeSessionSource } from '../sources/claude-session-source.js';
 import type { MemoryPipelineDefinition } from '../types.js';
-import type { ExtractionProvider } from '@/service/extraction/types.js';
+import type { ExtractionProvider } from '@/infrastructure/llm/types.js';
 
 export interface InitMemoryPipelineOptions {
   sessionSource: ClaudeSessionSource;

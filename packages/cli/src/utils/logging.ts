@@ -1,7 +1,8 @@
 import { formatWithOptions } from 'node:util';
 import { createConsola, LogLevels } from 'consola';
 import type { ConsolaReporter, LogObject } from 'consola';
-import type { LogLevel } from '@/type';
+
+export type LogLevel = 'error' | 'info' | 'debug';
 
 type ConsoleMethod = (...args: unknown[]) => void;
 

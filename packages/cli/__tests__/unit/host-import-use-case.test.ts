@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import { createHostImportUseCase, persistImportedSessions } from '../../src/application/hosts/import-host.js';
 import { KeyManager } from '../../src/crypto/keys.js';
-import { CorivoDatabase } from '../../src/storage/database.js';
+import { CorivoDatabase } from '@/storage/database';
 import { RawMemoryRepository } from '../../src/raw-memory/repository.js';
 import { MemoryProcessingJobQueue } from '../../src/raw-memory/job-queue.js';
 import { createEnqueueSessionExtractionUseCase } from '../../src/application/memory-ingest/enqueue-session-extraction.js';

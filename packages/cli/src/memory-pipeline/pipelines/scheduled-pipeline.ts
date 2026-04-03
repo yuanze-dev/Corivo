@@ -7,7 +7,7 @@ import { createRefreshMemoryIndexStage } from '../stages/refresh-memory-index.js
 import { createSummarizeBlockBatchStage } from '../stages/summarize-block-batch.js';
 import { ExtractionBackedModelProcessor, type ModelProcessor } from '../processors/model-processor.js';
 import type { MemoryPipelineDefinition } from '../types.js';
-import type { ExtractionProvider } from '@/service/extraction/types.js';
+import type { ExtractionProvider } from '@/infrastructure/llm/types.js';
 
 export interface ScheduledMemoryPipelineOptions {
   rawSessionJobSource: RawSessionJobSource;

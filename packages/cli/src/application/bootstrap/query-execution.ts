@@ -2,15 +2,15 @@ import chalk from 'chalk';
 import type { Block } from '@/models/block';
 import { ConfigError } from '@/errors';
 import { ContextPusher } from '@/push/context.js';
-import { createQueryPack } from '@/runtime/query-pack.js';
+import { createQueryPack } from '@/application/query/query-pack.js';
 import {
   createRuntimeQueryHistoryStore,
   createRuntimeQueryHistoryTracker,
 } from '@/runtime/query-history.js';
-import { formatSurfaceItem, type RuntimeOutputFormat } from '@/runtime/render.js';
-import { generateRecall } from '@/runtime/recall.js';
+import { formatSurfaceItem, type RuntimeOutputFormat } from '@/cli/presenters/query-renderer.js';
+import { generateRecall } from '@/application/query/generate-recall.js';
 import { loadMemoryIndex } from '@/runtime/memory-index.js';
-import { generateRawTranscriptRecall } from '@/runtime/raw-recall.js';
+import { generateRawTranscriptRecall } from '@/application/query/generate-raw-recall.js';
 import type { RuntimeCommandOptions } from '@/runtime/runtime-support';
 import { loadRuntimeDb } from '@/runtime/runtime-support';
 import type { Logger } from '@/utils/logging';

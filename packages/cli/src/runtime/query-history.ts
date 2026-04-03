@@ -1,4 +1,4 @@
-import type { CorivoDatabase } from '../storage/database.js';
+import type { CorivoDatabase } from '@/storage/database';
 import type { Logger } from '../utils/logging.js';
 import { QueryHistoryTracker } from '../engine/query-history.js';
 import {

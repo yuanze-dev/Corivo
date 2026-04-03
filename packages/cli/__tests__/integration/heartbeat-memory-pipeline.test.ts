@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import Database from 'better-sqlite3';
-import { CorivoDatabase } from '../../src/storage/database.js';
+import { CorivoDatabase } from '@/storage/database';
 import { KeyManager } from '../../src/crypto/keys.js';
 import { Heartbeat } from '../../src/engine/heartbeat.js';
 import * as memoryPipeline from '../../src/application/memory/run-memory-pipeline.js';

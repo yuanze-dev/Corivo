@@ -7,7 +7,7 @@
 
 import type { CliContext } from '../cli/context/types.js';
 import { applyPulledChangesets, authenticate, post, type PulledChangeset } from '../runtime/sync-client.js';
-import type { CorivoDatabase } from '../storage/database.js';
+import type { CorivoDatabase } from '@/storage/database';
 
 const TOKEN_TTL = 4 * 60 * 1000; // 4 minutes (server TTL 5 minutes)
 

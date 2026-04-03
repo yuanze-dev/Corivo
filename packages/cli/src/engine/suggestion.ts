@@ -7,7 +7,7 @@
  * "Predict what the user will type, not what you think they should do."
  */
 
-import type { CorivoDatabase } from '../storage/database.js';
+import type { CorivoDatabase } from '@/storage/database';
 import type { Block } from '../models/block.js';
 
 /**

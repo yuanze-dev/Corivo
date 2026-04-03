@@ -1,4 +1,4 @@
-import type { CorivoDatabase } from '../storage/database.js';
+import type { CorivoDatabase } from '@/storage/database';
 import type {
   RawMessageInput,
   RawMessageRecord,

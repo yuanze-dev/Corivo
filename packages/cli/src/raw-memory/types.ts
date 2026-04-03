@@ -1,4 +1,4 @@
-import type { HostId } from '../hosts/types.js';
+import type { HostId } from '@/domain/host/contracts/types.js';
 
 export type RawSessionSourceType = 'history-import' | 'realtime-hook';
 

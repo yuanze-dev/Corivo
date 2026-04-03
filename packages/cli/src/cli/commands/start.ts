@@ -8,7 +8,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { getConfigDir, getDefaultDatabasePath } from '@/storage/database'
 import { ConfigError } from '../../errors/index.js'
-import { getServiceManager, resolveCorivoBin } from '../../service/index.js'
+import { getServiceManager, resolveCorivoBin } from '@/infrastructure/platform/index.js'
 import { createCliContext } from '../context/create-context.js'
 
 export async function startCommand(): Promise<void> {

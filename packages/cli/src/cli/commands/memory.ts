@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import type { Logger } from '@/utils/logging';
-import type { ExtractionProvider } from '@/service/extraction/types';
+import type { ExtractionProvider } from '@/infrastructure/llm/types';
 import {
   DEFAULT_MEMORY_PROVIDER,
   type MemoryPipelineMode,

@@ -7,7 +7,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { runHeartbeatFirstRun } from '../../runtime/heartbeat-first-run.js';
+import { runHeartbeatFirstRun } from '@/application/review/heartbeat-first-run.js';
 import { getConfigDir, getDefaultDatabasePath } from '@/storage/database';
 import { printBanner } from '@/utils/banner';
 import { createCliContext } from '../context/create-context.js';

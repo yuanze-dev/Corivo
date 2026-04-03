@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KeyManager } from '../../src/crypto/keys.js';
 import { DatabaseClaudeSessionSource } from '../../src/memory-pipeline/sources/claude-session-source.js';
 import { DatabaseSessionRecordSource } from '../../src/memory-pipeline/sources/session-record-source.js';
-import { CorivoDatabase } from '../../src/storage/database.js';
+import { CorivoDatabase } from '@/storage/database';
 
 describe('DatabaseSessionRecordSource', () => {
   let db: CorivoDatabase;

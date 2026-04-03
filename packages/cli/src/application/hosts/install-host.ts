@@ -1,6 +1,6 @@
 import { createHostImportUseCase, type HostImportRequest } from './import-host.js';
-import { getHostAdapter } from '../../hosts/registry.js';
-import type { HostAdapter, HostId, HostInstallOptions, HostInstallResult } from '../../hosts/types.js';
+import { getHostAdapter } from '@/infrastructure/hosts/registry.js';
+import type { HostAdapter, HostId, HostInstallOptions, HostInstallResult } from '@/domain/host/contracts/types.js';
 import type { Logger } from '../../utils/logging.js';
 
 export type HostInstallRequest = HostInstallOptions & { host: HostId };

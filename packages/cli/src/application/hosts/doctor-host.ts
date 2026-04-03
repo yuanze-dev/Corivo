@@ -1,5 +1,5 @@
-import { getHostAdapter } from '../../hosts/registry.js';
-import type { HostDoctorResult, HostId, HostInstallOptions } from '../../hosts/types.js';
+import { getHostAdapter } from '@/infrastructure/hosts/registry.js';
+import type { HostDoctorResult, HostId, HostInstallOptions } from '@/domain/host/contracts/types.js';
 
 export type HostDoctorRequest = HostInstallOptions & { host: HostId };
 

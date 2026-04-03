@@ -7,7 +7,7 @@
  */
 
 import fs from 'node:fs/promises';
-import { CorivoDatabase, getConfigDir } from '../storage/database.js';
+import { CorivoDatabase, getConfigDir } from '@/storage/database';
 import { RuleEngine } from './rules/index.js';
 import { TechChoiceRule } from './rules/tech-choice.js';
 import { AssociationEngine } from './associations.js';

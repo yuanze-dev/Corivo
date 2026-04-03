@@ -21,7 +21,7 @@ describe('sync logging', () => {
     const logger = createMockLogger(logs, errors);
     const db = {
       upsertBlock: vi.fn(),
-    } as unknown as import('../../src/storage/database.js').CorivoDatabase;
+    } as unknown as import('@/storage/database').CorivoDatabase;
 
     const applied = applyPulledChangesets(
       db,
@@ -62,7 +62,7 @@ describe('sync logging', () => {
       upsertBlock: vi.fn(() => {
         throw new Error('SQLITE_CONSTRAINT');
       }),
-    } as unknown as import('../../src/storage/database.js').CorivoDatabase;
+    } as unknown as import('@/storage/database').CorivoDatabase;
 
     expect(() =>
       applyPulledChangesets(

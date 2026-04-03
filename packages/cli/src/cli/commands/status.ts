@@ -8,7 +8,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { loadSolverConfig } from '@/config';
 import { ContextPusher } from '@/push/context.js';
-import { getServiceManager } from '@/service/index.js';
+import { getServiceManager } from '@/infrastructure/platform/index.js';
 import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
 import { ConfigError } from '@/errors';
 import { createCliContext } from '../context/create-context.js';

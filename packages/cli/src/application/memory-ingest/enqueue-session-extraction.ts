@@ -1,4 +1,4 @@
-import type { HostId } from '../../hosts/types.js';
+import type { HostId } from '@/domain/host/contracts/types.js';
 import { MemoryProcessingJobQueue } from '../../raw-memory/job-queue.js';
 import type { MemoryProcessingJobRecord } from '../../raw-memory/types.js';
 

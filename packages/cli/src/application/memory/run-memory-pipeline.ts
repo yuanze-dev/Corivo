@@ -1,141 +1,166 @@
 import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
 import {
+  ArtifactStore,
+  createInitMemoryPipeline,
+  createScheduledMemoryPipeline,
+  DatabaseRawSessionJobSource,
+  DatabaseRawSessionRecordSource,
   type ClaudeSessionSource,
   FileRunLock,
-  type MemoryPipelineArtifactStore,
   type MemoryPipelineDefinition,
+  type MemoryPipelineArtifactStore,
   MemoryPipelineRunner,
-  type MemoryPipelineRunnerOptions,
   type MemoryPipelineRunResult,
   type PipelineTrigger,
   type RawSessionJobSource,
 } from '@/memory-pipeline';
 import type { Logger } from '@/utils/logging';
 import type { ExtractionProvider } from '@/extraction/types';
+import { createLogger } from '@/utils/logging';
+import { MemoryProcessingJobQueue } from '@/raw-memory/job-queue';
+import { RawMemoryRepository } from '@/raw-memory/repository';
 import { readMemoryPipelineConfig } from './config.js';
-import { createMemoryPipelineLogger } from './logger.js';
-import { buildInitMemoryPipeline, buildScheduledMemoryPipeline } from './pipelines.js';
-import {
-  closeMemoryPipelineDatabase,
-  createMemoryPipelineArtifactStore,
-  createMemoryPipelineLock,
-  createMemoryPipelineRunner,
-  getMemoryPipelineRunRoot,
-  openMemoryPipelineDatabase,
-} from './runtime.js';
+import { createMemoryPipelineArtifactStore, getMemoryPipelineRunRoot } from './runtime.js';
 import { createDatabaseRawSessionJobSource, createDatabaseSessionSource } from './sources.js';
-import { createMemoryPipelineTrigger } from './trigger.js';
 
 export type MemoryPipelineMode = 'full' | 'incremental';
 export const DEFAULT_MEMORY_PROVIDER: ExtractionProvider = 'claude';
 
-export interface MemoryPipelineExecutionDependencies {
+export interface MemoryPipelineRuntimeDependencies {
   resolveConfigDir: () => string;
   resolveDatabasePath: () => string;
   createLogger: () => Logger;
   readConfig: (configDir: string) => Promise<{ encrypted_db_key?: string }>;
-  createArtifactStore: (runRoot: string) => MemoryPipelineArtifactStore;
-  createLock: (runRoot: string) => FileRunLock;
-  createRunner: (options: MemoryPipelineRunnerOptions) => MemoryPipelineRunner;
-  createInitPipeline: (options: {
-    sessionSource: ClaudeSessionSource;
-    provider: ExtractionProvider;
-  }) => MemoryPipelineDefinition;
-  createScheduledPipeline: (options: {
-    rawSessionJobSource: RawSessionJobSource;
-    provider: ExtractionProvider;
-  }) => MemoryPipelineDefinition;
-  createSessionSource: (db: CorivoDatabase) => ClaudeSessionSource;
-  createRawSessionJobSource: (db: CorivoDatabase) => RawSessionJobSource;
   openDatabase: (dbPath: string) => CorivoDatabase;
   closeDatabase: (db: CorivoDatabase, dbPath: string) => void;
-  createTrigger: (mode: MemoryPipelineMode) => PipelineTrigger;
 }
 
-export type RunMemoryPipelineOptions = {
+export interface MemoryPipelineExecutionDependencies {
+  runtime?: Partial<MemoryPipelineRuntimeDependencies>;
+  buildPipeline?: (input: {
+    mode: MemoryPipelineMode;
+    provider: ExtractionProvider;
+    db: CorivoDatabase;
+  }) => MemoryPipelineDefinition;
+  createTrigger?: (mode: MemoryPipelineMode) => PipelineTrigger;
+  runPipeline?: (input: {
+    pipeline: MemoryPipelineDefinition;
+    trigger: PipelineTrigger;
+    logger: Logger;
+    runRoot: string;
+  }) => Promise<MemoryPipelineRunResult>;
+}
+
+export interface RunMemoryPipelineOptions {
   mode: MemoryPipelineMode;
   provider?: ExtractionProvider;
-} & Partial<MemoryPipelineExecutionDependencies>;
+  dependencies?: MemoryPipelineExecutionDependencies;
+}
 
-const defaultExecutionDependencies: MemoryPipelineExecutionDependencies = {
+const defaultRuntimeDependencies: MemoryPipelineRuntimeDependencies = {
   resolveConfigDir: getConfigDir,
   resolveDatabasePath: getDefaultDatabasePath,
-  createLogger: createMemoryPipelineLogger,
+  createLogger: createLogger,
   readConfig: readMemoryPipelineConfig,
-  createArtifactStore: createMemoryPipelineArtifactStore,
-  createLock: createMemoryPipelineLock,
-  createRunner: createMemoryPipelineRunner,
-  createInitPipeline: buildInitMemoryPipeline,
-  createScheduledPipeline: buildScheduledMemoryPipeline,
-  createSessionSource: createDatabaseSessionSource,
-  createRawSessionJobSource: createDatabaseRawSessionJobSource,
-  openDatabase: openMemoryPipelineDatabase,
-  closeDatabase: closeMemoryPipelineDatabase,
-  createTrigger: createMemoryPipelineTrigger,
+  openDatabase: (dbPath) => CorivoDatabase.getInstance({ path: dbPath, enableEncryption: false }),
+  closeDatabase: () => {
+    // No-op; the CorivoDatabase lifecycle is managed at the process level.
+  },
 };
 
 export async function runMemoryPipeline(
   options: RunMemoryPipelineOptions,
 ): Promise<MemoryPipelineRunResult> {
-  const { mode, provider = DEFAULT_MEMORY_PROVIDER, ...dependencyOverrides } = options;
-  const dependencies = { ...defaultExecutionDependencies, ...dependencyOverrides };
-  const logger = dependencies.createLogger();
-  const configDir = dependencies.resolveConfigDir();
+  const { mode, provider = DEFAULT_MEMORY_PROVIDER, dependencies: dependencyOverrides } = options;
+  const runtime = { ...defaultRuntimeDependencies, ...(dependencyOverrides?.runtime ?? {}) };
+  const buildPipeline = dependencyOverrides?.buildPipeline ?? defaultBuildPipeline;
+  const createTrigger = dependencyOverrides?.createTrigger ?? ((mode) => ({
+    type: mode === 'full' ? 'init' : 'manual',
+    runAt: Date.now(),
+    requestedBy: 'cli',
+  }));
+  const runPipeline = dependencyOverrides?.runPipeline ?? defaultRunPipeline;
+  const logger = runtime.createLogger();
+  const configDir = runtime.resolveConfigDir();
   logger.debug(`[memory:pipeline] starting mode=${mode} provider=${provider} configDir=${configDir}`);
-  await dependencies.readConfig(configDir);
+  await runtime.readConfig(configDir);
   logger.debug(`[memory:pipeline] config loaded configDir=${configDir}`);
 
   const runRoot = getMemoryPipelineRunRoot(configDir);
-  const artifactStore = dependencies.createArtifactStore(runRoot);
-  const lock = dependencies.createLock(runRoot);
-  const runner = dependencies.createRunner({
-    artifactStore,
-    lock,
-    logger,
-    runRoot,
-  });
-  logger.debug(`[memory:pipeline] resources ready runRoot=${runRoot}`);
-  logger.debug('[memory:pipeline] runner ready');
+  logger.debug(`[memory:pipeline] runtime ready runRoot=${runRoot}`);
 
   let openedDatabase: CorivoDatabase | undefined;
   let openedDatabasePath: string | undefined;
 
   try {
-    const dbPath = dependencies.resolveDatabasePath();
-    const db = dependencies.openDatabase(dbPath);
+    const dbPath = runtime.resolveDatabasePath();
+    const db = runtime.openDatabase(dbPath);
     openedDatabase = db;
     openedDatabasePath = dbPath;
     logger.debug(`[memory:pipeline] opened database path=${dbPath}`);
 
-    const pipeline =
-      mode === 'full'
-        ? dependencies.createInitPipeline({
-            sessionSource: dependencies.createSessionSource(db),
-            provider,
-          })
-        : dependencies.createScheduledPipeline({
-            rawSessionJobSource: dependencies.createRawSessionJobSource(db),
-            provider,
-          });
+    const pipeline = buildPipeline({
+      mode,
+      provider,
+      db,
+    });
     logger.debug(
       `[memory:pipeline] built pipeline id=${pipeline.id} provider=${provider} stageCount=${pipeline.stages.length}`
     );
 
-    const trigger = dependencies.createTrigger(mode);
+    const trigger = createTrigger(mode);
     logger.debug(
       `[memory:pipeline] created trigger type=${trigger.type} requestedBy=${trigger.requestedBy ?? 'unknown'} runAt=${trigger.runAt}`
     );
 
-    const result = await runner.run(pipeline, trigger);
+    const result = await runPipeline({ pipeline, trigger, logger, runRoot });
+    const failedStage = result.stages.find((stage) => stage.status === 'failed');
     logger.debug(
-      `[memory:pipeline] completed pipeline=${result.pipelineId} status=${result.status} run=${result.runId}`
+      `[memory:pipeline] completed pipeline=${result.pipelineId} status=${result.status} run=${result.runId} trigger=${result.trigger} stageCount=${result.stageCount} failedStage=${failedStage?.stageId ?? 'none'} failureClassification=${failedStage?.failureClassification ?? 'none'}`
     );
     return result;
   } finally {
     if (openedDatabase && openedDatabasePath) {
       logger.debug(`[memory:pipeline] closing database path=${openedDatabasePath}`);
-      dependencies.closeDatabase(openedDatabase, openedDatabasePath);
+      runtime.closeDatabase(openedDatabase, openedDatabasePath);
       logger.debug(`[memory:pipeline] closed database path=${openedDatabasePath}`);
     }
   }
+}
+
+function defaultBuildPipeline(input: {
+  mode: MemoryPipelineMode;
+  provider: ExtractionProvider;
+  db: CorivoDatabase;
+}): MemoryPipelineDefinition {
+  if (input.mode === 'full') {
+    return createInitMemoryPipeline({
+      sessionSource: createDatabaseSessionSource(input.db) as ClaudeSessionSource,
+      provider: input.provider,
+    });
+  }
+
+  return createScheduledMemoryPipeline({
+    rawSessionJobSource: createDatabaseRawSessionJobSource(input.db) as RawSessionJobSource,
+    provider: input.provider,
+  });
+}
+
+async function defaultRunPipeline(input: {
+  pipeline: MemoryPipelineDefinition;
+  trigger: PipelineTrigger;
+  logger: Logger;
+  runRoot: string;
+}): Promise<MemoryPipelineRunResult> {
+  const artifactStore = createMemoryPipelineArtifactStore(input.runRoot);
+  const lock = new FileRunLock(`${input.runRoot}/run.lock`);
+  const runner = new MemoryPipelineRunner({
+    artifactStore,
+    lock,
+    logger: input.logger,
+    runRoot: input.runRoot,
+  });
+  input.logger.debug(`[memory:pipeline] resources ready runRoot=${input.runRoot}`);
+  input.logger.debug('[memory:pipeline] runner ready');
+  return runner.run(input.pipeline, input.trigger);
 }

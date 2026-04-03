@@ -4,15 +4,12 @@ import type {
   PipelineStageResult,
 } from '../types.js';
 import type { ModelProcessor } from '../processors/model-processor.js';
-import { ExtractionBackedModelProcessor } from '../processors/model-processor.js';
-import type { ExtractionProvider } from '../../extraction/types.js';
 
 const STAGE_ID = 'summarize-session-batch';
 
 export interface SummarizeSessionBatchStageOptions {
-  processor?: ModelProcessor;
+  processor: ModelProcessor;
   sessionContents?: string[];
-  provider?: ExtractionProvider;
 }
 
 export class SummarizeSessionBatchStage implements MemoryPipelineStage {
@@ -20,8 +17,11 @@ export class SummarizeSessionBatchStage implements MemoryPipelineStage {
   private readonly processor: ModelProcessor;
   private readonly sessionContents: string[];
 
-  constructor(options: SummarizeSessionBatchStageOptions = {}) {
-    this.processor = options.processor ?? new ExtractionBackedModelProcessor({ provider: options.provider ?? 'claude' });
+  constructor(options: SummarizeSessionBatchStageOptions) {
+    if (!options?.processor || typeof options.processor.process !== 'function') {
+      throw new Error('SummarizeSessionBatchStage requires a ModelProcessor capability');
+    }
+    this.processor = options.processor;
     this.sessionContents = options.sessionContents ?? [];
   }
 

@@ -3,18 +3,32 @@ import type {
   MemoryPipelineStage,
   PipelineStageResult,
 } from '../types.js';
-import {
-  RAW_SESSION_JOBS_STATE_KEY,
-  RAW_SESSION_JOB_SOURCE_STATE_KEY,
-} from '../pipeline-state.js';
+import { setClaimedRawSessionJobs } from '../pipeline-state.js';
 import type { RawSessionJobSource } from '../sources/raw-session-job-source.js';
 
 const STAGE_ID = 'collect-raw-session-jobs';
 
+export interface CollectRawSessionJobsStageOptions {
+  source: RawSessionJobSource;
+  jobCompletionHook?: Pick<RawSessionJobSource, 'markSucceeded' | 'markFailed'>;
+}
+
 export class CollectRawSessionJobsStage implements MemoryPipelineStage {
   readonly id = STAGE_ID;
+  private readonly source: RawSessionJobSource;
+  private readonly jobCompletionHook?: Pick<RawSessionJobSource, 'markSucceeded' | 'markFailed'>;
 
-  constructor(private readonly source: RawSessionJobSource) {
+  constructor(sourceOrOptions: RawSessionJobSource | CollectRawSessionJobsStageOptions) {
+    if (typeof (sourceOrOptions as RawSessionJobSource)?.collect === 'function') {
+      this.source = sourceOrOptions as RawSessionJobSource;
+      this.jobCompletionHook = sourceOrOptions as RawSessionJobSource;
+    } else {
+      const options = sourceOrOptions as CollectRawSessionJobsStageOptions;
+      this.source = options?.source;
+      this.jobCompletionHook = options?.jobCompletionHook ?? options?.source;
+    }
+
+    const source = this.source;
     if (!source || typeof source.collect !== 'function') {
       throw new Error('RawSessionJobSource is required');
     }
@@ -22,8 +36,10 @@ export class CollectRawSessionJobsStage implements MemoryPipelineStage {
 
   async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {
     const jobs = await this.source.collect();
-    context.state.set(RAW_SESSION_JOBS_STATE_KEY, jobs);
-    context.state.set(RAW_SESSION_JOB_SOURCE_STATE_KEY, this.source);
+    setClaimedRawSessionJobs(context.state, {
+      jobs,
+      source: this.jobCompletionHook,
+    });
     const descriptor = await context.artifactStore.writeArtifact({
       runId: context.runId,
       kind: 'work-item',

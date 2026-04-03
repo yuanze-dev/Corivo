@@ -1,14 +1,20 @@
 import path from 'node:path';
-import { getRawSessionJobs, getRawSessionJobSource } from './pipeline-state.js';
+import {
+  createMemoryPipelineState,
+  getPendingClaimedRawSessionJobs,
+  getRawSessionJobCompletionHook,
+} from './pipeline-state.js';
 import { writeRunManifest } from './state/run-manifest.js';
 import type {
   MemoryPipelineContext,
   MemoryPipelineDefinition,
   PipelineStageResult,
+  PipelineStageFailureClassification,
   PipelineTrigger,
 } from './types.js';
 import type { RunManifest } from './state/run-manifest.js';
 import type { FileRunLock } from './state/run-lock.js';
+import type { MemoryPipelineState } from './pipeline-state.js';
 
 export interface MemoryPipelineRunnerOptions {
   artifactStore: MemoryPipelineContext['artifactStore'];
@@ -22,6 +28,10 @@ export interface MemoryPipelineRunnerOptions {
 export interface MemoryPipelineRunResult {
   runId: string;
   pipelineId: string;
+  trigger: PipelineTrigger['type'];
+  stageCount: number;
+  startedAt: number;
+  completedAt: number;
   status: 'success' | 'failed';
   stages: PipelineStageResult[];
 }
@@ -31,6 +41,7 @@ export class MemoryPipelineRunner {
 
   async run(pipeline: MemoryPipelineDefinition, trigger: PipelineTrigger): Promise<MemoryPipelineRunResult> {
     const runId = this.options.runIdGenerator?.() ?? this.createRunId();
+    const startedAt = Date.now();
     const manifestPath = path.join(this.options.runRoot, 'runs', runId, 'manifest.json');
     this.debug(`starting pipeline=${pipeline.id} run=${runId} trigger=${trigger.type} stageCount=${pipeline.stages.length}`);
     await this.options.lock.acquire(runId);
@@ -51,7 +62,7 @@ export class MemoryPipelineRunner {
       runId,
       trigger,
       artifactStore: this.options.artifactStore,
-      state: new Map(),
+      state: createMemoryPipelineState(),
       logger: this.options.logger,
     };
 
@@ -63,7 +74,7 @@ export class MemoryPipelineRunner {
         const result = await this.executeStage(stage, context);
         stageResults.push(result);
         this.debug(
-          `stage complete pipeline=${pipeline.id} run=${runId} stage=${stage.id} status=${result.status} input=${result.inputCount} output=${result.outputCount} artifacts=${result.artifactIds.length}`
+          `stage complete pipeline=${pipeline.id} run=${runId} stage=${stage.id} status=${result.status} input=${result.inputCount} output=${result.outputCount} artifacts=${result.artifactIds.length} durationMs=${result.durationMs ?? 0} failureClassification=${result.failureClassification ?? 'none'}`
         );
         manifest.status = result.status === 'failed' ? 'failed' : 'running';
         await manifestWriter(manifestPath, manifest);
@@ -72,14 +83,32 @@ export class MemoryPipelineRunner {
         if (result.status === 'failed') {
           await this.markClaimedJobsFailed(context.state, result.error ?? `${stage.id} failed`);
           this.debug(`pipeline failed pipeline=${pipeline.id} run=${runId} failedStage=${stage.id}`);
-          return this.buildResult(runId, pipeline.id, 'failed', stageResults);
+          return this.buildResult(
+            runId,
+            pipeline.id,
+            trigger.type,
+            pipeline.stages.length,
+            'failed',
+            stageResults,
+            startedAt,
+            Date.now(),
+          );
         }
       }
 
       manifest.status = 'success';
       await manifestWriter(manifestPath, manifest);
       this.debug(`pipeline succeeded pipeline=${pipeline.id} run=${runId}`);
-      return this.buildResult(runId, pipeline.id, 'success', stageResults);
+      return this.buildResult(
+        runId,
+        pipeline.id,
+        trigger.type,
+        pipeline.stages.length,
+        'success',
+        stageResults,
+        startedAt,
+        Date.now(),
+      );
     } catch (error) {
       await this.markClaimedJobsFailed(context.state, this.toErrorMessage(error));
       this.debug(`pipeline threw pipeline=${pipeline.id} run=${runId} error=${this.toErrorMessage(error)}`);
@@ -94,16 +123,27 @@ export class MemoryPipelineRunner {
     stage: MemoryPipelineDefinition['stages'][number],
     context: MemoryPipelineContext,
   ): Promise<PipelineStageResult> {
+    const startedAt = Date.now();
     try {
-      return await stage.run(context);
+      const result = await stage.run(context);
+      return this.withDuration(
+        {
+          ...result,
+          failureClassification:
+            result.status === 'failed'
+              ? result.failureClassification ?? 'stage-failed'
+              : result.failureClassification,
+        },
+        startedAt,
+      );
     } catch (error) {
-      return this.buildFailedStageResult(stage.id, error);
+      return this.buildFailedStageResult(stage.id, error, 'stage-exception', startedAt);
     }
   }
 
-  private async markClaimedJobsFailed(state: Map<string, unknown>, error: string): Promise<void> {
-    const source = getRawSessionJobSource(state);
-    const jobs = getRawSessionJobs(state);
+  private async markClaimedJobsFailed(state: MemoryPipelineState, error: string): Promise<void> {
+    const source = getRawSessionJobCompletionHook(state);
+    const jobs = getPendingClaimedRawSessionJobs(state);
 
     if (!source || jobs.length === 0) {
       return;
@@ -120,7 +160,12 @@ export class MemoryPipelineRunner {
       : 'memory pipeline failed unexpectedly';
   }
 
-  private buildFailedStageResult(stageId: string, error: unknown): PipelineStageResult {
+  private buildFailedStageResult(
+    stageId: string,
+    error: unknown,
+    failureClassification: PipelineStageFailureClassification,
+    startedAt: number,
+  ): PipelineStageResult {
     const message =
       error instanceof Error
         ? error.message
@@ -128,23 +173,46 @@ export class MemoryPipelineRunner {
         ? error
         : 'stage failed unexpectedly';
 
-    return {
+    const result: PipelineStageResult = {
       stageId,
       status: 'failed',
       inputCount: 0,
       outputCount: 0,
       artifactIds: [],
+      failureClassification,
       error: message,
     };
+
+    return this.withDuration(result, startedAt);
   }
 
   private buildResult(
     runId: string,
     pipelineId: MemoryPipelineDefinition['id'],
+    trigger: PipelineTrigger['type'],
+    pipelineStageCount: number,
     status: 'success' | 'failed',
     stages: PipelineStageResult[],
+    startedAt: number,
+    completedAt: number,
   ): MemoryPipelineRunResult {
-    return { runId, pipelineId, status, stages };
+    return {
+      runId,
+      pipelineId,
+      trigger,
+      stageCount: pipelineStageCount,
+      startedAt,
+      completedAt,
+      status,
+      stages,
+    };
+  }
+
+  private withDuration(stage: PipelineStageResult, startedAt: number): PipelineStageResult {
+    return {
+      ...stage,
+      durationMs: Math.max(0, Date.now() - startedAt),
+    };
   }
 
   private createRunId(): string {

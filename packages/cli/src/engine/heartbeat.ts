@@ -902,13 +902,17 @@ export class Heartbeat {
     this.memoryPipelineRunning = true;
     this.memoryPipelinePromise = runMemoryPipeline({
       mode: 'incremental',
-      resolveConfigDir: () => configDir,
-      resolveDatabasePath: () => dbPath,
-      createTrigger: () => ({
+      dependencies: {
+        runtime: {
+          resolveConfigDir: () => configDir,
+          resolveDatabasePath: () => dbPath,
+        },
+        createTrigger: () => ({
           type: 'scheduled',
           runAt: Date.now(),
           requestedBy: 'heartbeat',
         }),
+      },
     })
       .then(() => {})
       .catch((error) => {

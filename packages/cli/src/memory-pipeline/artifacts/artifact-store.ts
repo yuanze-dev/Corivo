@@ -4,6 +4,7 @@ import {
   ArtifactDescriptor,
   ArtifactQuery,
   ArtifactWriteInput,
+  FinalMemoryFileKind,
   MemoryPipelineArtifactStore,
 } from '../types.js';
 
@@ -176,6 +177,17 @@ export class ArtifactStore implements MemoryPipelineArtifactStore {
     await walk(startDir);
 
     return files.sort();
+  }
+
+  async listFinalMemoryFiles(kind: FinalMemoryFileKind = 'all'): Promise<string[]> {
+    const allFinalFiles = await this.listMemoryFiles('final');
+    if (kind === 'all') {
+      return allFinalFiles;
+    }
+    if (kind === 'index') {
+      return allFinalFiles.filter((file) => file.endsWith('/MEMORY.md'));
+    }
+    return allFinalFiles.filter((file) => file.endsWith('.md') && !file.endsWith('/MEMORY.md'));
   }
 
   private resolveDir(kind: string, runId?: string): string {

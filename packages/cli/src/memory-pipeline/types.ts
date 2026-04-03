@@ -1,3 +1,5 @@
+import type { MemoryPipelineState } from './pipeline-state.js';
+
 export type PipelineTriggerType = 'init' | 'manual' | 'scheduled';
 
 export interface PipelineTrigger {
@@ -43,7 +45,10 @@ export interface ArtifactWriteInput {
   metadata?: Record<string, unknown>;
 }
 
+export type FinalMemoryFileKind = 'detail' | 'index' | 'all';
+
 export type PipelineStageStatus = 'success' | 'partial' | 'failed' | 'skipped';
+export type PipelineStageFailureClassification = 'stage-failed' | 'stage-exception';
 
 export interface PipelineStageResult {
   stageId: string;
@@ -51,6 +56,8 @@ export interface PipelineStageResult {
   inputCount: number;
   outputCount: number;
   artifactIds: string[];
+  durationMs?: number;
+  failureClassification?: PipelineStageFailureClassification;
   cursor?: string;
   error?: string;
 }
@@ -67,7 +74,7 @@ export interface MemoryPipelineContext {
   runId: string;
   trigger: PipelineTrigger;
   artifactStore: MemoryPipelineArtifactStore;
-  state: Map<string, unknown>;
+  state: MemoryPipelineState;
   logger?: {
     log: (...args: unknown[]) => void;
     error: (...args: unknown[]) => void;

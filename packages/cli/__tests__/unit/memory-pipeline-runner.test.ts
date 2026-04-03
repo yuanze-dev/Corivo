@@ -5,14 +5,17 @@ import os from 'node:os';
 import path from 'node:path';
 import type {
   MemoryPipelineArtifactStore,
+  MemoryPipelineDefinition,
   MemoryPipelineStage,
   PipelineStageResult,
   PipelineStageStatus,
 } from '../../src/memory-pipeline/types.js';
+import type { SessionJobWorkItem } from '../../src/memory-pipeline/sources/raw-session-job-source.js';
 import { ArtifactStore } from '../../src/memory-pipeline/artifacts/artifact-store.js';
 import { readRunManifest } from '../../src/memory-pipeline/state/run-manifest.js';
 import { FileRunLock } from '../../src/memory-pipeline/state/run-lock.js';
 import { MemoryPipelineRunner } from '../../src/memory-pipeline/runner.js';
+import { CompleteRawSessionJobsStage } from '../../src/memory-pipeline/stages/complete-raw-session-jobs.js';
 const createArtifactStore = (): MemoryPipelineArtifactStore => ({
   async writeArtifact(input) {
     return {
@@ -78,7 +81,10 @@ describe('MemoryPipelineRunner', () => {
 
     expect(calls).toEqual(['a', 'b']);
     expect(result.status).toBe('success');
+    expect(result.trigger).toBe('manual');
+    expect(result.stageCount).toBe(2);
     expect(result.stages).toHaveLength(2);
+    expect(result.stages.every((stage) => typeof stage.durationMs === 'number')).toBe(true);
 
     const manifest = await readRunManifest(path.join(root, 'runs', 'run-sequence', 'manifest.json'));
     expect(manifest.status).toBe('success');
@@ -168,6 +174,7 @@ describe('MemoryPipelineRunner', () => {
 
     expect(calls).toEqual(['first', 'second']);
     expect(result.status).toBe('failed');
+    expect(result.stageCount).toBe(3);
     expect(result.stages).toHaveLength(2);
 
     const manifest = await readRunManifest(path.join(root, 'runs', 'run-failure', 'manifest.json'));
@@ -206,6 +213,7 @@ describe('MemoryPipelineRunner', () => {
     expect(result.stages).toHaveLength(1);
     expect(result.stages[0].stageId).toBe('boom');
     expect(result.stages[0].error).toContain('boom');
+    expect(result.stages[0].failureClassification).toBe('stage-exception');
   });
 
   it('records partial and skipped stage statuses without stopping', async () => {
@@ -243,7 +251,7 @@ describe('MemoryPipelineRunner', () => {
     expect(result.status).toBe('success');
   });
 
-  it('shares pipeline state across stages and marks claimed raw session jobs failed when a later stage fails', async () => {
+  it('shares typed pipeline state across stages and marks claimed raw session jobs failed when a later stage fails', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
     const lock = new FileRunLock(path.join(root, 'run.lock'));
     const runner = new MemoryPipelineRunner({
@@ -254,29 +262,155 @@ describe('MemoryPipelineRunner', () => {
     });
     const markFailed = vi.fn(async () => {});
 
-    const pipeline = {
+    const claimedJob: SessionJobWorkItem = {
+      id: 'job-1',
+      kind: 'session-job',
+      sourceRef: 'claude-code:sess-1',
+      freshnessToken: '1',
+      host: 'claude-code',
+      sessionKey: 'claude-code:sess-1',
+      session: {
+        id: 'raw-session-1',
+        host: 'claude-code',
+        externalSessionId: 'sess-1',
+        sessionKey: 'claude-code:sess-1',
+        sourceType: 'history-import',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      transcript: [],
+      job: {
+        id: 'job-1',
+        host: 'claude-code',
+        sessionKey: 'claude-code:sess-1',
+        jobType: 'extract-session',
+        status: 'running',
+        dedupeKey: 'extract-session:claude-code:sess-1',
+        priority: 0,
+        attemptCount: 1,
+        availableAt: 1,
+        claimedAt: 1,
+        finishedAt: null,
+        lastError: null,
+        payloadJson: null,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    };
+
+    const pipeline: MemoryPipelineDefinition = {
       id: 'scheduled-memory-pipeline',
       stages: [
         createStage('collect', async (context) => {
-          context.state.set('rawSessionJobSource', {
-            markFailed,
-          });
-          context.state.set('rawSessionJobs', [
-            { job: { id: 'job-1' } },
-          ]);
+          context.state.rawSessionJobs.source = { markFailed };
+          context.state.rawSessionJobs.claimed = [claimedJob];
           return createResult('collect', 'success');
         }),
         createStage('verify-state', async (context) => {
-          expect(context.state.get('rawSessionJobs')).toEqual([{ job: { id: 'job-1' } }]);
+          expect(context.state.rawSessionJobs.claimed).toEqual([claimedJob]);
           return createResult('verify-state', 'failed', { error: 'summarize failed' });
         }),
       ],
     };
 
-    const result = await runner.run(pipeline as any, { type: 'manual', runAt: Date.now() });
+    const result = await runner.run(pipeline, { type: 'manual', runAt: Date.now() });
 
     expect(result.status).toBe('failed');
+    expect(result.stages[1].failureClassification).toBe('stage-failed');
     expect(markFailed).toHaveBeenCalledWith('job-1', 'summarize failed');
+  });
+
+  it('does not fail-safe re-fail jobs already marked succeeded before completion-stage failure', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-'));
+    const lock = new FileRunLock(path.join(root, 'run.lock'));
+    const runner = new MemoryPipelineRunner({
+      artifactStore: createArtifactStore(),
+      lock,
+      runRoot: root,
+      runIdGenerator: () => 'run-partial-complete',
+    });
+
+    const markFailed = vi.fn(async () => {});
+    const markSucceeded = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('queue write failed'));
+
+    const firstJob: SessionJobWorkItem = {
+      id: 'job-1',
+      kind: 'session-job',
+      sourceRef: 'claude-code:sess-1',
+      freshnessToken: '1',
+      host: 'claude-code',
+      sessionKey: 'claude-code:sess-1',
+      session: {
+        id: 'raw-session-1',
+        host: 'claude-code',
+        externalSessionId: 'sess-1',
+        sessionKey: 'claude-code:sess-1',
+        sourceType: 'history-import',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      transcript: [],
+      job: {
+        id: 'job-1',
+        host: 'claude-code',
+        sessionKey: 'claude-code:sess-1',
+        jobType: 'extract-session',
+        status: 'running',
+        dedupeKey: 'extract-session:claude-code:sess-1',
+        priority: 0,
+        attemptCount: 1,
+        availableAt: 1,
+        claimedAt: 1,
+        finishedAt: null,
+        lastError: null,
+        payloadJson: null,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    };
+
+    const secondJob: SessionJobWorkItem = {
+      ...firstJob,
+      id: 'job-2',
+      sourceRef: 'claude-code:sess-2',
+      sessionKey: 'claude-code:sess-2',
+      session: {
+        ...firstJob.session,
+        id: 'raw-session-2',
+        externalSessionId: 'sess-2',
+        sessionKey: 'claude-code:sess-2',
+      },
+      job: {
+        ...firstJob.job,
+        id: 'job-2',
+        sessionKey: 'claude-code:sess-2',
+        dedupeKey: 'extract-session:claude-code:sess-2',
+      },
+    };
+
+    const pipeline: MemoryPipelineDefinition = {
+      id: 'scheduled-memory-pipeline',
+      stages: [
+        createStage('collect', async (context) => {
+          context.state.rawSessionJobs.source = { markSucceeded, markFailed };
+          context.state.rawSessionJobs.claimed = [firstJob, secondJob];
+          return createResult('collect', 'success');
+        }),
+        new CompleteRawSessionJobsStage(),
+      ],
+    };
+
+    const result = await runner.run(pipeline, { type: 'manual', runAt: Date.now() });
+
+    expect(result.status).toBe('failed');
+    expect(markSucceeded).toHaveBeenNthCalledWith(1, 'job-1');
+    expect(markSucceeded).toHaveBeenNthCalledWith(2, 'job-2');
+    expect(markFailed).toHaveBeenCalledTimes(1);
+    expect(markFailed).toHaveBeenCalledWith('job-2', expect.stringContaining('queue write failed'));
+    expect(markFailed).not.toHaveBeenCalledWith('job-1', expect.any(String));
   });
 
   it('throws when the lock is already held', async () => {

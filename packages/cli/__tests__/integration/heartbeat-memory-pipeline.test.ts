@@ -6,6 +6,20 @@ import { KeyManager } from '../../src/crypto/keys.js';
 import { Heartbeat } from '../../src/engine/heartbeat.js';
 import * as memoryPipeline from '../../src/application/memory/run-memory-pipeline.js';
 
+interface HeartbeatInternals {
+  running: boolean;
+  cycleCount: number;
+  memoryPipelineCycles: number;
+  memoryPipelineRunning: boolean;
+  run(): Promise<void>;
+  sleep(ms: number): Promise<void>;
+  triggerScheduledMemoryPipeline(): void;
+  shouldTriggerMemoryPipeline(): boolean;
+}
+
+const internals = (heartbeat: Heartbeat): HeartbeatInternals =>
+  heartbeat as unknown as HeartbeatInternals;
+
 describe('Heartbeat memory pipeline trigger', () => {
   let db: CorivoDatabase;
   let dbPath: string;
@@ -55,15 +69,16 @@ describe('Heartbeat memory pipeline trigger', () => {
         stages: [],
       });
 
-    const sleepSpy = vi.spyOn(heartbeat as any, 'sleep').mockImplementation(async () => {
-      (heartbeat as any).running = false;
+    const h = internals(heartbeat);
+    const sleepSpy = vi.spyOn(h, 'sleep').mockImplementation(async () => {
+      h.running = false;
     });
 
-    const cadence = (heartbeat as any).memoryPipelineCycles as number;
-    (heartbeat as any).cycleCount = cadence - 1;
-    (heartbeat as any).running = true;
+    const cadence = h.memoryPipelineCycles;
+    h.cycleCount = cadence - 1;
+    h.running = true;
 
-    const runPromise = (heartbeat as any).run();
+    const runPromise = h.run();
 
     for (let attempt = 0; attempt < 200 && runnerSpy.mock.calls.length === 0; attempt++) {
       await Promise.resolve();
@@ -74,18 +89,23 @@ describe('Heartbeat memory pipeline trigger', () => {
     expect(runnerSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         mode: 'incremental',
-        createTrigger: expect.any(Function),
+        dependencies: expect.objectContaining({
+          createTrigger: expect.any(Function),
+          runtime: expect.objectContaining({
+            resolveDatabasePath: expect.any(Function),
+          }),
+        }),
       }),
     );
 
-    const trigger = runnerSpy.mock.calls[0]?.[0]?.createTrigger?.('incremental');
+    const trigger = runnerSpy.mock.calls[0]?.[0]?.dependencies?.createTrigger?.('incremental');
     expect(trigger).toMatchObject({
       type: 'scheduled',
       requestedBy: 'heartbeat',
     });
-    expect(runnerSpy.mock.calls[0]?.[0]?.resolveDatabasePath?.()).toBe(dbPath);
-    expect(runnerSpy.mock.calls[0]?.[0]?.createSessionSource).toBeUndefined();
-    expect(runnerSpy.mock.calls[0]?.[0]?.openDatabase).toBeUndefined();
+    expect(runnerSpy.mock.calls[0]?.[0]?.dependencies?.runtime?.resolveDatabasePath?.()).toBe(dbPath);
+    expect(runnerSpy.mock.calls[0]?.[0]?.resolveDatabasePath).toBeUndefined();
+    expect(runnerSpy.mock.calls[0]?.[0]?.createTrigger).toBeUndefined();
 
     runnerSpy.mockRestore();
     sleepSpy.mockRestore();
@@ -105,7 +125,8 @@ describe('Heartbeat memory pipeline trigger', () => {
         }),
     );
 
-    const result = (heartbeat as any).triggerScheduledMemoryPipeline();
+    const h = internals(heartbeat);
+    const result = h.triggerScheduledMemoryPipeline();
 
     for (let attempt = 0; attempt < 200 && runnerSpy.mock.calls.length === 0; attempt++) {
       await Promise.resolve();
@@ -113,13 +134,13 @@ describe('Heartbeat memory pipeline trigger', () => {
 
     expect(result).toBeUndefined();
     expect(runnerSpy).toHaveBeenCalledTimes(1);
-    expect((heartbeat as any).memoryPipelineRunning).toBe(true);
+    expect(h.memoryPipelineRunning).toBe(true);
 
     resolvePipeline?.();
-    for (let attempt = 0; attempt < 200 && (heartbeat as any).memoryPipelineRunning; attempt++) {
+    for (let attempt = 0; attempt < 200 && h.memoryPipelineRunning; attempt++) {
       await Promise.resolve();
     }
-    expect((heartbeat as any).memoryPipelineRunning).toBe(false);
+    expect(h.memoryPipelineRunning).toBe(false);
 
     runnerSpy.mockRestore();
   });
@@ -134,11 +155,12 @@ describe('Heartbeat memory pipeline trigger', () => {
     });
     const loggerSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    (localHeartbeat as any).cycleCount = (localHeartbeat as any).memoryPipelineCycles;
-    (localHeartbeat as any).triggerScheduledMemoryPipeline();
+    const local = internals(localHeartbeat);
+    local.cycleCount = local.memoryPipelineCycles;
+    local.triggerScheduledMemoryPipeline();
 
     expect(runnerSpy).not.toHaveBeenCalled();
-    expect((localHeartbeat as any).memoryPipelineRunning).toBe(false);
+    expect(local.memoryPipelineRunning).toBe(false);
 
     runnerSpy.mockRestore();
     loggerSpy.mockRestore();
@@ -158,7 +180,8 @@ describe('Heartbeat memory pipeline trigger', () => {
         }),
     );
 
-    (heartbeat as any).triggerScheduledMemoryPipeline();
+    const h = internals(heartbeat);
+    h.triggerScheduledMemoryPipeline();
     const stopPromise = heartbeat.stop();
 
     let settled = false;
@@ -185,10 +208,11 @@ describe('Heartbeat memory pipeline trigger', () => {
       stages: [],
     });
 
-    (heartbeat as any).cycleCount = (heartbeat as any).memoryPipelineCycles - 1;
-    (heartbeat as any).running = false;
+    const h = internals(heartbeat);
+    h.cycleCount = h.memoryPipelineCycles - 1;
+    h.running = false;
 
-    expect((heartbeat as any).shouldTriggerMemoryPipeline()).toBe(false);
+    expect(h.shouldTriggerMemoryPipeline()).toBe(false);
     expect(runnerSpy).not.toHaveBeenCalled();
     runnerSpy.mockRestore();
   });

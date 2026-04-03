@@ -1,8 +1,7 @@
 import type { SessionRecord } from '../contracts/session-record.js';
 import { buildRawExtractionPrompt } from '../prompts/raw-extraction-prompt.js';
+import { recordExtractedRawMemory } from '../pipeline-state.js';
 import type { ModelProcessor } from '../processors/model-processor.js';
-import { ExtractionBackedModelProcessor } from '../processors/model-processor.js';
-import type { ExtractionProvider } from '../../extraction/types.js';
 import type {
   ArtifactDescriptor,
   MemoryPipelineContext,
@@ -25,16 +24,18 @@ interface SessionWorkItem extends WorkItem {
 }
 
 export interface ExtractRawMemoriesStageOptions {
-  processor?: ModelProcessor;
-  provider?: ExtractionProvider;
+  processor: ModelProcessor;
 }
 
 export class ExtractRawMemoriesStage implements MemoryPipelineStage {
   readonly id = STAGE_ID;
   private readonly processor: ModelProcessor;
 
-  constructor(options: ExtractRawMemoriesStageOptions = {}) {
-    this.processor = options.processor ?? new ExtractionBackedModelProcessor({ provider: options.provider ?? 'claude' });
+  constructor(options: ExtractRawMemoriesStageOptions) {
+    if (!options?.processor || typeof options.processor.process !== 'function') {
+      throw new Error('ExtractRawMemoriesStage requires a ModelProcessor capability');
+    }
+    this.processor = options.processor;
   }
 
   async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {
@@ -73,6 +74,10 @@ export class ExtractRawMemoriesStage implements MemoryPipelineStage {
             sessionId: session.sessionId,
             markdown,
           }),
+        });
+        recordExtractedRawMemory(context.state, {
+          sessionId: session.sessionId,
+          artifactId: descriptor.id,
         });
         artifactIds.push(descriptor.id);
       }

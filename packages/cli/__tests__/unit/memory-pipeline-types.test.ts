@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ExtractRawMemoriesStage,
   MergeFinalMemoriesStage,
+  NoopModelProcessor,
 } from '../../src/index.js';
 import type {
   PipelineTrigger,
@@ -56,14 +57,14 @@ describe('memory pipeline types', () => {
       status: 'success',
       stages: [
         {
-          stageId: new ExtractRawMemoriesStage().id,
+          stageId: new ExtractRawMemoriesStage({ processor: new NoopModelProcessor() }).id,
           status: 'success',
           inputCount: 1,
           outputCount: 1,
           artifactIds: ['raw-1'],
         },
         {
-          stageId: new MergeFinalMemoriesStage().id,
+          stageId: new MergeFinalMemoriesStage({ processor: new NoopModelProcessor() }).id,
           status: 'success',
           inputCount: 1,
           outputCount: 1,

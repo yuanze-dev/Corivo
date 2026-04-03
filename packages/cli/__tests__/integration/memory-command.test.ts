@@ -2,15 +2,16 @@ import { mkdtemp, mkdir, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { Command } from 'commander';
-import { describe, expect, it, beforeAll, beforeEach, afterAll, vi } from 'vitest';
+import { describe, expect, it, beforeAll, beforeEach, vi } from 'vitest';
 import type { CorivoDatabase } from '@/storage/database';
-import type { MemoryPipelineRunner } from '@/memory-pipeline';
-import { ArtifactStore, FileRunLock, MemoryPipelineRunner as DefaultMemoryPipelineRunner } from '@/memory-pipeline';
 import type { Logger } from '../../src/utils/logging.js';
 import {
   createMemoryCommand,
-  runMemoryPipeline,
 } from '../../src/cli/commands/memory.js';
+import { createHostCommand } from '../../src/cli/commands/host.js';
+import { createDaemonCommand } from '../../src/cli/commands/daemon.js';
+import { createQueryCommand } from '../../src/cli/commands/query.js';
+import { runMemoryPipeline } from '../../src/application/memory/run-memory-pipeline.js';
 import { MergeFinalMemoriesStage } from '../../src/memory-pipeline/stages/merge-final-memories.js';
 
 const standaloneExecutor = vi.fn(async (mode: 'full' | 'incremental', provider?: 'claude' | 'codex') => ({
@@ -103,6 +104,31 @@ describe('memory command (standalone)', () => {
   });
 });
 
+describe('command layer boundaries', () => {
+  it('exposes constructor APIs for dependency injection', () => {
+    expect(createMemoryCommand).toBeTypeOf('function');
+    expect(createHostCommand).toBeTypeOf('function');
+    expect(createDaemonCommand).toBeTypeOf('function');
+    expect(createQueryCommand).toBeTypeOf('function');
+  });
+
+  it('requires injected execution capabilities by default', async () => {
+    await expect(createMemoryCommand().parseAsync(['run'], { from: 'user' })).rejects.toThrow(
+      'memory command requires injected executor capability'
+    );
+    await expect(createHostCommand().parseAsync(['install', 'codex'], { from: 'user' })).rejects.toThrow(
+      'host command requires injected installHost capability'
+    );
+    await expect(createDaemonCommand().parseAsync(['run'], { from: 'user' })).rejects.toThrow(
+      'daemon command requires injected runDaemon capability'
+    );
+
+    await expect(createQueryCommand().parseAsync(['sqlite'], { from: 'user' })).rejects.toThrow(
+      'query command requires injected runSearchQuery capability'
+    );
+  });
+});
+
 describe('memory command (CLI integration)', () => {
   const cliExecutor = vi.fn(async (mode: 'full' | 'incremental', provider?: 'claude' | 'codex') => ({
     runId: 'run-cli',
@@ -134,60 +160,88 @@ describe('memory command (CLI integration)', () => {
 });
 
 describe('memory pipeline cleanup', () => {
-  it('builds the incremental pipeline with a requested extraction provider', async () => {
+  it('supports narrow dependency overrides via runtime/buildPipeline/runPipeline seams', async () => {
+    const createLogger = vi.fn(() => createMockLogger());
+    const readConfig = vi.fn(async () => ({}));
+    const closeDatabase = vi.fn(() => {});
+    const buildPipeline = vi.fn(() => ({
+      id: 'scheduled-memory-pipeline',
+      stages: [],
+    }));
+    const runPipeline = vi.fn(async () => ({
+      runId: 'run',
+      pipelineId: 'scheduled-memory-pipeline',
+      status: 'success' as const,
+      stages: [],
+    }));
+
+    await expect(
+      runMemoryPipeline({
+        mode: 'incremental',
+        provider: 'codex',
+        dependencies: {
+          runtime: {
+            resolveConfigDir: () => '/tmp/corivo',
+            resolveDatabasePath: () => '/tmp/corivo/corivo.db',
+            createLogger,
+            readConfig,
+            openDatabase: () =>
+              ({
+                close: () => {},
+              } as CorivoDatabase),
+            closeDatabase,
+          },
+          buildPipeline,
+          runPipeline,
+        },
+      }),
+    ).resolves.toMatchObject({
+      pipelineId: 'scheduled-memory-pipeline',
+      status: 'success',
+    });
+
+    expect(createLogger).toHaveBeenCalledTimes(1);
+    expect(readConfig).toHaveBeenCalledWith('/tmp/corivo');
+    expect(buildPipeline).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'incremental',
+        provider: 'codex',
+      }),
+    );
+    expect(runPipeline).toHaveBeenCalledTimes(1);
+    expect(closeDatabase).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes requested extraction provider into buildPipeline', async () => {
     let seenProvider: string | undefined;
 
     await expect(
       runMemoryPipeline({
         mode: 'incremental',
         provider: 'codex',
-        resolveConfigDir: () => '/tmp/corivo',
-        resolveDatabasePath: () => '/tmp/corivo/corivo.db',
-        readConfig: async () => ({}),
-        createArtifactStore: () => ({
-          writeArtifact: async () => ({
-            id: 'artifact',
-            kind: 'work-item',
-            version: 1,
-            path: 'artifacts/detail/test.json',
-            source: 'test',
-            createdAt: Date.now(),
+        dependencies: {
+          runtime: {
+            resolveConfigDir: () => '/tmp/corivo',
+            resolveDatabasePath: () => '/tmp/corivo/corivo.db',
+            readConfig: async () => ({}),
+            openDatabase: () =>
+              ({
+                close: () => {},
+              } as CorivoDatabase),
+            closeDatabase: () => {},
+          },
+          buildPipeline: ({ provider }) => {
+            seenProvider = provider;
+            return { id: 'scheduled-memory-pipeline', stages: [] };
+          },
+          runPipeline: async () => ({
+            runId: 'run',
+            pipelineId: 'scheduled-memory-pipeline',
+            status: 'success',
+            stages: [],
           }),
-          persistDescriptor: async () => {},
-          getDescriptor: async () => undefined,
-          readArtifact: async () => '[]',
-          listArtifacts: async () => [],
-        }),
-        createLock: () => ({
-          acquire: async () => {},
-          release: async () => {},
-        }),
-        createRunner: () =>
-          ({
-            run: async () => ({
-              runId: 'run',
-              pipelineId: 'scheduled-memory-pipeline',
-              status: 'success',
-              stages: [],
-            }),
-          } as MemoryPipelineRunner),
-        createInitPipeline: () => ({ id: 'init-memory-pipeline', stages: [] }),
-        createScheduledPipeline: ({ provider }) => {
-          seenProvider = provider;
-          return { id: 'scheduled-memory-pipeline', stages: [] };
         },
-        createSessionSource: () => ({ collect: async () => [] }),
-        createRawSessionJobSource: () => ({
-          collect: async () => [],
-          markSucceeded: async () => {},
-          markFailed: async () => {},
-        }),
-        openDatabase: () =>
-          ({
-            close: () => {},
-          } as CorivoDatabase),
-        closeDatabase: () => {},
-      } as any),
+      }),
     ).resolves.toMatchObject({
       pipelineId: 'scheduled-memory-pipeline',
       status: 'success',
@@ -198,68 +252,48 @@ describe('memory pipeline cleanup', () => {
 
   it('emits detailed debug logs across pipeline setup and stage execution', async () => {
     const logger = createMockLogger();
+    const configDir = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-debug-'));
 
     await expect(
       runMemoryPipeline({
         mode: 'incremental',
         provider: 'codex',
-        resolveConfigDir: () => '/tmp/corivo',
-        resolveDatabasePath: () => '/tmp/corivo/corivo.db',
-        readConfig: async () => ({}),
-        createLogger: () => logger,
-        createArtifactStore: () => ({
-          writeArtifact: async () => ({
-            id: 'artifact',
-            kind: 'work-item',
-            version: 1,
-            path: 'artifacts/detail/test.json',
-            source: 'test',
-            createdAt: Date.now(),
+        dependencies: {
+          runtime: {
+            resolveConfigDir: () => configDir,
+            resolveDatabasePath: () => '/tmp/corivo/corivo.db',
+            readConfig: async () => ({}),
+            createLogger: () => logger,
+            openDatabase: () =>
+              ({
+                close: () => {},
+              } as CorivoDatabase),
+            closeDatabase: () => {},
+          },
+          buildPipeline: () => ({
+            id: 'scheduled-memory-pipeline',
+            stages: [
+              {
+                id: 'collect-jobs',
+                run: async () => ({
+                  stageId: 'collect-jobs',
+                  status: 'success',
+                  inputCount: 2,
+                  outputCount: 1,
+                  artifactIds: ['artifact-1'],
+                }),
+              },
+            ],
           }),
-          persistDescriptor: async () => {},
-          getDescriptor: async () => undefined,
-          readArtifact: async () => '[]',
-          listArtifacts: async () => [],
-        }),
-        createLock: () => ({
-          acquire: async () => {},
-          release: async () => {},
-        }),
-        createScheduledPipeline: ({ provider }) => ({
-          id: 'scheduled-memory-pipeline',
-          stages: [
-            {
-              id: 'collect-jobs',
-              run: async () => ({
-                stageId: 'collect-jobs',
-                status: 'success',
-                inputCount: 2,
-                outputCount: 1,
-                artifactIds: ['artifact-1'],
-              }),
-            },
-          ],
-        }),
-        createInitPipeline: () => ({ id: 'init-memory-pipeline', stages: [] }),
-        createSessionSource: () => ({ collect: async () => [] }),
-        createRawSessionJobSource: () => ({
-          collect: async () => [],
-          markSucceeded: async () => {},
-          markFailed: async () => {},
-        }),
-        openDatabase: () =>
-          ({
-            close: () => {},
-          } as CorivoDatabase),
-        closeDatabase: () => {},
-      } as any),
+        },
+      }),
     ).resolves.toMatchObject({
       pipelineId: 'scheduled-memory-pipeline',
       status: 'success',
     });
 
-    expect(logger.debug).toHaveBeenCalledWith('[memory:pipeline] starting mode=incremental provider=codex configDir=/tmp/corivo');
-    expect(logger.debug).toHaveBeenCalledWith('[memory:pipeline] resources ready runRoot=/tmp/corivo/memory-pipeline');
+    expect(logger.debug).toHaveBeenCalledWith(`[memory:pipeline] starting mode=incremental provider=codex configDir=${configDir}`);
+    expect(logger.debug).toHaveBeenCalledWith(`[memory:pipeline] resources ready runRoot=${configDir}/memory-pipeline`);
     expect(logger.debug).toHaveBeenCalledWith('[memory:pipeline] opened database path=/tmp/corivo/corivo.db');
     expect(logger.debug).toHaveBeenCalledWith('[memory:pipeline] built pipeline id=scheduled-memory-pipeline provider=codex stageCount=1');
     expect(logger.debug).toHaveBeenCalledWith(expect.stringMatching(/^\[memory:pipeline:runner] acquired lock run=run-/));
@@ -270,7 +304,7 @@ describe('memory pipeline cleanup', () => {
     );
     expect(logger.debug).toHaveBeenCalledWith(
       expect.stringMatching(
-        /^\[memory:pipeline:runner] stage complete pipeline=scheduled-memory-pipeline run=run-.* stage=collect-jobs status=success input=2 output=1 artifacts=1$/
+        /^\[memory:pipeline:runner] stage complete pipeline=scheduled-memory-pipeline run=run-.* stage=collect-jobs status=success input=2 output=1 artifacts=1 durationMs=\d+ failureClassification=none$/
       ),
     );
     expect(logger.debug).toHaveBeenCalledWith(
@@ -280,167 +314,95 @@ describe('memory pipeline cleanup', () => {
     );
   });
 
-  it('builds the incremental pipeline from raw-session job source', async () => {
-    const createScheduledPipeline = vi.fn(() => ({
-      id: 'scheduled-memory-pipeline' as const,
-      stages: [],
-    }));
-    const createRawSessionJobSource = vi.fn(() => ({
-      collect: async () => [],
-      markSucceeded: async () => {},
-      markFailed: async () => {},
-    }));
+  it('uses incremental mode when composing incremental pipelines', async () => {
+    let seenMode: string | undefined;
 
     await runMemoryPipeline({
       mode: 'incremental',
-      resolveConfigDir: () => '/tmp/corivo',
-      resolveDatabasePath: () => '/tmp/corivo/corivo.db',
-      readConfig: async () => ({}),
-      createArtifactStore: () => ({
-        writeArtifact: async () => ({
-          id: 'artifact',
-          kind: 'work-item',
-          version: 1,
-          path: 'artifacts/detail/test.json',
-          source: 'test',
-          createdAt: Date.now(),
+      dependencies: {
+        runtime: {
+          resolveConfigDir: () => '/tmp/corivo',
+          resolveDatabasePath: () => '/tmp/corivo/corivo.db',
+          readConfig: async () => ({}),
+          openDatabase: () =>
+            ({
+              close: () => {},
+            } as CorivoDatabase),
+          closeDatabase: () => {},
+        },
+        buildPipeline: ({ mode }) => {
+          seenMode = mode;
+          return { id: 'scheduled-memory-pipeline', stages: [] };
+        },
+        runPipeline: async () => ({
+          runId: 'run',
+          pipelineId: 'scheduled-memory-pipeline',
+          status: 'success',
+          stages: [],
         }),
-        persistDescriptor: async () => {},
-        getDescriptor: async () => undefined,
-      }),
-      createLock: () => ({
-        acquire: async () => {},
-        release: async () => {},
-      }),
-      createRunner: () =>
-        ({
-          run: async () => ({
-            runId: 'run',
-            pipelineId: 'scheduled-memory-pipeline',
-            status: 'success',
-            stages: [],
-          }),
-        } as MemoryPipelineRunner),
-      createInitPipeline: () => ({ id: 'init-memory-pipeline', stages: [] }),
-      createScheduledPipeline,
-      createSessionSource: () => ({ collect: async () => [] }),
-      createRawSessionJobSource,
-      openDatabase: () =>
-        ({
-          close: () => {},
-        } as CorivoDatabase),
-      closeDatabase: () => {},
-    } as any);
+      },
+    });
 
-    expect(createRawSessionJobSource).toHaveBeenCalled();
-    expect(createScheduledPipeline).toHaveBeenCalledWith(
-      expect.objectContaining({ rawSessionJobSource: expect.anything() }),
-    );
+    expect(seenMode).toBe('incremental');
   });
 
-  it('closes the database even if incremental build fails', async () => {
+  it('closes the database even if buildPipeline fails', async () => {
     let closed = false;
 
     await expect(
       runMemoryPipeline({
         mode: 'incremental',
-        resolveConfigDir: () => '/tmp/corivo',
-        resolveDatabasePath: () => '/tmp/corivo/corivo.db',
-        readConfig: async () => ({}),
-        createArtifactStore: () => ({
-          writeArtifact: async () => ({
-            id: 'artifact',
-            kind: 'work-item',
-            version: 1,
-            path: 'artifacts/detail/test.json',
-            source: 'test',
-            createdAt: Date.now(),
-          }),
-          persistDescriptor: async () => {},
-          getDescriptor: async () => undefined,
-        }),
-        createLock: () => ({
-          acquire: async () => {},
-          release: async () => {},
-        }),
-        createRunner: () =>
-          ({
-            run: async () => ({
-              runId: 'run',
-              pipelineId: 'scheduled-memory-pipeline',
-              status: 'success',
-              stages: [],
-            }),
-          } as MemoryPipelineRunner),
-        createInitPipeline: () => ({ id: 'init-memory-pipeline', stages: [] }),
-        createScheduledPipeline: () => {
-          throw new Error('pipeline build failure');
+        dependencies: {
+          runtime: {
+            resolveConfigDir: () => '/tmp/corivo',
+            resolveDatabasePath: () => '/tmp/corivo/corivo.db',
+            readConfig: async () => ({}),
+            openDatabase: () =>
+              ({
+                close: () => {},
+              } as CorivoDatabase),
+            closeDatabase: () => {
+              closed = true;
+            },
+          },
+          buildPipeline: () => {
+            throw new Error('pipeline build failure');
+          },
         },
-        createSessionSource: () => ({ collect: async () => [] }),
-        createRawSessionJobSource: () => ({
-          collect: async () => [],
-          markSucceeded: async () => {},
-          markFailed: async () => {},
-        }),
-        openDatabase: () =>
-          ({
-            close: () => {},
-          } as CorivoDatabase),
-        closeDatabase: () => {
-          closed = true;
-        },
-      } as any),
+      }),
     ).rejects.toThrow('pipeline build failure');
 
     expect(closed).toBe(true);
   });
 
   it('builds the full pipeline with extract-raw-memories in the shared execution path', async () => {
-    const seenStageIds: string[] = [];
+    let seenStageIds: string[] = [];
 
     await expect(
       runMemoryPipeline({
         mode: 'full',
-        resolveConfigDir: () => '/tmp/corivo',
-        resolveDatabasePath: () => '/tmp/corivo/corivo.db',
-        readConfig: async () => ({}),
-        createArtifactStore: () => ({
-          writeArtifact: async () => ({
-            id: 'artifact',
-            kind: 'work-item',
-            version: 1,
-            path: 'artifacts/detail/test.json',
-            source: 'test',
-            createdAt: Date.now(),
-          }),
-          persistDescriptor: async () => {},
-          getDescriptor: async () => undefined,
-          readArtifact: async () => '[]',
-          listArtifacts: async () => [],
-        }),
-        createLock: () => ({
-          acquire: async () => {},
-          release: async () => {},
-        }),
-        createRunner: () =>
-          ({
-            run: async (pipeline) => {
-              seenStageIds.push(...pipeline.stages.map((stage) => stage.id));
-              return {
-                runId: 'run',
-                pipelineId: pipeline.id,
-                status: 'success',
-                stages: [],
-              };
-            },
-          } as MemoryPipelineRunner),
-        openDatabase: () =>
-          ({
-            querySessionRecords: () => [],
-            close: () => {},
-          } as CorivoDatabase),
-        closeDatabase: () => {},
-        createSessionSource: () => ({ collect: async () => [] }),
+        dependencies: {
+          runtime: {
+            resolveConfigDir: () => '/tmp/corivo',
+            resolveDatabasePath: () => '/tmp/corivo/corivo.db',
+            readConfig: async () => ({}),
+            openDatabase: () =>
+              ({
+                querySessionRecords: () => [],
+                close: () => {},
+              } as CorivoDatabase),
+            closeDatabase: () => {},
+          },
+          runPipeline: async ({ pipeline }) => {
+            seenStageIds = pipeline.stages.map((stage) => stage.id);
+            return {
+              runId: 'run',
+              pipelineId: pipeline.id,
+              status: 'success',
+              stages: [],
+            };
+          },
+        },
       }),
     ).resolves.toMatchObject({
       pipelineId: 'init-memory-pipeline',
@@ -458,7 +420,7 @@ describe('memory pipeline cleanup', () => {
     ]);
   });
 
-  it('builds the full pipeline from database-backed raw sessions in the shared execution path', async () => {
+  it('passes opened database into buildPipeline for full mode composition', async () => {
     let listedSessions = false;
     let transcriptLookupKey: string | undefined;
     let sessionItemsPromise: Promise<unknown[]> | undefined;
@@ -467,84 +429,103 @@ describe('memory pipeline cleanup', () => {
     await expect(
       runMemoryPipeline({
         mode: 'full',
-        resolveConfigDir: () => '/tmp/corivo',
-        resolveDatabasePath: () => '/tmp/corivo/corivo.db',
-        readConfig: async () => ({}),
-        createArtifactStore: () => ({
-          writeArtifact: async () => ({
-            id: 'artifact',
-            kind: 'work-item',
-            version: 1,
-            path: 'artifacts/detail/test.json',
-            source: 'test',
-            createdAt: Date.now(),
-          }),
-          persistDescriptor: async () => {},
-          getDescriptor: async () => undefined,
-          readArtifact: async () => '[]',
-          listArtifacts: async () => [],
-        }),
-        createLock: () => ({
-          acquire: async () => {},
-          release: async () => {},
-        }),
-        createRunner: () =>
-          ({
-            run: async () => ({
-              runId: 'run',
-              pipelineId: 'init-memory-pipeline',
-              status: 'success',
-              stages: [],
-            }),
-          } as MemoryPipelineRunner),
-        createInitPipeline: ({ sessionSource }) => {
-          sessionItemsPromise = sessionSource.collect();
-          return { id: 'init-memory-pipeline', stages: [] };
-        },
-        openDatabase: () =>
-          ({
-            listRawSessions: () => {
-              listedSessions = true;
-              return [
-                {
-                  id: 'raw-session-1',
-                  host: 'codex',
-                  externalSessionId: 'session-1',
-                  sessionKey: 'codex:session-1',
-                  sourceType: 'history-import',
-                  updatedAt: 123,
+        dependencies: {
+          runtime: {
+            resolveConfigDir: () => '/tmp/corivo',
+            resolveDatabasePath: () => '/tmp/corivo/corivo.db',
+            readConfig: async () => ({}),
+            openDatabase: () =>
+              ({
+                listRawSessions: () => {
+                  listedSessions = true;
+                  return [
+                    {
+                      id: 'raw-session-1',
+                      host: 'codex',
+                      externalSessionId: 'session-1',
+                      sessionKey: 'codex:session-1',
+                      sourceType: 'history-import',
+                      updatedAt: 123,
+                    },
+                  ];
                 },
-              ];
+                getRawTranscript: (sessionKey: string) => {
+                  transcriptLookupKey = sessionKey;
+                  return {
+                    session: {
+                      id: 'raw-session-1',
+                      host: 'codex',
+                      externalSessionId: 'session-1',
+                      sessionKey: 'codex:session-1',
+                      sourceType: 'history-import',
+                      updatedAt: 123,
+                    },
+                    messages: [
+                      {
+                        id: 'raw-message-1',
+                        sessionKey: 'codex:session-1',
+                        role: 'user',
+                        content: 'Remember that I prefer small PRs.',
+                        ordinal: 1,
+                        ingestedFrom: 'host-import',
+                        createdDbAt: 123,
+                        updatedDbAt: 123,
+                      },
+                    ],
+                  };
+                },
+                close: () => {},
+              } as CorivoDatabase),
+            closeDatabase: () => {
+              closed = true;
             },
-            getRawTranscript: (sessionKey: string) => {
-              transcriptLookupKey = sessionKey;
-              return {
+          },
+          buildPipeline: ({ db }) => {
+            const rawDb = db as CorivoDatabase & {
+              listRawSessions: () => Array<{
+                id: string;
+                host: string;
+                sessionKey: string;
+                externalSessionId: string;
+                updatedAt: number;
+              }>;
+              getRawTranscript: (sessionKey: string) => {
                 session: {
-                  id: 'raw-session-1',
-                  host: 'codex',
-                  externalSessionId: 'session-1',
-                  sessionKey: 'codex:session-1',
-                  sourceType: 'history-import',
-                  updatedAt: 123,
-                },
-                messages: [
-                  {
-                    id: 'raw-message-1',
-                    sessionKey: 'codex:session-1',
-                    role: 'user',
-                    content: 'Remember that I prefer small PRs.',
-                    ordinal: 1,
-                    ingestedFrom: 'host-import',
-                    createdDbAt: 123,
-                    updatedDbAt: 123,
-                  },
-                ],
+                  id: string;
+                  externalSessionId: string;
+                  host: string;
+                };
+                messages: Array<{ role: string; content: string }>;
               };
-            },
-            close: () => {},
-          } as CorivoDatabase),
-        closeDatabase: () => {
-          closed = true;
+            };
+            sessionItemsPromise = Promise.resolve(
+              rawDb.listRawSessions().map((session) => {
+                const transcript = rawDb.getRawTranscript(session.sessionKey);
+                return {
+                  id: session.id,
+                  kind: 'session',
+                  sourceRef: session.sessionKey,
+                  freshnessToken: String(session.updatedAt),
+                  metadata: {
+                    session: {
+                      id: session.id,
+                      sessionId: transcript.session.externalSessionId,
+                      kind: 'raw-session',
+                      host: transcript.session.host,
+                      messages: transcript.messages,
+                    },
+                  },
+                };
+              }),
+            );
+            return { id: 'init-memory-pipeline', stages: [] };
+          },
+          runPipeline: async () => ({
+            runId: 'run',
+            pipelineId: 'init-memory-pipeline',
+            status: 'success',
+            stages: [],
+          }),
         },
       }),
     ).resolves.toMatchObject({
@@ -586,25 +567,31 @@ describe('memory pipeline cleanup', () => {
 
     const result = await runMemoryPipeline({
       mode: 'full',
-      resolveConfigDir: () => configDir,
-      resolveDatabasePath: () => path.join(configDir, 'corivo.db'),
-      readConfig: async () => ({}),
-      createArtifactStore: (incomingRunRoot) => new ArtifactStore(incomingRunRoot),
-      createLock: (incomingRunRoot) => new FileRunLock(path.join(incomingRunRoot, 'run.lock')),
-      createRunner: (options) => new DefaultMemoryPipelineRunner(options),
-      createInitPipeline: () => ({
-        id: 'init-memory-pipeline',
-        stages: [
-          {
-            id: 'seed-raw-memories',
-            async run(context) {
-              const descriptor = await context.artifactStore.writeArtifact({
-                runId: context.runId,
-                kind: 'raw-memory-batch',
-                source: 'extract-raw-memories',
-                body: JSON.stringify({
-                  sessionId: 'session-123',
-                  markdown: `<!-- FILE: private/user-short-prs.md -->
+      dependencies: {
+        runtime: {
+          resolveConfigDir: () => configDir,
+          resolveDatabasePath: () => path.join(configDir, 'corivo.db'),
+          readConfig: async () => ({}),
+          openDatabase: () =>
+            ({
+              querySessionRecords: () => [],
+              close: () => {},
+            } as CorivoDatabase),
+          closeDatabase: () => {},
+        },
+        buildPipeline: () => ({
+          id: 'init-memory-pipeline',
+          stages: [
+            {
+              id: 'seed-raw-memories',
+              async run(context) {
+                const descriptor = await context.artifactStore.writeArtifact({
+                  runId: context.runId,
+                  kind: 'raw-memory-batch',
+                  source: 'extract-raw-memories',
+                  body: JSON.stringify({
+                    sessionId: 'session-123',
+                    markdown: `<!-- FILE: private/user-short-prs.md -->
 \`\`\`markdown
 ---
 name: User prefers short PRs
@@ -617,23 +604,23 @@ source_session: session-123
 Keep PRs narrowly scoped and easy to review.
 \`\`\`
 `,
-                }),
-              });
+                  }),
+                });
 
-              return {
-                stageId: 'seed-raw-memories',
-                status: 'success' as const,
-                inputCount: 0,
-                outputCount: 1,
-                artifactIds: [descriptor.id],
-              };
+                return {
+                  stageId: 'seed-raw-memories',
+                  status: 'success' as const,
+                  inputCount: 0,
+                  outputCount: 1,
+                  artifactIds: [descriptor.id],
+                };
+              },
             },
-          },
-          new MergeFinalMemoriesStage({
-            processor: {
-              process: vi.fn(async () => ({
-                outputs: [
-                  `<!-- FILE: memories/final/private/user-short-prs.md -->
+            new MergeFinalMemoriesStage({
+              processor: {
+                process: vi.fn(async () => ({
+                  outputs: [
+                    `<!-- FILE: memories/final/private/user-short-prs.md -->
 \`\`\`markdown
 ---
 name: User prefers short PRs
@@ -655,20 +642,14 @@ Prefer small, reviewable pull requests by default.
 \`\`\`markdown
 \`\`\`
 `,
-                ],
-                metadata: { provider: 'claude', status: 'success' as const },
-              })),
-            },
-          }),
-        ],
-      }),
-      openDatabase: () =>
-        ({
-          querySessionRecords: () => [],
-          close: () => {},
-        } as CorivoDatabase),
-      closeDatabase: () => {},
-      createSessionSource: () => ({ collect: async () => [] }),
+                  ],
+                  metadata: { provider: 'claude', status: 'success' as const },
+                })),
+              },
+            }),
+          ],
+        }),
+      },
     });
 
     expect(result).toMatchObject({

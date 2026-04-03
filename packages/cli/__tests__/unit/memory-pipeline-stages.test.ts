@@ -38,9 +38,10 @@ import { MergeFinalMemoriesStage } from '../../src/memory-pipeline/stages/merge-
 import { DatabaseClaudeSessionSource } from '../../src/memory-pipeline/sources/claude-session-source.js';
 import type { StaleBlockSource } from '../../src/memory-pipeline/stages/collect-stale-blocks.js';
 import {
-  RAW_SESSION_JOBS_STATE_KEY,
-  RAW_SESSION_JOB_SOURCE_STATE_KEY,
+  createMemoryPipelineState,
+  setClaimedRawSessionJobs,
 } from '../../src/memory-pipeline/pipeline-state.js';
+import { buildRawExtractionPrompt } from '../../src/memory-pipeline/prompts/raw-extraction-prompt.js';
 
 type BlockWithExtras = Omit<Block, 'created_at' | 'updated_at'> & {
   created_at?: number;
@@ -151,6 +152,17 @@ class RecordingArtifactStore implements MemoryPipelineArtifactStore {
       .filter((file) => file.startsWith(prefix))
       .sort();
   }
+
+  async listFinalMemoryFiles(kind: 'detail' | 'index' | 'all' = 'all'): Promise<string[]> {
+    const finalFiles = await this.listMemoryFiles('final');
+    if (kind === 'all') {
+      return finalFiles;
+    }
+    if (kind === 'index') {
+      return finalFiles.filter((file) => file.endsWith('/MEMORY.md'));
+    }
+    return finalFiles.filter((file) => file.endsWith('.md') && !file.endsWith('/MEMORY.md'));
+  }
 }
 
 const createContext = (
@@ -160,7 +172,7 @@ const createContext = (
   runId,
   trigger: { type: 'manual', runAt: Date.now() },
   artifactStore,
-  state: new Map(),
+  state: createMemoryPipelineState(),
 });
 
 describe('memory pipeline extension points', () => {
@@ -317,15 +329,17 @@ describe('memory pipeline extension points', () => {
 
   it('configures scheduled pipeline with the expected stage order', () => {
     const pipeline = createScheduledMemoryPipeline({
-      rawSessionJobSource: new DatabaseRawSessionJobSource({
-        queue: { claimNext: () => null, markSucceeded: () => {}, markFailed: () => {} } as any,
-        repository: { getTranscript: () => null } as any,
-      }),
+      rawSessionJobSource: {
+        collect: async () => [],
+        markSucceeded: async () => {},
+        markFailed: async () => {},
+      },
     });
     const ids = pipeline.stages.map((stage) => stage.id);
     expect(ids).toEqual([
       'collect-raw-session-jobs',
       'summarize-block-batch',
+      'merge-final-memories',
       'append-detail-records',
       'refresh-memory-index',
       'complete-raw-session-jobs',
@@ -333,13 +347,13 @@ describe('memory pipeline extension points', () => {
   });
 
   it('enforces RawSessionJobSource when building scheduled pipeline', () => {
-    expect(() => createScheduledMemoryPipeline({} as any)).toThrow(
+    expect(() => createScheduledMemoryPipeline({} as unknown as { rawSessionJobSource: RawSessionJobSource })).toThrow(
       'RawSessionJobSource is required to build scheduled memory pipeline',
     );
-    expect(() => new CollectRawSessionJobsStage(undefined as any)).toThrow(
+    expect(() => new CollectRawSessionJobsStage(undefined as unknown as RawSessionJobSource)).toThrow(
       'RawSessionJobSource is required',
     );
-    expect(() => new CollectStaleBlocksStage(undefined as any)).toThrow(
+    expect(() => new CollectStaleBlocksStage(undefined as unknown as StaleBlockSource)).toThrow(
       'StaleBlockSource is required',
     );
   });
@@ -417,6 +431,9 @@ describe('memory pipeline extension points', () => {
       outputCount: 1,
     });
     expect(result.artifactIds).toEqual([store.descriptors[0].id]);
+    expect(context.state.collectedSessions).toHaveLength(1);
+    expect(context.state.collectedSessions[0]?.sourceRef).toBe('claude://session-1');
+    expect(context.state.collectedSessions[0]?.metadata?.session?.sessionId).toBe('session-1');
   });
 
   it('rejects non-claude session work items before writing artifacts', async () => {
@@ -451,10 +468,10 @@ describe('memory pipeline extension points', () => {
   });
 
   it('enforces ClaudeSessionSource when building init pipeline', () => {
-    expect(() => createInitMemoryPipeline({} as any)).toThrow(
+    expect(() => createInitMemoryPipeline({} as unknown as { sessionSource: ClaudeSessionSource })).toThrow(
       'ClaudeSessionSource is required to build init memory pipeline',
     );
-    expect(() => new CollectClaudeSessionsStage(undefined as any)).toThrow(
+    expect(() => new CollectClaudeSessionsStage(undefined as unknown as ClaudeSessionSource)).toThrow(
       'ClaudeSessionSource is required',
     );
   });
@@ -515,8 +532,12 @@ Prefer small, reviewable pull requests by default.
       '- [Release check cadence](release-checks.md) — Post-release verification is a standing team habit.\n',
     );
     const stage = new RefreshMemoryIndexStage();
-
-    const result = await stage.run(createContext(store, 'run-refresh-index'));
+    const context = createContext(store, 'run-refresh-index');
+    context.state.mergedFinalOutputs.files = [
+      'memory/final/private/MEMORY.md',
+      'memory/final/team/MEMORY.md',
+    ];
+    const result = await stage.run(context);
     const [write] = store.writes;
 
     expect(write.kind).toBe('memory-index');
@@ -540,6 +561,8 @@ Prefer small, reviewable pull requests by default.
       inputCount: 2,
       outputCount: 2,
     });
+    expect(context.state.indexRefresh?.stageId).toBe(stage.id);
+    expect(context.state.indexRefresh?.indexCount).toBe(2);
   });
 
   it('rebuilds the memory index artifact from existing MEMORY.md files', async () => {
@@ -549,8 +572,9 @@ Prefer small, reviewable pull requests by default.
       '- [User prefers short PRs](user-short-prs.md) — Small, reviewable PRs are the default expectation.\n',
     );
     const stage = new RebuildMemoryIndexStage();
-
-    const result = await stage.run(createContext(store, 'run-rebuild-index'));
+    const context = createContext(store, 'run-rebuild-index');
+    context.state.mergedFinalOutputs.files = ['memory/final/private/MEMORY.md'];
+    const result = await stage.run(context);
     const [write] = store.writes;
 
     expect(write.kind).toBe('memory-index');
@@ -662,8 +686,8 @@ Prefer small, reviewable pull requests by default.
       outputCount: jobs.length,
     });
     expect(result.artifactIds).toEqual([store.descriptors[0].id]);
-    expect(context.state.get(RAW_SESSION_JOBS_STATE_KEY)).toEqual(jobs);
-    expect(context.state.get(RAW_SESSION_JOB_SOURCE_STATE_KEY)).toBe(source);
+    expect(context.state.rawSessionJobs.claimed).toEqual(jobs);
+    expect(context.state.rawSessionJobs.source).toBe(source);
   });
 
   it('summarizes transcript-derived content from collected raw session jobs', async () => {
@@ -676,7 +700,9 @@ Prefer small, reviewable pull requests by default.
     };
     const stage = new SummarizeBlockBatchStage({ processor });
     const context = createContext(store, 'run-session-job-summary');
-    context.state.set(RAW_SESSION_JOBS_STATE_KEY, [
+    setClaimedRawSessionJobs(context.state, {
+      source: undefined,
+      jobs: [
       {
         id: 'job-1',
         kind: 'session-job',
@@ -732,18 +758,33 @@ Prefer small, reviewable pull requests by default.
           updatedAt: 1,
         },
       },
-    ]);
+      ],
+    });
 
     const result = await stage.run(context);
 
-    expect(processor.process).toHaveBeenCalledWith([
-      'user: remember this\nassistant: noted',
-    ]);
+    const expectedPrompt = buildRawExtractionPrompt({
+      sessionFilename: 'sess-1.md',
+      sessionTranscript: 'user: remember this\nassistant: noted',
+    });
+    expect(processor.process).toHaveBeenCalledWith(
+      [expectedPrompt],
+      { timeoutMs: 36000 },
+    );
     expect(JSON.parse(store.writes[0].body)).toEqual({
+      sessionId: 'sess-1',
+      markdown: `summary: ${expectedPrompt}`,
+    });
+    expect(store.writes[0]).toMatchObject({
+      runId: 'run-session-job-summary',
+      kind: 'raw-memory-batch',
+      source: 'extract-raw-memories',
+    });
+    expect(JSON.parse(store.writes[1].body)).toEqual({
       runId: 'run-session-job-summary',
       stage: stage.id,
-      blocks: ['user: remember this\nassistant: noted'],
-      summaries: ['summary: user: remember this\nassistant: noted'],
+      blocks: [expectedPrompt],
+      summaries: [`summary: ${expectedPrompt}`],
       metadata: { provider: 'claude', status: 'success' },
     });
     expect(result).toMatchObject({
@@ -751,6 +792,7 @@ Prefer small, reviewable pull requests by default.
       status: 'success',
       inputCount: 1,
       outputCount: 1,
+      artifactIds: [store.descriptors[0].id, store.descriptors[1].id],
     });
   });
 
@@ -764,7 +806,9 @@ Prefer small, reviewable pull requests by default.
     };
     const stage = new SummarizeBlockBatchStage({ processor });
     const context = createContext(store, 'run-session-job-summary-multi');
-    context.state.set(RAW_SESSION_JOBS_STATE_KEY, [
+    setClaimedRawSessionJobs(context.state, {
+      source: undefined,
+      jobs: [
       {
         id: 'job-1',
         kind: 'session-job',
@@ -855,17 +899,34 @@ Prefer small, reviewable pull requests by default.
           updatedAt: 1,
         },
       },
-    ]);
+      ],
+    });
 
     const result = await stage.run(context);
 
-    expect(processor.process).toHaveBeenNthCalledWith(1, ['user: first']);
-    expect(processor.process).toHaveBeenNthCalledWith(2, ['assistant: second']);
+    const expectedFirstPrompt = buildRawExtractionPrompt({
+      sessionFilename: 'sess-1.md',
+      sessionTranscript: 'user: first',
+    });
+    const expectedSecondPrompt = buildRawExtractionPrompt({
+      sessionFilename: 'sess-2.md',
+      sessionTranscript: 'assistant: second',
+    });
+    expect(processor.process).toHaveBeenNthCalledWith(1, [expectedFirstPrompt], { timeoutMs: 34500 });
+    expect(processor.process).toHaveBeenNthCalledWith(2, [expectedSecondPrompt], { timeoutMs: 34500 });
     expect(JSON.parse(store.writes[0].body)).toEqual({
+      sessionId: 'sess-1',
+      markdown: `summary: ${expectedFirstPrompt}`,
+    });
+    expect(JSON.parse(store.writes[1].body)).toEqual({
+      sessionId: 'sess-2',
+      markdown: `summary: ${expectedSecondPrompt}`,
+    });
+    expect(JSON.parse(store.writes[2].body)).toEqual({
       runId: 'run-session-job-summary-multi',
       stage: stage.id,
-      blocks: ['user: first', 'assistant: second'],
-      summaries: ['summary: user: first', 'summary: assistant: second'],
+      blocks: [expectedFirstPrompt, expectedSecondPrompt],
+      summaries: [`summary: ${expectedFirstPrompt}`, `summary: ${expectedSecondPrompt}`],
       metadata: { provider: 'claude', status: 'success' },
     });
     expect(result).toMatchObject({
@@ -873,7 +934,175 @@ Prefer small, reviewable pull requests by default.
       status: 'success',
       inputCount: 2,
       outputCount: 2,
+      artifactIds: [store.descriptors[0].id, store.descriptors[1].id, store.descriptors[2].id],
     });
+  });
+
+  it('computes dynamic timeout per transcript from message count and total characters', async () => {
+    const store = new RecordingArtifactStore();
+    const process = vi.fn(async (inputs: string[]) => ({
+      outputs: [`summary: ${inputs[0]}`],
+      metadata: { provider: 'codex', status: 'success' as const },
+    }));
+    const processor: ModelProcessor = { process };
+    const stage = new SummarizeBlockBatchStage({ processor });
+    const context = createContext(store, 'run-session-job-summary-timeout');
+    const longUser = 'u'.repeat(1100);
+    const longAssistant = 'a'.repeat(900);
+    setClaimedRawSessionJobs(context.state, {
+      source: undefined,
+      jobs: [
+        {
+          id: 'job-timeout-1',
+          kind: 'session-job',
+          sourceRef: 'codex:sess-timeout-1',
+          host: 'codex',
+          sessionKey: 'codex:sess-timeout-1',
+          session: {
+            id: 'raw-session-timeout-1',
+            host: 'codex',
+            externalSessionId: 'sess-timeout-1',
+            sessionKey: 'codex:sess-timeout-1',
+            sourceType: 'history-import',
+            createdAt: 1,
+            updatedAt: 2,
+          },
+          transcript: [
+            {
+              id: 'msg-timeout-1',
+              sessionKey: 'codex:sess-timeout-1',
+              role: 'user',
+              content: longUser,
+              ordinal: 1,
+              ingestedFrom: 'host-import',
+              createdDbAt: 1,
+              updatedDbAt: 1,
+            },
+            {
+              id: 'msg-timeout-2',
+              sessionKey: 'codex:sess-timeout-1',
+              role: 'assistant',
+              content: longAssistant,
+              ordinal: 2,
+              ingestedFrom: 'host-import',
+              createdDbAt: 2,
+              updatedDbAt: 2,
+            },
+          ],
+          job: {
+            id: 'job-timeout-1',
+            host: 'codex',
+            sessionKey: 'codex:sess-timeout-1',
+            jobType: 'extract-session',
+            status: 'running',
+            dedupeKey: 'extract-session:codex:sess-timeout-1',
+            priority: 0,
+            attemptCount: 1,
+            availableAt: 1,
+            claimedAt: 1,
+            finishedAt: null,
+            lastError: null,
+            payloadJson: null,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+      ],
+    });
+
+    await stage.run(context);
+    const expectedPrompt = buildRawExtractionPrompt({
+      sessionFilename: 'sess-timeout-1.md',
+      sessionTranscript: `user: ${longUser}\nassistant: ${longAssistant}`,
+    });
+
+    expect(process).toHaveBeenCalledWith(
+      [expectedPrompt],
+      { timeoutMs: 39000 },
+    );
+  });
+
+  it('adds extra timeout for transcripts with an extra-long assistant message', async () => {
+    const store = new RecordingArtifactStore();
+    const process = vi.fn(async (inputs: string[]) => ({
+      outputs: [`summary: ${inputs[0]}`],
+      metadata: { provider: 'codex', status: 'success' as const },
+    }));
+    const processor: ModelProcessor = { process };
+    const stage = new SummarizeBlockBatchStage({ processor });
+    const context = createContext(store, 'run-session-job-summary-timeout-long-assistant');
+    const longAssistant = 'a'.repeat(4500);
+    setClaimedRawSessionJobs(context.state, {
+      source: undefined,
+      jobs: [
+        {
+          id: 'job-timeout-2',
+          kind: 'session-job',
+          sourceRef: 'codex:sess-timeout-2',
+          host: 'codex',
+          sessionKey: 'codex:sess-timeout-2',
+          session: {
+            id: 'raw-session-timeout-2',
+            host: 'codex',
+            externalSessionId: 'sess-timeout-2',
+            sessionKey: 'codex:sess-timeout-2',
+            sourceType: 'history-import',
+            createdAt: 1,
+            updatedAt: 2,
+          },
+          transcript: [
+            {
+              id: 'msg-timeout-3',
+              sessionKey: 'codex:sess-timeout-2',
+              role: 'user',
+              content: 'short',
+              ordinal: 1,
+              ingestedFrom: 'host-import',
+              createdDbAt: 1,
+              updatedDbAt: 1,
+            },
+            {
+              id: 'msg-timeout-4',
+              sessionKey: 'codex:sess-timeout-2',
+              role: 'assistant',
+              content: longAssistant,
+              ordinal: 2,
+              ingestedFrom: 'host-import',
+              createdDbAt: 2,
+              updatedDbAt: 2,
+            },
+          ],
+          job: {
+            id: 'job-timeout-2',
+            host: 'codex',
+            sessionKey: 'codex:sess-timeout-2',
+            jobType: 'extract-session',
+            status: 'running',
+            dedupeKey: 'extract-session:codex:sess-timeout-2',
+            priority: 0,
+            attemptCount: 1,
+            availableAt: 1,
+            claimedAt: 1,
+            finishedAt: null,
+            lastError: null,
+            payloadJson: null,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+      ],
+    });
+
+    await stage.run(context);
+    const expectedPrompt = buildRawExtractionPrompt({
+      sessionFilename: 'sess-timeout-2.md',
+      sessionTranscript: `user: short\nassistant: ${longAssistant}`,
+    });
+
+    expect(process).toHaveBeenCalledWith(
+      [expectedPrompt],
+      { timeoutMs: 68000 },
+    );
   });
 
   it('preserves provider error text when transcript-derived summarization fails', async () => {
@@ -886,7 +1115,9 @@ Prefer small, reviewable pull requests by default.
     };
     const stage = new SummarizeBlockBatchStage({ processor });
     const context = createContext(store, 'run-session-job-summary-fail');
-    context.state.set(RAW_SESSION_JOBS_STATE_KEY, [
+    setClaimedRawSessionJobs(context.state, {
+      source: undefined,
+      jobs: [
       {
         id: 'job-1',
         kind: 'session-job',
@@ -932,7 +1163,8 @@ Prefer small, reviewable pull requests by default.
           updatedAt: 1,
         },
       },
-    ]);
+      ],
+    });
 
     const result = await stage.run(context);
 
@@ -953,8 +1185,9 @@ Prefer small, reviewable pull requests by default.
     };
     const stage = new CompleteRawSessionJobsStage();
     const context = createContext(new RecordingArtifactStore(), 'run-complete-session-jobs');
-    context.state.set(RAW_SESSION_JOB_SOURCE_STATE_KEY, source);
-    context.state.set(RAW_SESSION_JOBS_STATE_KEY, [
+    setClaimedRawSessionJobs(context.state, {
+      source,
+      jobs: [
       {
         id: 'job-1',
         kind: 'session-job',
@@ -989,11 +1222,13 @@ Prefer small, reviewable pull requests by default.
           updatedAt: 1,
         },
       },
-    ]);
+      ],
+    });
 
     const result = await stage.run(context);
 
     expect(source.markSucceeded).toHaveBeenCalledWith('job-1');
+    expect(context.state.rawSessionJobs.succeededJobIds.has('job-1')).toBe(true);
     expect(result).toMatchObject({
       stageId: stage.id,
       status: 'success',
@@ -1001,6 +1236,105 @@ Prefer small, reviewable pull requests by default.
       outputCount: 1,
       artifactIds: [],
     });
+  });
+
+  it('returns failed with partial output when some raw session job completions fail', async () => {
+    const source: RawSessionJobSource = {
+      collect: vi.fn(async () => []),
+      markSucceeded: vi
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('write failed')),
+      markFailed: vi.fn(async () => {}),
+    };
+    const stage = new CompleteRawSessionJobsStage();
+    const context = createContext(new RecordingArtifactStore(), 'run-complete-session-jobs-partial');
+    setClaimedRawSessionJobs(context.state, {
+      source,
+      jobs: [
+        {
+          id: 'job-1',
+          kind: 'session-job',
+          sourceRef: 'claude-code:sess-1',
+          host: 'claude-code',
+          sessionKey: 'claude-code:sess-1',
+          session: {
+            id: 'raw-session-1',
+            host: 'claude-code',
+            externalSessionId: 'sess-1',
+            sessionKey: 'claude-code:sess-1',
+            sourceType: 'history-import',
+            createdAt: 1,
+            updatedAt: 2,
+          },
+          transcript: [],
+          job: {
+            id: 'job-1',
+            host: 'claude-code',
+            sessionKey: 'claude-code:sess-1',
+            jobType: 'extract-session',
+            status: 'running',
+            dedupeKey: 'extract-session:claude-code:sess-1',
+            priority: 0,
+            attemptCount: 1,
+            availableAt: 1,
+            claimedAt: 1,
+            finishedAt: null,
+            lastError: null,
+            payloadJson: null,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+        {
+          id: 'job-2',
+          kind: 'session-job',
+          sourceRef: 'claude-code:sess-2',
+          host: 'claude-code',
+          sessionKey: 'claude-code:sess-2',
+          session: {
+            id: 'raw-session-2',
+            host: 'claude-code',
+            externalSessionId: 'sess-2',
+            sessionKey: 'claude-code:sess-2',
+            sourceType: 'history-import',
+            createdAt: 1,
+            updatedAt: 2,
+          },
+          transcript: [],
+          job: {
+            id: 'job-2',
+            host: 'claude-code',
+            sessionKey: 'claude-code:sess-2',
+            jobType: 'extract-session',
+            status: 'running',
+            dedupeKey: 'extract-session:claude-code:sess-2',
+            priority: 0,
+            attemptCount: 1,
+            availableAt: 1,
+            claimedAt: 1,
+            finishedAt: null,
+            lastError: null,
+            payloadJson: null,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+      ],
+    });
+
+    const result = await stage.run(context);
+
+    expect(result).toMatchObject({
+      stageId: stage.id,
+      status: 'failed',
+      inputCount: 2,
+      outputCount: 1,
+    });
+    expect(result.error).toContain('job-2');
+    expect(result.error).toContain('write failed');
+    expect(context.state.rawSessionJobs.succeededJobIds.has('job-1')).toBe(true);
+    expect(context.state.rawSessionJobs.succeededJobIds.has('job-2')).toBe(false);
   });
 
   it('runs summarize session batch stage and emits a contextual summary', async () => {
@@ -1098,15 +1432,15 @@ Prefer small, reviewable pull requests by default.
         }),
     };
     const stage = new ExtractRawMemoriesStage({ processor });
-
-    const result = await stage.run(createContext(store, 'run-extract'));
+    const context = createContext(store, 'run-extract');
+    const result = await stage.run(context);
 
     expect(processor.process).toHaveBeenCalledTimes(2);
-    expect((processor.process as any).mock.calls[0][0][0]).toContain('Session filename: session-1.md');
-    expect((processor.process as any).mock.calls[0][0][0]).toContain(
+    expect(vi.mocked(processor.process).mock.calls[0]?.[0]?.[0]).toContain('Session filename: session-1.md');
+    expect(vi.mocked(processor.process).mock.calls[0]?.[0]?.[0]).toContain(
       'Remember that I prefer short PR descriptions.',
     );
-    expect((processor.process as any).mock.calls[1][0][0]).toContain('Session filename: session-2.md');
+    expect(vi.mocked(processor.process).mock.calls[1]?.[0]?.[0]).toContain('Session filename: session-2.md');
     expect(store.writes.slice(1)).toMatchObject([
       {
         runId: 'run-extract',
@@ -1136,6 +1470,16 @@ Prefer small, reviewable pull requests by default.
       outputCount: 2,
       artifactIds: [store.descriptors[1].id, store.descriptors[2].id],
     });
+    expect(context.state.extractedRawMemories).toEqual([
+      {
+        sessionId: 'session-1',
+        artifactId: store.descriptors[1].id,
+      },
+      {
+        sessionId: 'session-2',
+        artifactId: store.descriptors[2].id,
+      },
+    ]);
   });
 
   it('marks raw extraction as partial and does not emit NO_MEMORIES when a processor call times out', async () => {
@@ -1334,15 +1678,16 @@ Always verify the deployment with a focused smoke test.
       })),
     };
     const stage = new MergeFinalMemoriesStage({ processor });
-
-    const result = await stage.run(createContext(store, 'run-merge-final'));
+    const context = createContext(store, 'run-merge-final');
+    const result = await stage.run(context);
 
     expect(processor.process).toHaveBeenCalledTimes(1);
-    expect((processor.process as any).mock.calls[0][0][0]).toContain(
+    expect(vi.mocked(processor.process).mock.calls[0]?.[0]?.[0]).toContain(
       'You are acting as the final memory merge subagent.',
     );
-    expect((processor.process as any).mock.calls[0][0][0]).toContain('session-001.memories.md');
-    expect((processor.process as any).mock.calls[0][0][0]).toContain('session-002.memories.md');
+    expect(vi.mocked(processor.process).mock.calls[0]?.[0]?.[0]).toContain('session-001.memories.md');
+    expect(vi.mocked(processor.process).mock.calls[0]?.[0]?.[0]).toContain('session-002.memories.md');
+    expect(vi.mocked(processor.process).mock.calls[0]?.[1]).toEqual({ timeoutMs: 180000 });
 
     await expect(
       readFile(path.join(tempRoot, 'memory', 'raw', 'session-001.memories.md'), 'utf8'),
@@ -1380,6 +1725,12 @@ Always verify the deployment with a focused smoke test.
       outputCount: 4,
       artifactIds: [descriptors[0]!.id],
     });
+    expect(context.state.mergedFinalOutputs.files).toEqual([
+      'memory/final/private/user-short-prs.md',
+      'memory/final/team/release-checks.md',
+      'memory/final/private/MEMORY.md',
+      'memory/final/team/MEMORY.md',
+    ]);
   });
 
   it('no-ops cleanly when there are no raw memory artifacts to merge', async () => {
@@ -1412,6 +1763,143 @@ Always verify the deployment with a focused smoke test.
         source: 'merge-final-memories',
       }),
     ).resolves.toEqual([]);
+  });
+
+  it('skips NO_MEMORIES raw artifacts when building merge inputs and writing raw files', async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'corivo-merge-skip-no-memories-'));
+    const runRoot = path.join(tempRoot, 'memory-pipeline');
+    await mkdir(runRoot, { recursive: true });
+    const store = new ArtifactStore(runRoot);
+
+    await store.writeArtifact({
+      runId: 'run-merge-skip-no-memories',
+      kind: 'raw-memory-batch',
+      source: 'extract-raw-memories',
+      body: JSON.stringify({
+        sessionId: 'session-001',
+        markdown: `<!-- FILE: private/user-short-prs.md -->
+\`\`\`markdown
+---
+name: User prefers short PRs
+description: User usually wants small reviewable pull requests
+type: user
+scope: private
+source_session: session-001
+---
+
+Keep PRs narrowly scoped and easy to review.
+\`\`\`
+`,
+      }),
+    });
+    await store.writeArtifact({
+      runId: 'run-merge-skip-no-memories',
+      kind: 'raw-memory-batch',
+      source: 'extract-raw-memories',
+      body: JSON.stringify({
+        sessionId: 'session-002',
+        markdown: '<!-- NO_MEMORIES -->',
+      }),
+    });
+
+    const processor: ModelProcessor = {
+      process: vi.fn(async () => ({
+        outputs: [
+          `<!-- FILE: memories/final/private/user-short-prs.md -->
+\`\`\`markdown
+---
+name: User prefers short PRs
+description: Canonical preference for small reviewable pull requests
+type: user
+scope: private
+merged_from: [session-001]
+---
+
+Keep pull requests narrowly scoped and easy to review.
+\`\`\`
+
+<!-- FILE: memories/final/private/MEMORY.md -->
+\`\`\`markdown
+- [User prefers short PRs](user-short-prs.md) — Keep PRs narrowly scoped and easy to review.
+\`\`\`
+
+<!-- FILE: memories/final/team/MEMORY.md -->
+\`\`\`markdown
+\`\`\`
+`,
+        ],
+        metadata: { provider: 'claude', status: 'success' },
+      })),
+    };
+
+    const stage = new MergeFinalMemoriesStage({ processor });
+    const result = await stage.run(createContext(store, 'run-merge-skip-no-memories'));
+
+    expect(processor.process).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(processor.process).mock.calls[0]?.[0]?.[0]).toContain('session-001.memories.md');
+    expect(vi.mocked(processor.process).mock.calls[0]?.[0]?.[0]).not.toContain('session-002.memories.md');
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'raw', 'session-001.memories.md'), 'utf8'),
+    ).resolves.toContain('source_session: session-001');
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'raw', 'session-002.memories.md'), 'utf8'),
+    ).rejects.toThrow();
+    expect(result).toMatchObject({
+      stageId: 'merge-final-memories',
+      status: 'success',
+      inputCount: 2,
+    });
+  });
+
+  it('no-ops when every raw memory artifact is NO_MEMORIES', async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'corivo-merge-all-no-memories-'));
+    const runRoot = path.join(tempRoot, 'memory-pipeline');
+    await mkdir(runRoot, { recursive: true });
+    const store = new ArtifactStore(runRoot);
+
+    await store.writeArtifact({
+      runId: 'run-merge-all-no-memories',
+      kind: 'raw-memory-batch',
+      source: 'extract-raw-memories',
+      body: JSON.stringify({
+        sessionId: 'session-001',
+        markdown: '<!-- NO_MEMORIES -->',
+      }),
+    });
+    await store.writeArtifact({
+      runId: 'run-merge-all-no-memories',
+      kind: 'raw-memory-batch',
+      source: 'extract-raw-memories',
+      body: JSON.stringify({
+        sessionId: 'session-002',
+        markdown: '<!-- NO_MEMORIES -->',
+      }),
+    });
+
+    const processor: ModelProcessor = {
+      process: vi.fn(async () => ({
+        outputs: ['should not run'],
+        metadata: { provider: 'claude', status: 'success' },
+      })),
+    };
+
+    const stage = new MergeFinalMemoriesStage({ processor });
+    const result = await stage.run(createContext(store, 'run-merge-all-no-memories'));
+
+    expect(processor.process).not.toHaveBeenCalled();
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'raw', 'session-001.memories.md'), 'utf8'),
+    ).rejects.toThrow();
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'raw', 'session-002.memories.md'), 'utf8'),
+    ).rejects.toThrow();
+    expect(result).toMatchObject({
+      stageId: 'merge-final-memories',
+      status: 'success',
+      inputCount: 2,
+      outputCount: 0,
+      artifactIds: [],
+    });
   });
 
   it.each([
@@ -1469,6 +1957,60 @@ Keep PRs narrowly scoped and easy to review.
     await expect(
       readFile(path.join(tempRoot, 'memory', 'final', 'private', 'user-short-prs.md'), 'utf8'),
     ).rejects.toThrow();
+  });
+
+  it('falls back to deterministic final files when merge output is malformed and there are no existing final detail files', async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'corivo-merge-fallback-'));
+    const runRoot = path.join(tempRoot, 'memory-pipeline');
+    await mkdir(runRoot, { recursive: true });
+    const store = new ArtifactStore(runRoot);
+
+    await store.writeArtifact({
+      runId: 'run-merge-fallback',
+      kind: 'raw-memory-batch',
+      source: 'extract-raw-memories',
+      body: JSON.stringify({
+        sessionId: 'session-001',
+        markdown: `<!-- FILE: private/user-short-prs.md -->
+\`\`\`markdown
+---
+name: User prefers short PRs
+description: User usually wants small reviewable pull requests
+type: user
+scope: private
+source_session: session-001
+---
+
+Keep PRs narrowly scoped and easy to review.
+\`\`\`
+`,
+      }),
+    });
+
+    const processor: ModelProcessor = {
+      process: vi.fn(async () => ({
+        outputs: ['I merged the memory set.'],
+        metadata: { provider: 'codex', status: 'success' },
+      })),
+    };
+    const stage = new MergeFinalMemoriesStage({ processor });
+    const result = await stage.run(createContext(store, 'run-merge-fallback'));
+
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'final', 'private', 'user-short-prs.md'), 'utf8'),
+    ).resolves.toContain('merged_from: [session-001]');
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'final', 'private', 'MEMORY.md'), 'utf8'),
+    ).resolves.toContain('[User prefers short PRs](user-short-prs.md)');
+    await expect(
+      readFile(path.join(tempRoot, 'memory', 'final', 'team', 'MEMORY.md'), 'utf8'),
+    ).resolves.toBe('');
+    expect(result).toMatchObject({
+      stageId: 'merge-final-memories',
+      status: 'success',
+      inputCount: 1,
+      outputCount: 3,
+    });
   });
 
   it('rejects duplicate final file blocks before writing any final files', async () => {
@@ -1723,6 +2265,7 @@ not valid final memory content
     );
     const stage = new RefreshMemoryIndexStage();
     const context = createContext(store, 'run-refresh');
+    context.state.mergedFinalOutputs.files = ['memory/final/private/MEMORY.md'];
 
     const result = await stage.run(context);
 
@@ -1757,6 +2300,7 @@ not valid final memory content
     );
     const stage = new RebuildMemoryIndexStage();
     const context = createContext(store, 'run-index');
+    context.state.mergedFinalOutputs.files = ['memory/final/team/MEMORY.md'];
 
     const result = await stage.run(context);
 

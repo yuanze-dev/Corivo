@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { ensureHostAssetPackage } from './host-asset-packages.js';
 import { copyHostAsset, readHostTemplateText } from './host-assets.js';
-import type { HostDoctorResult, HostInstallResult } from '../hosts/types.js';
+import type { HostDoctorResult, HostInstallResult } from '../types.js';
 
 const START_MARKER = '<!-- CORIVO CODEX START -->';
 const END_MARKER = '<!-- CORIVO CODEX END -->';
@@ -117,6 +118,7 @@ export async function installCodexHost(homeDir?: string): Promise<HostInstallRes
   const paths = getCodexPaths(homeDir);
 
   try {
+    await ensureHostAssetPackage('codex');
     await fs.mkdir(paths.adapterDir, { recursive: true });
     await ensureMemoryWorkspace(paths.homeDir);
 

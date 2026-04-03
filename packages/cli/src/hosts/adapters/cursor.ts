@@ -1,5 +1,5 @@
 import type { HostAdapter } from '../types.js';
-import { installCursorHost, isCursorInstalled, uninstallCursorHost } from '../../inject/cursor-rules.js';
+import { installCursorHost, isCursorInstalled, uninstallCursorHost } from '../installers/cursor-rules.js';
 
 export const cursorHostAdapter: HostAdapter = {
   id: 'cursor',

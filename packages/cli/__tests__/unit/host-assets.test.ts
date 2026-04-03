@@ -10,7 +10,7 @@ import {
   resolveHostAssetRoot,
   resolveHostRawAssetPath,
   readHostTemplateText,
-} from '../../src/inject/host-assets.js';
+} from '../../src/hosts/installers/host-assets.js';
 
 describe('host assets loader', () => {
   afterEach(() => {
@@ -36,7 +36,7 @@ describe('host assets loader', () => {
     const rawAssetPath = path.join(installedHostRoot, 'assets', 'corivo-logo.svg');
 
     try {
-      await fs.writeFile(path.join(packageRoot, 'package.json'), '{"name":"test-cli"}\n', 'utf8');
+      await fs.writeFile(path.join(packageRoot, 'package.json'), '{"name":"test-cli","version":"0.12.7"}\n', 'utf8');
       await fs.mkdir(path.dirname(templatePath), { recursive: true });
       await fs.mkdir(path.dirname(rawAssetPath), { recursive: true });
       await fs.writeFile(path.join(installedHostRoot, 'package.json'), '{"name":"@corivo-ai/codex"}\n', 'utf8');
@@ -52,6 +52,36 @@ describe('host assets loader', () => {
       );
     } finally {
       await fs.rm(packageRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves host assets from the cached host package when local package and repo assets are absent', async () => {
+    const packageRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-cached-host-package-root-'));
+    const cacheRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-host-cache-root-'));
+    const cachedHostRoot = path.join(cacheRoot, 'packages', 'codex', '0.12.7', 'node_modules', '@corivo-ai', 'codex');
+    const templatePath = path.join(cachedHostRoot, 'templates', 'AGENTS.codex.md');
+    const rawAssetPath = path.join(cachedHostRoot, 'assets', 'corivo-logo.svg');
+
+    try {
+      process.env.CORIVO_HOST_ASSET_CACHE_ROOT = cacheRoot;
+      await fs.writeFile(path.join(packageRoot, 'package.json'), '{"name":"test-cli","version":"0.12.7"}\n', 'utf8');
+      await fs.mkdir(path.dirname(templatePath), { recursive: true });
+      await fs.mkdir(path.dirname(rawAssetPath), { recursive: true });
+      await fs.writeFile(path.join(cachedHostRoot, 'package.json'), '{"name":"@corivo-ai/codex"}\n', 'utf8');
+      await fs.writeFile(templatePath, '# cached codex rules\n', 'utf8');
+      await fs.writeFile(rawAssetPath, '<svg data-cache />', 'utf8');
+
+      expect(await fs.realpath(resolveHostAssetRoot('codex', { packageRoot }))).toBe(await fs.realpath(cachedHostRoot));
+      expect(await fs.realpath(resolveHostRawAssetPath('codex', 'assets/corivo-logo.svg', { packageRoot }))).toBe(
+        await fs.realpath(rawAssetPath),
+      );
+      await expect(readHostTemplateText('codex', 'templates/AGENTS.codex.md', { packageRoot })).resolves.toBe(
+        '# cached codex rules\n',
+      );
+    } finally {
+      delete process.env.CORIVO_HOST_ASSET_CACHE_ROOT;
+      await fs.rm(packageRoot, { recursive: true, force: true });
+      await fs.rm(cacheRoot, { recursive: true, force: true });
     }
   });
 
@@ -168,6 +198,7 @@ describe('host assets loader', () => {
         resolvePreferredAssetRoot({
           packageRoot: packageAssetRoot,
           repoRoot,
+          cacheRoot: overrideRoot,
           scopeLabel: 'test host assets',
         }),
       ).toEqual({
@@ -181,11 +212,26 @@ describe('host assets loader', () => {
         resolvePreferredAssetRoot({
           packageRoot: packageAssetRoot,
           repoRoot,
+          cacheRoot: overrideRoot,
           scopeLabel: 'test host assets',
         }),
       ).toEqual({
         root: repoRoot,
         source: 'repo',
+      });
+
+      await fs.rm(repoRoot, { recursive: true, force: true });
+
+      expect(
+        resolvePreferredAssetRoot({
+          packageRoot: packageAssetRoot,
+          repoRoot,
+          cacheRoot: overrideRoot,
+          scopeLabel: 'test host assets',
+        }),
+      ).toEqual({
+        root: path.resolve(overrideRoot),
+        source: 'cache',
       });
     } finally {
       await fs.rm(overrideRoot, { recursive: true, force: true });

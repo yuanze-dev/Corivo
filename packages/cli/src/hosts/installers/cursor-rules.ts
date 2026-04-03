@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { ensureHostAssetPackage } from './host-asset-packages.js';
 import { copyHostAsset, readHostTemplateText } from './host-assets.js';
-import type { HostDoctorResult, HostInstallResult } from '../hosts/types.js';
+import type { HostDoctorResult, HostInstallResult } from '../types.js';
 
 export async function getCursorRuleTemplate(): Promise<string> {
   return readHostTemplateText('cursor', 'templates/corivo.mdc');
@@ -59,6 +60,7 @@ export async function installCursorHost(homeDir?: string): Promise<HostInstallRe
   const paths = getCursorPaths(homeDir);
 
   try {
+    await ensureHostAssetPackage('cursor');
     const template = await getCursorRuleTemplate();
     await fs.mkdir(paths.rulesDir, { recursive: true });
     await fs.writeFile(paths.rulePath, template, 'utf8');

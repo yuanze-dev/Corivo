@@ -16,25 +16,25 @@ const installOpencodeHost = vi.fn();
 const isOpencodeInstalled = vi.fn();
 const uninstallOpencodeHost = vi.fn();
 
-vi.mock('../../src/inject/claude-host.js', () => ({
+vi.mock('../../src/hosts/installers/claude-host.js', () => ({
   installClaudeCodeHost,
   isClaudeCodeInstalled,
   uninstallClaudeCodeHost,
 }));
 
-vi.mock('../../src/inject/codex-rules.js', () => ({
+vi.mock('../../src/hosts/installers/codex-rules.js', () => ({
   installCodexHost,
   isCodexInstalled,
   uninstallCodexHost,
 }));
 
-vi.mock('../../src/inject/cursor-rules.js', () => ({
+vi.mock('../../src/hosts/installers/cursor-rules.js', () => ({
   installCursorHost,
   isCursorInstalled,
   uninstallCursorHost,
 }));
 
-vi.mock('../../src/inject/opencode-plugin.js', () => ({
+vi.mock('../../src/hosts/installers/opencode-plugin.js', () => ({
   installOpencodeHost,
   isOpencodeInstalled,
   uninstallOpencodeHost,

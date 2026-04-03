@@ -1,5 +1,5 @@
 import type { HostAdapter } from '../types.js';
-import { installClaudeCodeHost, isClaudeCodeInstalled, uninstallClaudeCodeHost } from '../../inject/claude-host.js';
+import { installClaudeCodeHost, isClaudeCodeInstalled, uninstallClaudeCodeHost } from '../installers/claude-host.js';
 import { importClaudeHistory } from '../importers/claude-history.js';
 
 export const claudeCodeHostAdapter: HostAdapter = {

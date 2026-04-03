@@ -1,5 +1,5 @@
 import type { HostAdapter } from '../types.js';
-import { installCodexHost, isCodexInstalled, uninstallCodexHost } from '../../inject/codex-rules.js';
+import { installCodexHost, isCodexInstalled, uninstallCodexHost } from '../installers/codex-rules.js';
 import { importCodexHistory } from '../importers/codex-history.js';
 
 export const codexHostAdapter: HostAdapter = {

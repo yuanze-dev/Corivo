@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { ensureHostAssetPackage } from './host-asset-packages.js';
 import { copyHostAsset } from './host-assets.js';
-import type { HostDoctorResult, HostInstallResult } from '../hosts/types.js';
+import type { HostDoctorResult, HostInstallResult } from '../types.js';
 
 type ClaudeSettings = {
   hooks?: Record<string, Array<{ hooks?: Array<{ type: string; command: string; timeout: number }> }>>;
@@ -64,6 +65,7 @@ export async function injectGlobalClaudeCodeHost(): Promise<{
 
 export async function installClaudeCodeHost(homeDir?: string): Promise<HostInstallResult> {
   try {
+    await ensureHostAssetPackage('claude-code');
     const paths = await getClaudeCodePaths(homeDir);
 
     await ensureMemoryWorkspace(paths.homeDir);

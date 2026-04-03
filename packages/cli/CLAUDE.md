@@ -70,7 +70,7 @@ src/
     pattern.ts        Pattern 接口（决策模式）
   push/
     context.ts        上下文推送逻辑
-  inject/
+  hosts/installers/
     claude-rules.ts   注入 CLAUDE.md 规则
   daemon/
     index.ts          守护进程入口

@@ -1,5 +1,5 @@
 import type { HostAdapter } from '../types.js';
-import { installOpencodeHost, isOpencodeInstalled, uninstallOpencodeHost } from '../../inject/opencode-plugin.js';
+import { installOpencodeHost, isOpencodeInstalled, uninstallOpencodeHost } from '../installers/opencode-plugin.js';
 
 export const opencodeHostAdapter: HostAdapter = {
   id: 'opencode',

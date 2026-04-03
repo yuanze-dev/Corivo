@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { injectGlobalClaudeCodeHost } from '../../src/inject/claude-host.js';
+import { injectGlobalClaudeCodeHost } from '../../src/hosts/installers/claude-host.js';
 
 const CLAUDE_SESSION_INIT_PATH = path.resolve('../plugins/claude-code/hooks/scripts/session-init.sh');
 const CLAUDE_INGEST_TURN_PATH = path.resolve('../plugins/claude-code/hooks/scripts/ingest-turn.sh');

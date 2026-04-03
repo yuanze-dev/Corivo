@@ -1,5 +1,7 @@
 import { defineConfig } from 'tsdown';
 
+const isProd = process.env.NODE_ENV === 'production';
+
 export default defineConfig({
   entry: {
     index: 'src/index.ts',
@@ -11,15 +13,17 @@ export default defineConfig({
   },
   format: 'esm',
   target: 'node18',
-  unbundle: true,
+  unbundle: false,
+  minify: isProd,
+  treeshake: true,
   hash: false,
+  clean: true,
+  dts: true,
+  sourcemap: !isProd,
   outExtensions: () => ({
     js: '.js',
     dts: '.d.ts',
   }),
-  sourcemap: true,
-  clean: true,
-  dts: true,
   deps: {
     neverBundle: ['better-sqlite3'],
   },

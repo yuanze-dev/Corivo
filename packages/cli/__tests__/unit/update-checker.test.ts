@@ -130,4 +130,11 @@ describe('update checker', () => {
     expect(status.hasUpdate).toBe(false);
     expect(status.latestVersion).toBeNull();
   });
+
+  it('does not publish workspace protocol dependencies in the CLI manifest', () => {
+    const dependencyEntries = Object.entries(packageJson.dependencies ?? {});
+    const workspaceDependencies = dependencyEntries.filter(([, version]) => version.startsWith('workspace:'));
+
+    expect(workspaceDependencies).toEqual([]);
+  });
 });

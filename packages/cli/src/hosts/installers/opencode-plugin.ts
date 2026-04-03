@@ -3,12 +3,18 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  ensureHostAssetPackage,
+  getHostAssetCacheRoot,
+  getHostAssetPackageVersion,
+  resolveCachedHostAssetPackageRoot,
+} from './host-asset-packages.js';
 import { resolvePreferredAssetRoot } from './host-assets.js';
 import {
   resolveInstalledPackageRoot,
   resolveNearestPackageRoot,
 } from './package-assets.js';
-import type { HostDoctorResult, HostInstallResult } from '../hosts/types.js';
+import type { HostDoctorResult, HostInstallResult } from '../types.js';
 
 const ASSET_ROOT_OVERRIDE_ENV = 'CORIVO_HOST_ASSETS_ROOT';
 const OPENCODE_RUNTIME_PACKAGE_NAME = '@corivo-ai/opencode';
@@ -49,6 +55,7 @@ export async function installOpencodeHost(homeDir?: string): Promise<HostInstall
   const paths = getOpencodePaths(homeDir);
 
   try {
+    await ensureHostAssetPackage('opencode');
     const packagedPluginPath = resolvePackagedOpencodePluginAssetPath();
     await fs.mkdir(paths.pluginDir, { recursive: true });
     await fs.copyFile(packagedPluginPath, paths.pluginPath);
@@ -72,9 +79,14 @@ export async function installOpencodeHost(homeDir?: string): Promise<HostInstall
 export function resolvePackagedOpencodePluginAssetPath(options: {
   packageRoot?: string;
   overrideRoot?: string | null;
+  version?: string;
 } = {}): string {
   const packageRoot = options.packageRoot ?? resolveNearestPackageRoot(__dirname);
   const configuredOverrideRoot = options.overrideRoot ?? process.env[ASSET_ROOT_OVERRIDE_ENV] ?? null;
+  const version = getHostAssetPackageVersion({
+    packageRoot,
+    version: options.version,
+  });
   const explicitInstalledPackageRoot = path.join(
     packageRoot,
     'node_modules',
@@ -112,10 +124,27 @@ export function resolvePackagedOpencodePluginAssetPath(options: {
     );
   }
 
+  const cachedPackageRoot = resolveCachedHostAssetPackageRoot('opencode', {
+    packageRoot,
+    cacheRoot: getHostAssetCacheRoot(),
+    version,
+  });
+  if (cachedPackageRoot) {
+    const cachedAssetPath = path.join(cachedPackageRoot, 'assets', OPENCODE_RUNTIME_ASSET_FILE);
+    if (existsSync(cachedAssetPath)) {
+      return cachedAssetPath;
+    }
+
+    throw new Error(
+      `Missing packaged OpenCode runtime asset. Checked paths: ${cachedAssetPath}. Rebuild or reinstall corivo if published assets are missing.`,
+    );
+  }
+
   const selectedRoot = resolvePreferredAssetRoot({
     overrideRoot: null,
     packageRoot: null,
     repoRoot: path.join(packageRoot, OPENCODE_RUNTIME_REPO_ROOT),
+    cacheRoot: null,
     scopeLabel: 'Corivo OpenCode runtime assets',
   });
   const assetPath = path.join(selectedRoot.root, OPENCODE_RUNTIME_ASSET_FILE);

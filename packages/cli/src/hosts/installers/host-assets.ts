@@ -5,47 +5,17 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getHostAssetCacheRoot, getHostAssetPackageVersion, resolveCachedHostAssetPackageRoot } from './host-asset-packages.js';
+import { assetBackedHostIds, hostDeclarations, hostIds, type AssetBackedHostId, type HostId } from './host-manifest.js';
 import {
   resolveInstalledPackageRoot,
   resolveNearestPackageRoot,
 } from './package-assets.js';
+import type { HostAssetRootCandidate } from './host-assets.types.js';
 
 const HOST_ASSET_ROOT_ENV = 'CORIVO_HOST_ASSETS_ROOT';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const hostDeclarations = {
-  'claude-code': {
-    directory: 'claude-code',
-    assetSupport: 'bundled',
-    packageName: '@corivo-ai/claude-code',
-  },
-  codex: {
-    directory: 'codex',
-    assetSupport: 'bundled',
-    packageName: '@corivo-ai/codex',
-  },
-  cursor: {
-    directory: 'cursor',
-    assetSupport: 'bundled',
-    packageName: '@corivo-ai/cursor',
-  },
-  opencode: {
-    directory: 'opencode',
-    assetSupport: 'none',
-    packageName: '@corivo-ai/opencode',
-  },
-} as const;
-
-const hostIds = Object.keys(hostDeclarations) as Array<keyof typeof hostDeclarations>;
-const assetBackedHostIds = hostIds.filter(
-  (host): host is AssetBackedHostId => hostDeclarations[host].assetSupport === 'bundled',
-);
-
-export type HostId = keyof typeof hostDeclarations;
-type AssetBackedHostId = {
-  [K in HostId]: (typeof hostDeclarations)[K]['assetSupport'] extends 'bundled' ? K : never
-}[HostId];
 
 type CopyHostAssetOptions = {
   mode?: number;
@@ -53,17 +23,16 @@ type CopyHostAssetOptions = {
 
 type ResolveHostAssetOptions = {
   packageRoot?: string;
-};
-
-type HostAssetRootCandidate = {
-  root: string;
-  source: 'override' | 'package' | 'repo';
+  homeDir?: string;
+  cacheRoot?: string;
+  version?: string;
 };
 
 export function resolvePreferredAssetRoot(options: {
   overrideRoot?: string | null;
   packageRoot?: string | null;
   repoRoot?: string | null;
+  cacheRoot?: string | null;
   scopeLabel: string;
 }): HostAssetRootCandidate {
   const normalizedOverrideRoot = options.overrideRoot?.trim();
@@ -90,10 +59,20 @@ export function resolvePreferredAssetRoot(options: {
     };
   }
 
+  const normalizedCacheRoot = options.cacheRoot ? path.resolve(options.cacheRoot) : null;
+  if (normalizedCacheRoot && existsSync(normalizedCacheRoot)) {
+    return {
+      root: normalizedCacheRoot,
+      source: 'cache',
+    };
+  }
+
   throw new Error(
     buildMissingRootMessage(
       options.scopeLabel,
-      [normalizedPackageRoot, normalizedRepoRoot].filter((candidate): candidate is string => Boolean(candidate)),
+      [normalizedPackageRoot, normalizedRepoRoot, normalizedCacheRoot].filter(
+        (candidate): candidate is string => Boolean(candidate),
+      ),
     ),
   );
 }
@@ -104,6 +83,10 @@ export function resolveHostsAssetRoot(options: ResolveHostAssetOptions = {}): st
 
 export function getSupportedHostIds(): readonly HostId[] {
   return hostIds;
+}
+
+export function getHostAssetPackageName(host: HostId): string {
+  return hostDeclarations[host].packageName;
 }
 
 export function resolveHostAssetRoot(host: string, options: ResolveHostAssetOptions = {}): string {
@@ -165,12 +148,12 @@ export async function copyHostAsset(
 
 function resolveSelectedHostAssetRoot(options: ResolveHostAssetOptions = {}): HostAssetRootCandidate {
   const packageRoot = options.packageRoot ? path.resolve(options.packageRoot) : resolveNearestPackageRoot(__dirname);
-  const packageCandidate = getInstalledHostAssetRootCandidate(packageRoot);
-  const repoCandidate = getRepoHostAssetRootCandidate(packageRoot);
+  const candidates = getHostAssetRootCandidates(packageRoot, options);
   return resolvePreferredAssetRoot({
-    overrideRoot: process.env[HOST_ASSET_ROOT_ENV],
-    packageRoot: packageCandidate?.root,
-    repoRoot: repoCandidate?.root,
+    overrideRoot: candidates.overrideRoot,
+    packageRoot: candidates.packageRoot,
+    repoRoot: candidates.repoRoot,
+    cacheRoot: candidates.cacheRoot,
     scopeLabel: 'Corivo host assets',
   });
 }
@@ -203,9 +186,62 @@ function getRepoHostAssetRootCandidate(packageRoot: string): HostAssetRootCandid
     return null;
   }
 
+  const hasBundledHostDir = assetBackedHostIds.some((host) =>
+    existsSync(path.join(repoRoot, hostDeclarations[host].directory)),
+  );
+  if (!hasBundledHostDir) {
+    return null;
+  }
+
   return {
     root: repoRoot,
     source: 'repo',
+  };
+}
+
+function getCachedHostAssetRootCandidate(packageRoot: string, options: ResolveHostAssetOptions): HostAssetRootCandidate | null {
+  const version = getHostAssetPackageVersion({
+    packageRoot,
+    version: options.version,
+  });
+
+  for (const host of assetBackedHostIds) {
+    const cachedPackageRoot = resolveCachedHostAssetPackageRoot(host, {
+      homeDir: options.homeDir,
+      cacheRoot: options.cacheRoot ?? getHostAssetCacheRoot(options.homeDir),
+      version,
+    });
+
+    if (cachedPackageRoot) {
+      return {
+        root: path.dirname(cachedPackageRoot),
+        source: 'cache',
+      };
+    }
+  }
+
+  return null;
+}
+
+function getHostAssetRootCandidates(
+  packageRoot: string,
+  options: ResolveHostAssetOptions,
+): {
+  overrideRoot: string | null;
+  packageRoot: string | null;
+  repoRoot: string | null;
+  cacheRoot: string | null;
+} {
+  const overrideRoot = process.env[HOST_ASSET_ROOT_ENV]?.trim() ? path.resolve(process.env[HOST_ASSET_ROOT_ENV]!.trim()) : null;
+  const packageCandidate = getInstalledHostAssetRootCandidate(packageRoot);
+  const repoCandidate = getRepoHostAssetRootCandidate(packageRoot);
+  const cacheCandidate = getCachedHostAssetRootCandidate(packageRoot, options);
+
+  return {
+    overrideRoot,
+    packageRoot: packageCandidate?.root ?? null,
+    repoRoot: repoCandidate?.root ?? null,
+    cacheRoot: cacheCandidate?.root ?? null,
   };
 }
 

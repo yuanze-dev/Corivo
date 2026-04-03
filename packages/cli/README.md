@@ -63,7 +63,7 @@ This package uses one directional layering:
 - Application layer (`src/application/*`): use-cases and orchestration flow; compose dependencies instead of constructing them deep inside business modules.
 - Runtime layer (`src/runtime/*`): reusable capability/policy functions (recall, query history store adapter, trigger/follow-up rendering rules, etc).
 - Pipeline layer (`src/memory-pipeline/*`): state + stage capabilities + runner flow, without command parsing concerns.
-- Host/plugin integration (`src/hosts/*`, `src/inject/*`, `packages/plugins/*`): host-specific differences and install assets, delegated through `corivo host ...`.
+- Host/plugin integration (`src/hosts/*`, `src/hosts/installers/*`, `packages/plugins/*`): host-specific differences and install assets, delegated through `corivo host ...`.
 
 Composition roots:
 

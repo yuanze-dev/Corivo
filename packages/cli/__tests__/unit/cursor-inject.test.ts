@@ -7,7 +7,7 @@ const CURSOR_TEMPLATE_PATH = path.resolve('../plugins/cursor/templates/corivo.md
 const CURSOR_SESSION_CARRY_OVER_PATH = path.resolve('../plugins/cursor/hooks/scripts/session-carry-over.sh');
 const CURSOR_PROMPT_RECALL_PATH = path.resolve('../plugins/cursor/hooks/scripts/prompt-recall.sh');
 const CURSOR_STOP_REVIEW_PATH = path.resolve('../plugins/cursor/hooks/scripts/stop-review.sh');
-const CURSOR_RULES_MODULE_PATH = '../../src/inject/cursor-rules.js';
+const CURSOR_RULES_MODULE_PATH = '../../src/hosts/installers/cursor-rules.js';
 
 describe('Cursor Corivo integration', () => {
   let tempHome: string;

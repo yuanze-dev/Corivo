@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { applyPulledChangesets, post } from '../../src/cli/commands/sync.js';
+import { applyPulledChangesets, post } from '../../src/runtime/sync-client.js';
 import type { Logger } from '../../src/utils/logging.js';
 
 function createMockLogger(logs: string[], errors: string[]): Logger {

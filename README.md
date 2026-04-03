@@ -244,6 +244,21 @@ CLI commands and optional sync
 
 Memory is modeled as blocks with vitality (`active -> cooling -> cold -> archived`). Decisions decay slower than lightweight knowledge, so long-lived project choices remain easier to recover.
 
+## Shipped Module Boundaries
+
+Corivo now follows a state/capability/flow split with explicit composition roots:
+
+- `packages/cli/src/cli/commands/*`: command adapters only (flag parsing and output).
+- `packages/cli/src/application/*`: use-case and orchestration flow; `application/bootstrap/create-cli-app.ts` is the CLI composition root.
+- `packages/cli/src/runtime/*`: runtime capabilities and policy functions shared by commands/engine.
+- `packages/cli/src/memory-pipeline/*`: pipeline state, stage capabilities, and runner flow.
+- `packages/plugins/*`: host-specific integration assets/runtime, kept thin and delegated to CLI entrypoints.
+- `packages/solver/src/routes/*`: HTTP adapter layer.
+- `packages/solver/src/application/*`: application-level contracts/use-cases.
+- `packages/solver/src/runtime/create-server.ts` + `packages/solver/src/server.ts`: solver runtime wiring/composition roots.
+
+Practical rule: command/routes adapt IO, application composes dependencies, runtime/storage/auth/sync implement capabilities, and runner/use-case modules own process flow.
+
 ## Plugin Directory Model
 
 Corivo organizes plugins by plugin name:

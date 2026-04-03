@@ -51,7 +51,7 @@ describe('E2E: CLI Basic Workflow', () => {
       stdio: 'pipe',
       env: { ...process.env, HOME: TEST_DIR }
     });
-    expect(result).toContain('Config file not found');
+    expect(result).toContain('Please run: corivo init');
   });
 
   it('should show error for missing init', () => {

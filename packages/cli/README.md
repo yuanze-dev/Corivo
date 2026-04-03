@@ -36,7 +36,11 @@ pnpm -r run build
 ## Where To Look Next
 
 - CLI entrypoint: `src/cli/index.ts`
+- CLI composition root: `src/application/bootstrap/create-cli-app.ts`
 - Command implementations: `src/cli/commands/`
+- Application orchestration: `src/application/`
+- Runtime capabilities/policies: `src/runtime/`
+- Memory pipeline state/capability/flow: `src/memory-pipeline/`
 - Heartbeat and engine logic: `src/engine/`
 - Database layer: `src/storage/database.ts`
 - Service management: `src/service/`
@@ -50,6 +54,23 @@ Keep `CliContext` focused on horizontal runtime concerns. It exists to reduce re
 Do not place business actions in `CliContext`. Sync orchestration, heartbeat rules, block processing, and other domain logic should stay in their own modules.
 
 Pure functions do not need the whole context. When a helper only needs a narrow dependency such as `logger` or `clock`, prefer passing that smaller capability explicitly.
+
+## Architectural Split (State / Capability / Flow)
+
+This package uses one directional layering:
+
+- Command layer (`src/cli/commands/*`): parse CLI input and render output only.
+- Application layer (`src/application/*`): use-cases and orchestration flow; compose dependencies instead of constructing them deep inside business modules.
+- Runtime layer (`src/runtime/*`): reusable capability/policy functions (recall, query history store adapter, trigger/follow-up rendering rules, etc).
+- Pipeline layer (`src/memory-pipeline/*`): state + stage capabilities + runner flow, without command parsing concerns.
+- Host/plugin integration (`src/hosts/*`, `src/inject/*`, `packages/plugins/*`): host-specific differences and install assets, delegated through `corivo host ...`.
+
+Composition roots:
+
+- CLI app wiring: `src/application/bootstrap/create-cli-app.ts`
+- Memory pipeline command orchestration: `src/application/memory/run-memory-pipeline.ts`
+
+The cleanup pass intentionally removes pseudo-modules (pure 1:1 forwarding wrappers) where they do not add semantics, while keeping real boundaries that carry policy, contracts, or composition responsibilities.
 
 ## Memory Pipeline
 

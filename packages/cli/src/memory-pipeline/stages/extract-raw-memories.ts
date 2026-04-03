@@ -2,6 +2,7 @@ import type { SessionRecord } from '../contracts/session-record.js';
 import { buildRawExtractionPrompt } from '../prompts/raw-extraction-prompt.js';
 import { recordExtractedRawMemory } from '../pipeline-state.js';
 import type { ModelProcessor } from '../processors/model-processor.js';
+import { processRawMemoryWithValidation } from './raw-memory-validation.js';
 import type {
   ArtifactDescriptor,
   MemoryPipelineContext,
@@ -12,7 +13,6 @@ import type {
 
 export const EXTRACT_RAW_MEMORIES_STAGE_ID = 'extract-raw-memories';
 const COLLECT_STAGE_ID = 'collect-claude-sessions';
-const NO_MEMORIES_MARKER = '<!-- NO_MEMORIES -->';
 const INVALID_SESSION_PAYLOAD_ERROR =
   'ExtractRawMemoriesStage requires a valid session payload with at least one usable message';
 
@@ -58,7 +58,7 @@ export const createExtractRawMemoriesStage = (
             sessionFilename: `${session.sessionId}.md`,
             sessionTranscript: renderSessionTranscript(session),
           });
-          const result = await processor.process([prompt]);
+          const result = await processRawMemoryWithValidation(processor, prompt);
           const failure = getProcessorFailure(result);
           if (failure) {
             failures.push(failure);
@@ -121,10 +121,7 @@ const normalizeRole = (role: string): string => {
   return role.charAt(0).toUpperCase() + role.slice(1);
 };
 
-const resolveMarkdown = (outputs: string[]): string => {
-  const firstOutput = outputs.find((output) => output.trim().length > 0);
-  return firstOutput ?? NO_MEMORIES_MARKER;
-};
+const resolveMarkdown = (outputs: string[]): string => outputs[0] ?? '<!-- NO_MEMORIES -->';
 
 const getValidatedSession = (workItem: SessionWorkItem): SessionRecord => {
   const session = workItem.metadata?.session;

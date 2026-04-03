@@ -53,6 +53,11 @@ import { generateAssociationId, AssociationType } from '../models/association.js
 import { KeyManager } from '../crypto/keys.js';
 import { randomUUID } from 'node:crypto';
 import type { HostId } from '@/domain/host/contracts/types.js';
+import {
+  getConfigDir,
+  getDefaultDatabasePath,
+  getPidFilePath,
+} from '@/infrastructure/storage/lifecycle/database-paths.js';
 import type {
   EnsureExtractSessionJobInput,
   MemoryProcessingJobRecord,
@@ -2095,30 +2100,4 @@ export class CorivoDatabase {
   }
 }
 
-/**
- * Database tool functions
- */
-
-/**
- * Get the default database path
- */
-export function getDefaultDatabasePath(): string {
-  const home = process.env.HOME || process.env.USERPROFILE || '.';
-  return `${home}/.corivo/corivo.db`;
-}
-
-/**
- * Get PID file path
- */
-export function getPidFilePath(): string {
-  const home = process.env.HOME || process.env.USERPROFILE || '.';
-  return `${home}/.corivo/heartbeat.pid`;
-}
-
-/**
- * Get configuration directory path
- */
-export function getConfigDir(): string {
-  const home = process.env.HOME || process.env.USERPROFILE || '.';
-  return `${home}/.corivo`;
-}
+export { getConfigDir, getDefaultDatabasePath, getPidFilePath };

@@ -47,13 +47,11 @@ pnpm -r run build
 
 ## CLI Runtime Composition
 
-`src/cli/context/` provides shared runtime capabilities for commands and services, including logger, config access, paths/fs helpers, clock, user-facing output, and database access.
+`src/cli/runtime.ts` provides modular CLI runtime helpers for commands and services, including logger creation, output wiring, config access, path helpers, clock access, and database bootstrap functions.
 
-Keep `CliContext` focused on horizontal runtime concerns. It exists to reduce repeated wiring such as `createLogger()`, config loading, path resolution, and database bootstrap code.
+Prefer direct function imports over a bundled runtime context object. When a module only needs `logger`, `output`, `loadCliConfig`, or `getCliDatabase`, import just that helper instead of passing a wide service bag.
 
-Do not place business actions in `CliContext`. Sync orchestration, heartbeat rules, block processing, and other domain logic should stay in their own modules.
-
-Pure functions do not need the whole context. When a helper only needs a narrow dependency such as `logger` or `clock`, prefer passing that smaller capability explicitly.
+Do not place business actions in `src/cli/runtime.ts`. Sync orchestration, heartbeat rules, block processing, and other domain logic should stay in their own modules.
 
 ## Architectural Split (State / Capability / Flow)
 

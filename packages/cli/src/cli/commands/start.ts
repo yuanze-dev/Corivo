@@ -9,11 +9,10 @@ import path from 'node:path'
 import { getConfigDir, getDefaultDatabasePath } from '@/storage/database'
 import { ConfigError } from '../../errors/index.js'
 import { getServiceManager, resolveCorivoBin } from '@/infrastructure/platform/index.js'
-import { createCliContext } from '../context/create-context.js'
+import { getCliOutput } from '@/cli/runtime'
 
 export async function startCommand(): Promise<void> {
-  const context = createCliContext()
-  const output = context.output
+  const output = getCliOutput()
   const configDir = getConfigDir()
   const configPath = path.join(configDir, 'config.json')
 

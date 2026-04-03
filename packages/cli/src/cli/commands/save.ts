@@ -11,7 +11,7 @@ import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/
 import { ConfigError, ValidationError } from '../../errors/index.js';
 import { validateAnnotation } from '../../models/index.js';
 import { detectConflictReminder } from '../../runtime/conflict-detection.js';
-import { createCliContext } from '../context/create-context.js';
+import { getCliOutput } from '@/cli/runtime';
 
 interface SaveOptions {
   content?: string;
@@ -21,8 +21,7 @@ interface SaveOptions {
 }
 
 export async function saveCommand(options: SaveOptions): Promise<void> {
-  const context = createCliContext();
-  const output = context.output;
+  const output = getCliOutput();
   // Read configuration
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');

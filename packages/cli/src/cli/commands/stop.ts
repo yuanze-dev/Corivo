@@ -5,11 +5,10 @@
  */
 
 import { getServiceManager } from '@/infrastructure/platform/index.js'
-import { createCliContext } from '../context/create-context.js'
+import { getCliOutput } from '@/cli/runtime'
 
 export async function stopCommand(): Promise<void> {
-  const context = createCliContext()
-  const output = context.output
+  const output = getCliOutput()
   const manager = getServiceManager()
 
   output.info('Stopping heartbeat daemon...')

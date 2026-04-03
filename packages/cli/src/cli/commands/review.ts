@@ -4,7 +4,7 @@ import { formatSurfaceItem } from '@/cli/presenters/query-renderer.js';
 import { generateReview } from '@/application/review/run-review.js';
 import type { RuntimeCommandOptions } from '@/runtime/runtime-support.js';
 import { loadRuntimeDb } from '@/runtime/runtime-support.js';
-import { createCliContext } from '../context/create-context.js';
+import { getCliOutput } from '@/cli/runtime';
 
 export interface ReviewCommandOptions extends RuntimeCommandOptions {
   lastMessage?: string;
@@ -32,7 +32,7 @@ reviewCommand
   .option('-f, --format <type>', 'Output format: text | json | hook-text', 'text')
   .option('--no-password', 'Skip password prompt (development mode)')
   .action(async (options) => {
-    const context = createCliContext();
+    const outputWriter = getCliOutput();
     const output = await runReviewCommand({
       password: options.password,
       format: options.format,
@@ -40,7 +40,7 @@ reviewCommand
     });
 
     if (output) {
-      context.output.info(output);
+      outputWriter.info(output);
     }
   });
 

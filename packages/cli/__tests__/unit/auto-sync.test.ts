@@ -4,7 +4,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AutoSync } from '../../src/engine/auto-sync.js';
-import type { CliContext } from '../../src/cli/context/types.js';
 import type { Logger } from '../../src/utils/logging.js';
 
 // Utility functions for the mocked sync runtime seam
@@ -66,7 +65,13 @@ describe('AutoSync', () => {
   let logs: string[];
   let errors: string[];
   let now: number;
-  let context: Pick<CliContext, 'logger' | 'config' | 'clock'>;
+  let runtime: {
+    logger: Logger;
+    loadConfig: typeof mockLoadConfig;
+    loadSolver: typeof mockLoadSolverConfig;
+    saveSolver: typeof mockSaveSolverConfig;
+    now: () => number;
+  };
   const mockLoadConfig = vi.fn();
   const mockLoadSolverConfig = vi.fn();
   const mockSaveSolverConfig = vi.fn().mockResolvedValue(undefined);
@@ -76,18 +81,14 @@ describe('AutoSync', () => {
     logs = [];
     errors = [];
     now = Date.now();
-    context = {
+    runtime = {
       logger: createMockLogger(logs, errors),
-      config: {
-        load: mockLoadConfig,
-        loadSolver: mockLoadSolverConfig,
-        saveSolver: mockSaveSolverConfig,
-      },
-      clock: {
-        now: () => now,
-      },
+      loadConfig: mockLoadConfig,
+      loadSolver: mockLoadSolverConfig,
+      saveSolver: mockSaveSolverConfig,
+      now: () => now,
     };
-    autoSync = new AutoSync(mockDb, context);
+    autoSync = new AutoSync(mockDb, runtime);
     mockAuthenticate.mockResolvedValue('mock-token');
     mockPost.mockResolvedValue({ stored: 0, changesets: [], current_version: 0 });
   });

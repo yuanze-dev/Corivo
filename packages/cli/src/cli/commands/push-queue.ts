@@ -6,7 +6,7 @@
 
 import { Command } from 'commander';
 import { createRuntimePushQueue } from '../../runtime/push-queue.js';
-import { createCliContext } from '../context/create-context.js';
+import { getCliOutput } from '@/cli/runtime';
 
 export const pushQueueCommand = new Command('push-queue');
 
@@ -18,8 +18,7 @@ pushQueueCommand
   .option('--clear', 'Clear the queue')
   .option('--json', 'Output as JSON')
   .action(async (options) => {
-    const context = createCliContext();
-    const output = context.output;
+    const output = getCliOutput();
     try {
       const queue = createRuntimePushQueue();
       await queue.load();

@@ -73,17 +73,26 @@ describe('process runtime state', () => {
 
   it('keeps engine modules orchestration-oriented by delegating SQL and parsing rules to runtime', () => {
     const orchestratorFiles = [
-      'src/engine/query-history.ts',
-      'src/engine/trigger-decision.ts',
-      'src/engine/follow-up.ts',
+      {
+        path: 'src/engine/query-history.ts',
+        expectedImport: /from ['"]@\/domain\/memory\/services\//,
+      },
+      {
+        path: 'src/engine/trigger-decision.ts',
+        expectedImport: /from ['"]@\/domain\/memory\/services\//,
+      },
+      {
+        path: 'src/engine/follow-up.ts',
+        expectedImport: /from ['"]@\/domain\/memory\/services\//,
+      },
     ];
 
-    for (const relativePath of orchestratorFiles) {
+    for (const { path: relativePath, expectedImport } of orchestratorFiles) {
       const absolutePath = path.resolve(process.cwd(), relativePath);
       const content = fs.readFileSync(absolutePath, 'utf8');
       expect(content).not.toMatch(/\bquery_logs\b/);
       expect(content).not.toMatch(/\bprepare\s*\(/);
-      expect(content).toMatch(/from ['"]\.\.\/runtime\//);
+      expect(content).toMatch(expectedImport);
     }
   });
 

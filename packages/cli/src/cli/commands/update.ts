@@ -14,7 +14,7 @@ import {
   fetchVersionInfo,
 } from '../../update/checker.js';
 import type { UpdateConfig } from '../../update/types.js';
-import { createCliContext } from '../context/create-context.js';
+import { getCliOutput } from '@/cli/runtime';
 
 export const updateCommand = new Command('update');
 
@@ -40,8 +40,7 @@ updateCommand
   });
 
 async function handleUpdateCommand(options: { check?: boolean }) {
-  const context = createCliContext();
-  const output = context.output;
+  const output = getCliOutput();
   printBanner('Corivo Update', { color: chalk.cyan });
 
   const currentVersion = getCurrentVersion();
@@ -116,8 +115,7 @@ async function handleUpdateCommand(options: { check?: boolean }) {
 }
 
 async function checkUpdates() {
-  const context = createCliContext();
-  const output = context.output;
+  const output = getCliOutput();
   output.info('');
   output.info(chalk.cyan('Corivo Version Check'));
   output.info('');
@@ -152,8 +150,7 @@ async function checkUpdates() {
 }
 
 async function showUpdateStatus() {
-  const context = createCliContext();
-  const output = context.output;
+  const output = getCliOutput();
   output.info('');
   output.info(chalk.cyan('Corivo Update Status'));
   output.info('');

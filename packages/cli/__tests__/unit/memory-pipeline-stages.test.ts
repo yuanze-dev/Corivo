@@ -43,6 +43,27 @@ import {
 } from '../../src/memory-pipeline/pipeline-state.js';
 import { buildRawExtractionPrompt } from '../../src/memory-pipeline/prompts/raw-extraction-prompt.js';
 
+const buildRawMemoryMarkdown = (input: {
+  filePath: string;
+  name: string;
+  description: string;
+  type: 'user' | 'feedback' | 'project' | 'reference';
+  scope: 'private' | 'team';
+  sourceSession: string;
+  body: string;
+}): string => `<!-- FILE: ${input.filePath} -->
+\`\`\`markdown
+---
+name: ${input.name}
+description: ${input.description}
+type: ${input.type}
+scope: ${input.scope}
+source_session: ${input.sourceSession}
+---
+
+${input.body}
+\`\`\``;
+
 type BlockWithExtras = Omit<Block, 'created_at' | 'updated_at'> & {
   created_at?: number;
   updated_at?: number;
@@ -692,9 +713,18 @@ Prefer small, reviewable pull requests by default.
 
   it('summarizes transcript-derived content from collected raw session jobs', async () => {
     const store = new RecordingArtifactStore();
+    const expectedMarkdown = buildRawMemoryMarkdown({
+      filePath: 'private/session-memory.md',
+      name: 'Session memory',
+      description: 'Remembered from session transcript',
+      type: 'user',
+      scope: 'private',
+      sourceSession: 'sess-1.md',
+      body: 'remembered from transcript',
+    });
     const processor: ModelProcessor = {
-      process: vi.fn(async (inputs: string[]) => ({
-        outputs: inputs.map((text) => `summary: ${text}`),
+      process: vi.fn(async () => ({
+        outputs: [expectedMarkdown],
         metadata: { provider: 'claude', status: 'success' },
       })),
     };
@@ -773,7 +803,7 @@ Prefer small, reviewable pull requests by default.
     );
     expect(JSON.parse(store.writes[0].body)).toEqual({
       sessionId: 'sess-1',
-      markdown: `summary: ${expectedPrompt}`,
+      markdown: expectedMarkdown,
     });
     expect(store.writes[0]).toMatchObject({
       runId: 'run-session-job-summary',
@@ -784,7 +814,7 @@ Prefer small, reviewable pull requests by default.
       runId: 'run-session-job-summary',
       stage: stage.id,
       blocks: [expectedPrompt],
-      summaries: [`summary: ${expectedPrompt}`],
+      summaries: [expectedMarkdown],
       metadata: { provider: 'claude', status: 'success' },
     });
     expect(result).toMatchObject({
@@ -798,11 +828,35 @@ Prefer small, reviewable pull requests by default.
 
   it('processes transcript-derived raw session jobs one-by-one to preserve per-job output cardinality', async () => {
     const store = new RecordingArtifactStore();
+    const expectedFirstMarkdown = buildRawMemoryMarkdown({
+      filePath: 'private/session-memory-1.md',
+      name: 'Session memory one',
+      description: 'Remembered from first transcript',
+      type: 'user',
+      scope: 'private',
+      sourceSession: 'sess-1.md',
+      body: 'summary one',
+    });
+    const expectedSecondMarkdown = buildRawMemoryMarkdown({
+      filePath: 'private/session-memory-2.md',
+      name: 'Session memory two',
+      description: 'Remembered from second transcript',
+      type: 'user',
+      scope: 'private',
+      sourceSession: 'sess-2.md',
+      body: 'summary two',
+    });
     const processor: ModelProcessor = {
-      process: vi.fn(async (inputs: string[]) => ({
-        outputs: [`summary: ${inputs[0]}`],
-        metadata: { provider: 'claude', status: 'success' },
-      })),
+      process: vi
+        .fn()
+        .mockResolvedValueOnce({
+          outputs: [expectedFirstMarkdown],
+          metadata: { provider: 'claude', status: 'success' },
+        })
+        .mockResolvedValueOnce({
+          outputs: [expectedSecondMarkdown],
+          metadata: { provider: 'claude', status: 'success' },
+        }),
     };
     const stage = createSummarizeBlockBatchStage({ processor });
     const context = createContext(store, 'run-session-job-summary-multi');
@@ -916,17 +970,17 @@ Prefer small, reviewable pull requests by default.
     expect(processor.process).toHaveBeenNthCalledWith(2, [expectedSecondPrompt], { timeoutMs: 34500 });
     expect(JSON.parse(store.writes[0].body)).toEqual({
       sessionId: 'sess-1',
-      markdown: `summary: ${expectedFirstPrompt}`,
+      markdown: expectedFirstMarkdown,
     });
     expect(JSON.parse(store.writes[1].body)).toEqual({
       sessionId: 'sess-2',
-      markdown: `summary: ${expectedSecondPrompt}`,
+      markdown: expectedSecondMarkdown,
     });
     expect(JSON.parse(store.writes[2].body)).toEqual({
       runId: 'run-session-job-summary-multi',
       stage: stage.id,
       blocks: [expectedFirstPrompt, expectedSecondPrompt],
-      summaries: [`summary: ${expectedFirstPrompt}`, `summary: ${expectedSecondPrompt}`],
+      summaries: [expectedFirstMarkdown, expectedSecondMarkdown],
       metadata: { provider: 'claude', status: 'success' },
     });
     expect(result).toMatchObject({
@@ -1173,7 +1227,405 @@ Prefer small, reviewable pull requests by default.
       status: 'failed',
       inputCount: 1,
       outputCount: 0,
-      error: 'model overloaded',
+      error: '[sess-1] model overloaded',
+    });
+  });
+
+  it('continues transcript-derived summarization after a timeout and records diagnostics', async () => {
+    const store = new RecordingArtifactStore();
+    const processor: ModelProcessor = {
+      process: vi
+        .fn()
+        .mockResolvedValueOnce({
+          outputs: [
+            buildRawMemoryMarkdown({
+              filePath: 'private/memory-1.md',
+              name: 'Memory one',
+              description: 'First recovered memory',
+              type: 'user',
+              scope: 'private',
+              sourceSession: 'sess-partial-1.md',
+              body: 'memory-1',
+            }),
+          ],
+          metadata: { provider: 'codex', status: 'success' as const },
+        })
+        .mockResolvedValueOnce({
+          outputs: [],
+          metadata: {
+            provider: 'codex',
+            status: 'timeout' as const,
+            error: 'codex extraction timed out',
+            diagnostics: {
+              timeoutMs: 37500,
+              exitCode: null,
+              stderr: 'timed out after waiting for model',
+              stdout: '[codex] starting',
+            },
+          },
+        })
+        .mockResolvedValueOnce({
+          outputs: [
+            buildRawMemoryMarkdown({
+              filePath: 'private/memory-3.md',
+              name: 'Memory three',
+              description: 'Third recovered memory',
+              type: 'user',
+              scope: 'private',
+              sourceSession: 'sess-partial-3.md',
+              body: 'memory-3',
+            }),
+          ],
+          metadata: { provider: 'codex', status: 'success' as const },
+        }),
+    };
+    const stage = createSummarizeBlockBatchStage({ processor });
+    const context = createContext(store, 'run-session-job-summary-partial');
+    setClaimedRawSessionJobs(context.state, {
+      source: undefined,
+      jobs: [
+        {
+          id: 'job-partial-1',
+          kind: 'session-job',
+          sourceRef: 'codex:sess-partial-1',
+          host: 'codex',
+          sessionKey: 'codex:sess-partial-1',
+          session: {
+            id: 'raw-session-partial-1',
+            host: 'codex',
+            externalSessionId: 'sess-partial-1',
+            sessionKey: 'codex:sess-partial-1',
+            sourceType: 'history-import',
+            createdAt: 1,
+            updatedAt: 2,
+          },
+          transcript: [
+            {
+              id: 'msg-partial-1',
+              sessionKey: 'codex:sess-partial-1',
+              role: 'user',
+              content: 'remember alpha',
+              ordinal: 1,
+              ingestedFrom: 'host-import',
+              createdDbAt: 1,
+              updatedDbAt: 1,
+            },
+          ],
+          job: {
+            id: 'job-partial-1',
+            host: 'codex',
+            sessionKey: 'codex:sess-partial-1',
+            jobType: 'extract-session',
+            status: 'running',
+            dedupeKey: 'extract-session:codex:sess-partial-1',
+            priority: 0,
+            attemptCount: 1,
+            availableAt: 1,
+            claimedAt: 1,
+            finishedAt: null,
+            lastError: null,
+            payloadJson: null,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+        {
+          id: 'job-partial-2',
+          kind: 'session-job',
+          sourceRef: 'codex:sess-partial-2',
+          host: 'codex',
+          sessionKey: 'codex:sess-partial-2',
+          session: {
+            id: 'raw-session-partial-2',
+            host: 'codex',
+            externalSessionId: 'sess-partial-2',
+            sessionKey: 'codex:sess-partial-2',
+            sourceType: 'history-import',
+            createdAt: 1,
+            updatedAt: 2,
+          },
+          transcript: [
+            {
+              id: 'msg-partial-2',
+              sessionKey: 'codex:sess-partial-2',
+              role: 'user',
+              content: 'remember beta',
+              ordinal: 1,
+              ingestedFrom: 'host-import',
+              createdDbAt: 1,
+              updatedDbAt: 1,
+            },
+          ],
+          job: {
+            id: 'job-partial-2',
+            host: 'codex',
+            sessionKey: 'codex:sess-partial-2',
+            jobType: 'extract-session',
+            status: 'running',
+            dedupeKey: 'extract-session:codex:sess-partial-2',
+            priority: 0,
+            attemptCount: 1,
+            availableAt: 1,
+            claimedAt: 1,
+            finishedAt: null,
+            lastError: null,
+            payloadJson: null,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+        {
+          id: 'job-partial-3',
+          kind: 'session-job',
+          sourceRef: 'codex:sess-partial-3',
+          host: 'codex',
+          sessionKey: 'codex:sess-partial-3',
+          session: {
+            id: 'raw-session-partial-3',
+            host: 'codex',
+            externalSessionId: 'sess-partial-3',
+            sessionKey: 'codex:sess-partial-3',
+            sourceType: 'history-import',
+            createdAt: 1,
+            updatedAt: 2,
+          },
+          transcript: [
+            {
+              id: 'msg-partial-3',
+              sessionKey: 'codex:sess-partial-3',
+              role: 'user',
+              content: 'remember gamma',
+              ordinal: 1,
+              ingestedFrom: 'host-import',
+              createdDbAt: 1,
+              updatedDbAt: 1,
+            },
+          ],
+          job: {
+            id: 'job-partial-3',
+            host: 'codex',
+            sessionKey: 'codex:sess-partial-3',
+            jobType: 'extract-session',
+            status: 'running',
+            dedupeKey: 'extract-session:codex:sess-partial-3',
+            priority: 0,
+            attemptCount: 1,
+            availableAt: 1,
+            claimedAt: 1,
+            finishedAt: null,
+            lastError: null,
+            payloadJson: null,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+      ],
+    });
+
+    const result = await stage.run(context);
+
+    expect(processor.process).toHaveBeenCalledTimes(3);
+    expect(result).toMatchObject({
+      stageId: stage.id,
+      status: 'partial',
+      inputCount: 3,
+      outputCount: 2,
+      error: expect.stringContaining('sess-partial-2'),
+    });
+    expect(JSON.parse(store.writes[0].body)).toEqual({
+      sessionId: 'sess-partial-1',
+      markdown: buildRawMemoryMarkdown({
+        filePath: 'private/memory-1.md',
+        name: 'Memory one',
+        description: 'First recovered memory',
+        type: 'user',
+        scope: 'private',
+        sourceSession: 'sess-partial-1.md',
+        body: 'memory-1',
+      }),
+    });
+    expect(JSON.parse(store.writes[1].body)).toEqual({
+      sessionId: 'sess-partial-3',
+      markdown: buildRawMemoryMarkdown({
+        filePath: 'private/memory-3.md',
+        name: 'Memory three',
+        description: 'Third recovered memory',
+        type: 'user',
+        scope: 'private',
+        sourceSession: 'sess-partial-3.md',
+        body: 'memory-3',
+      }),
+    });
+    expect(JSON.parse(store.writes[2].body)).toEqual({
+      runId: 'run-session-job-summary-partial',
+      stage: stage.id,
+      blocks: expect.any(Array),
+      summaries: [
+        buildRawMemoryMarkdown({
+          filePath: 'private/memory-1.md',
+          name: 'Memory one',
+          description: 'First recovered memory',
+          type: 'user',
+          scope: 'private',
+          sourceSession: 'sess-partial-1.md',
+          body: 'memory-1',
+        }),
+        buildRawMemoryMarkdown({
+          filePath: 'private/memory-3.md',
+          name: 'Memory three',
+          description: 'Third recovered memory',
+          type: 'user',
+          scope: 'private',
+          sourceSession: 'sess-partial-3.md',
+          body: 'memory-3',
+        }),
+      ],
+      metadata: {
+        items: [
+          { provider: 'codex', status: 'success' },
+          {
+            provider: 'codex',
+            status: 'timeout',
+            error: 'codex extraction timed out',
+            diagnostics: {
+              timeoutMs: 37500,
+              exitCode: null,
+              stderr: 'timed out after waiting for model',
+              stdout: '[codex] starting',
+            },
+          },
+          { provider: 'codex', status: 'success' },
+        ],
+        failures: [
+          {
+            index: 1,
+            sessionId: 'sess-partial-2',
+            provider: 'codex',
+            status: 'timeout',
+            error: 'codex extraction timed out',
+            diagnostics: {
+              timeoutMs: 37500,
+              exitCode: null,
+              stderr: 'timed out after waiting for model',
+              stdout: '[codex] starting',
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it('retries transcript-derived raw markdown when the FILE path is invalid', async () => {
+    const store = new RecordingArtifactStore();
+    const invalidMarkdown = `<!-- FILE: memories/final/private/user-name.md -->
+\`\`\`markdown
+---
+name: User english name
+description: User says their English name is Sean
+type: user
+scope: private
+source_session: sess-retry-path.md
+---
+
+The user says their English name is Sean.
+\`\`\`
+`;
+    const validMarkdown = `<!-- FILE: private/user-name.md -->
+\`\`\`markdown
+---
+name: User english name
+description: User says their English name is Sean
+type: user
+scope: private
+source_session: sess-retry-path.md
+---
+
+The user says their English name is Sean.
+\`\`\`
+`;
+    const processor: ModelProcessor = {
+      process: vi
+        .fn()
+        .mockResolvedValueOnce({
+          outputs: [invalidMarkdown],
+          metadata: { provider: 'codex', status: 'success' as const },
+        })
+        .mockResolvedValueOnce({
+          outputs: [validMarkdown],
+          metadata: { provider: 'codex', status: 'success' as const },
+        }),
+    };
+    const stage = createSummarizeBlockBatchStage({ processor });
+    const context = createContext(store, 'run-session-job-summary-retry-invalid-file-path');
+    setClaimedRawSessionJobs(context.state, {
+      source: undefined,
+      jobs: [
+        {
+          id: 'job-retry-path-1',
+          kind: 'session-job',
+          sourceRef: 'codex:sess-retry-path',
+          host: 'codex',
+          sessionKey: 'codex:sess-retry-path',
+          session: {
+            id: 'raw-session-retry-path',
+            host: 'codex',
+            externalSessionId: 'sess-retry-path',
+            sessionKey: 'codex:sess-retry-path',
+            sourceType: 'history-import',
+            createdAt: 1,
+            updatedAt: 2,
+          },
+          transcript: [
+            {
+              id: 'msg-retry-path-1',
+              sessionKey: 'codex:sess-retry-path',
+              role: 'user',
+              content: 'Remember my English name is Sean.',
+              ordinal: 1,
+              ingestedFrom: 'host-import',
+              createdDbAt: 1,
+              updatedDbAt: 1,
+            },
+          ],
+          job: {
+            id: 'job-retry-path-1',
+            host: 'codex',
+            sessionKey: 'codex:sess-retry-path',
+            jobType: 'extract-session',
+            status: 'running',
+            dedupeKey: 'extract-session:codex:sess-retry-path',
+            priority: 0,
+            attemptCount: 1,
+            availableAt: 1,
+            claimedAt: 1,
+            finishedAt: null,
+            lastError: null,
+            payloadJson: null,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+      ],
+    });
+
+    const result = await stage.run(context);
+
+    expect(processor.process).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(processor.process).mock.calls[1]?.[0]?.[0]).toContain(
+      'Your previous raw memory output was invalid',
+    );
+    expect(vi.mocked(processor.process).mock.calls[1]?.[0]?.[0]).toContain(
+      'Invalid raw memory file path',
+    );
+    expect(result).toMatchObject({
+      stageId: stage.id,
+      status: 'success',
+      inputCount: 1,
+      outputCount: 1,
+    });
+    expect(JSON.parse(store.writes[0].body)).toEqual({
+      sessionId: 'sess-retry-path',
+      markdown: validMarkdown.trim(),
     });
   });
 
@@ -1422,7 +1874,15 @@ Prefer small, reviewable pull requests by default.
         .fn()
         .mockResolvedValueOnce({
           outputs: [
-            '<!-- FILE: private/short-prs.md -->\n```markdown\nremembered\n```',
+            buildRawMemoryMarkdown({
+              filePath: 'private/short-prs.md',
+              name: 'Short PR preference',
+              description: 'User prefers short PR descriptions',
+              type: 'user',
+              scope: 'private',
+              sourceSession: 'session-1.md',
+              body: 'remembered',
+            }),
           ],
           metadata: { provider: 'claude', status: 'success' },
         })
@@ -1457,7 +1917,15 @@ Prefer small, reviewable pull requests by default.
     ]);
     expect(JSON.parse(store.writes[1].body)).toEqual({
       sessionId: 'session-1',
-      markdown: '<!-- FILE: private/short-prs.md -->\n```markdown\nremembered\n```',
+      markdown: buildRawMemoryMarkdown({
+        filePath: 'private/short-prs.md',
+        name: 'Short PR preference',
+        description: 'User prefers short PR descriptions',
+        type: 'user',
+        scope: 'private',
+        sourceSession: 'session-1.md',
+        body: 'remembered',
+      }),
     });
     expect(JSON.parse(store.writes[2].body)).toEqual({
       sessionId: 'session-2',
@@ -1521,7 +1989,17 @@ Prefer small, reviewable pull requests by default.
       process: vi
         .fn()
         .mockResolvedValueOnce({
-          outputs: ['<!-- FILE: private/pr-style.md -->\n```markdown\nshort PRs\n```'],
+          outputs: [
+            buildRawMemoryMarkdown({
+              filePath: 'private/pr-style.md',
+              name: 'PR style preference',
+              description: 'User prefers short PRs',
+              type: 'user',
+              scope: 'private',
+              sourceSession: 'session-1.md',
+              body: 'short PRs',
+            }),
+          ],
           metadata: { provider: 'claude', status: 'success' },
         })
         .mockResolvedValueOnce({
@@ -1544,7 +2022,98 @@ Prefer small, reviewable pull requests by default.
     expect(store.writes).toHaveLength(2);
     expect(JSON.parse(store.writes[1].body)).toEqual({
       sessionId: 'session-1',
-      markdown: '<!-- FILE: private/pr-style.md -->\n```markdown\nshort PRs\n```',
+      markdown: buildRawMemoryMarkdown({
+        filePath: 'private/pr-style.md',
+        name: 'PR style preference',
+        description: 'User prefers short PRs',
+        type: 'user',
+        scope: 'private',
+        sourceSession: 'session-1.md',
+        body: 'short PRs',
+      }),
+    });
+  });
+
+  it('retries raw extraction when markdown output has an invalid FILE path', async () => {
+    const store = new RecordingArtifactStore();
+    await store.writeArtifact({
+      runId: 'run-extract-retry-invalid-file-path',
+      kind: 'work-item',
+      source: 'collect-claude-sessions',
+      body: JSON.stringify([
+        {
+          id: 'session-retry-1',
+          kind: 'session',
+          sourceRef: 'claude://session-retry-1',
+          metadata: {
+            session: {
+              id: 'session-retry-1',
+              sessionId: 'session-retry-1',
+              sourceRef: 'claude://session-retry-1',
+              messages: [{ role: 'user', content: 'Remember that my English name is Sean.' }],
+            },
+          },
+        },
+      ]),
+    });
+    const invalidMarkdown = `<!-- FILE: memories/final/private/user-name.md -->
+\`\`\`markdown
+---
+name: User english name
+description: User says their English name is Sean
+type: user
+scope: private
+source_session: session-retry-1.md
+---
+
+The user says their English name is Sean.
+\`\`\`
+`;
+    const validMarkdown = `<!-- FILE: private/user-name.md -->
+\`\`\`markdown
+---
+name: User english name
+description: User says their English name is Sean
+type: user
+scope: private
+source_session: session-retry-1.md
+---
+
+The user says their English name is Sean.
+\`\`\`
+`;
+    const processor: ModelProcessor = {
+      process: vi
+        .fn()
+        .mockResolvedValueOnce({
+          outputs: [invalidMarkdown],
+          metadata: { provider: 'claude', status: 'success' },
+        })
+        .mockResolvedValueOnce({
+          outputs: [validMarkdown],
+          metadata: { provider: 'claude', status: 'success' },
+        }),
+    };
+    const stage = createExtractRawMemoriesStage({ processor });
+
+    const result = await stage.run(createContext(store, 'run-extract-retry-invalid-file-path'));
+
+    expect(processor.process).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(processor.process).mock.calls[1]?.[0]?.[0]).toContain(
+      'Your previous raw memory output was invalid',
+    );
+    expect(vi.mocked(processor.process).mock.calls[1]?.[0]?.[0]).toContain(
+      'Invalid raw memory file path',
+    );
+    expect(result).toMatchObject({
+      stageId: stage.id,
+      status: 'success',
+      inputCount: 1,
+      outputCount: 1,
+    });
+    expect(JSON.parse(store.writes[1].body)).toEqual({
+      sessionId: 'session-retry-1',
+      markdown: validMarkdown.trim(),
     });
   });
 

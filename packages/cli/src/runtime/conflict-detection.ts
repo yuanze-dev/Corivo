@@ -1,5 +1,5 @@
 import type { Block } from '../models/index.js';
-import { ConflictDetector, type ConflictReminder } from '../engine/conflict-detector.js';
+import { ConflictDetector, type ConflictReminder } from '@/domain/memory/services/conflict-detector.js';
 
 export function detectConflictReminder(
   newContent: string,

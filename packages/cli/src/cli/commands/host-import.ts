@@ -12,8 +12,12 @@ import { HostImportCursorStore } from '@/raw-memory/import-cursors';
 import { MemoryProcessingJobQueue } from '@/raw-memory/job-queue';
 import { RawMemoryRepository } from '@/raw-memory/repository';
 import { loadRuntimeDb } from '@/runtime/runtime-support.js';
-import { createCliContext } from '@/cli/context';
-import { createConfiguredCliContext } from '@/cli/context';
+import {
+  createCliLogger,
+  createCliOutput,
+  createConfiguredCliLogger,
+  loadCliConfig,
+} from '@/cli/runtime';
 
 interface HostImportCommandOptions {
   all?: boolean;
@@ -52,9 +56,10 @@ export function createHostImportCommand(deps: HostImportCommandDeps = {}): Comma
     .option('--dry-run', 'Run import without persisting data')
     .option('-t, --target <path>', 'Target path')
     .action(async (host: HostId, options: HostImportCommandOptions) => {
-      const context = createCliContext();
-      const writeStdout = deps.writeStdout ?? ((text: string) => context.output.info(text));
-      const writeStderr = deps.writeStderr ?? ((text: string) => context.output.error(text));
+      const logger = createCliLogger();
+      const output = createCliOutput(logger);
+      const writeStdout = deps.writeStdout ?? ((text: string) => output.info(text));
+      const writeStderr = deps.writeStderr ?? ((text: string) => output.error(text));
       if (options.all && options.since) {
         throw new Error('Cannot use --all with --since.');
       }
@@ -82,9 +87,8 @@ export function createHostImportCommand(deps: HostImportCommandDeps = {}): Comma
 export const hostImportCommand = createHostImportCommand();
 
 async function createDefaultExecuteImport() {
-  const bootstrapContext = createCliContext();
-  const config = await bootstrapContext.config.load();
-  const context = createConfiguredCliContext(config);
+  const config = await loadCliConfig();
+  const logger = createConfiguredCliLogger(config);
   const db = await loadRuntimeDb({ password: false });
   if (!db) {
     throw new ConfigError('Corivo is not initialized. Please run: corivo init');
@@ -104,6 +108,6 @@ async function createDefaultExecuteImport() {
         enqueueSessionExtraction,
       });
     },
-    logger: context.logger,
+    logger,
   });
 }

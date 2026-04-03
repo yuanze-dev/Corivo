@@ -11,13 +11,13 @@ import { KeyManager } from '../../crypto/keys.js';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 import { ConfigError, ValidationError } from '../../errors/index.js';
 import { readPassword } from '../utils/password.js';
-import { createCliContext } from '../context/create-context.js';
+import { getCliOutput } from '@/cli/runtime';
 
 /**
  * Simple form printing
  */
 function printTable(headers: string[], rows: string[][]): void {
-  const output = createCliContext().output;
+  const output = getCliOutput();
   // Calculate the maximum width of each column
   const widths = headers.map((h, i) => {
     const maxRowWidth = Math.max(...rows.map(r => r[i]?.length || 0));
@@ -44,8 +44,7 @@ interface UnlockOptions {
 }
 
 export async function unlockCommand(options: UnlockOptions = {}): Promise<void> {
-  const context = createCliContext();
-  const output = context.output;
+  const output = getCliOutput();
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');
 

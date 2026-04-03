@@ -10,19 +10,19 @@ import fs from 'node:fs/promises';
 import { CorivoDatabase, getConfigDir } from '@/storage/database';
 import { RuleEngine } from './rules/index.js';
 import { TechChoiceRule } from './rules/tech-choice.js';
-import { AssociationEngine } from './associations.js';
-import { ConsolidationEngine } from './consolidation.js';
-import { WeeklySummary } from './weekly-summary.js';
-import { FollowUpManager } from './follow-up.js';
-import { TriggerDecision } from './trigger-decision.js';
-import { PushQueue } from './push-queue.js';
+import { AssociationEngine } from '@/domain/memory/services/associations.js';
+import { ConsolidationEngine } from '@/domain/memory/services/consolidation.js';
+import { WeeklySummary } from '@/domain/memory/services/weekly-summary.js';
+import { FollowUpManager } from '@/domain/memory/services/follow-up.js';
+import { TriggerDecision } from '@/domain/memory/services/trigger-decision.js';
+import { PushQueue } from '@/infrastructure/output/push-queue.js';
 import { AutoSync } from './auto-sync.js';
 import type { RealtimeCollector, CorivoPlugin } from '../ingestors/types.js';
 import { DatabaseError } from '../errors/index.js';
 import type { BlockStatus, Pattern } from '../models/index.js';
 import { vitalityToStatus } from '../models/block.js';
 import { loadConfig } from '../config.js';
-import { createCliContext } from '../cli/context/create-context.js';
+import { getCliNow, loadCliConfig, loadCliSolver, saveCliSolver } from '@/cli/runtime';
 import { createLogger, type Logger } from '../utils/logging.js';
 import { runMemoryPipeline } from '../application/memory/run-memory-pipeline.js';
 
@@ -161,11 +161,13 @@ export class Heartbeat {
       const corivoConfig = await loadConfig(configDir);
       this.autoSync = new AutoSync(
         this.db,
-        createCliContext({
+        {
           logger: this.logger,
-          logLevel: corivoConfig?.settings?.logLevel,
-          fileLog: false,
-        })
+          loadConfig: () => loadCliConfig(configDir),
+          loadSolver: () => loadCliSolver(configDir),
+          saveSolver: (config) => saveCliSolver(config, configDir),
+          now: () => getCliNow(),
+        }
       );
       this.syncCycles = this.computeSyncCycles(corivoConfig?.settings?.syncIntervalSeconds);
 

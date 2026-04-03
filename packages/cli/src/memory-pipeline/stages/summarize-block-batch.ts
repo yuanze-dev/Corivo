@@ -6,6 +6,7 @@ import type {
   ModelProcessorMetadata,
   ModelProcessorProcessOptions,
 } from '../processors/model-processor.js';
+import { processRawMemoryWithValidation } from './raw-memory-validation.js';
 
 export const SUMMARIZE_BLOCK_BATCH_STAGE_ID = 'summarize-block-batch';
 
@@ -21,6 +22,15 @@ export interface SummarizeBlockBatchStageOptions {
   processor: ModelProcessor;
   blockContents?: string[];
   promptBuilder?: (input: { sessionFilename: string; sessionTranscript: string }) => string;
+}
+
+interface TranscriptFailureRecord {
+  index: number;
+  sessionId: string;
+  provider?: string;
+  status: 'error' | 'timeout';
+  error: string;
+  diagnostics?: ModelProcessorMetadata['diagnostics'];
 }
 
 export const createSummarizeBlockBatchStage = (
@@ -48,6 +58,8 @@ export const createSummarizeBlockBatchStage = (
         blockContents.length > 0
           ? await processor.process(inputs)
           : await processTranscriptInputs(context, inputs, processor, promptBuilder);
+      const outputIndexes = result.outputIndexes ?? [];
+      const failures = result.failures ?? [];
       const payload: Record<string, unknown> = {
         runId: context.runId,
         stage: SUMMARIZE_BLOCK_BATCH_STAGE_ID,
@@ -70,9 +82,9 @@ export const createSummarizeBlockBatchStage = (
               source: RAW_MEMORY_ARTIFACT_SOURCE,
               body: JSON.stringify({
                 sessionId:
-                  claimedJobs[index]?.session.externalSessionId ??
-                  claimedJobs[index]?.sessionKey ??
-                  `session-${index + 1}`,
+                  claimedJobs[outputIndexes[index] ?? index]?.session.externalSessionId ??
+                  claimedJobs[outputIndexes[index] ?? index]?.sessionKey ??
+                  `session-${(outputIndexes[index] ?? index) + 1}`,
                 markdown,
               }),
             })
@@ -89,21 +101,36 @@ export const createSummarizeBlockBatchStage = (
       });
       artifactIds.push(descriptor.id);
 
+      const transcriptFailures = transcriptDerived ? failures.length : 0;
+      const failedAllTranscriptInputs = transcriptDerived && result.outputs.length === 0 && inputs.length > 0;
       const failureStatus = transcriptDerived
-        ? result.outputs.length !== inputs.length ||
-          result.metadata?.status === 'error' ||
-          result.metadata?.status === 'timeout'
+        ? failedAllTranscriptInputs
+          ? 'failed'
+          : transcriptFailures > 0
+            ? 'partial'
+            : 'success'
         : result.outputs.length === 0 &&
-          (result.metadata?.status === 'error' || result.metadata?.status === 'timeout');
+            (result.metadata?.status === 'error' || result.metadata?.status === 'timeout')
+          ? 'failed'
+          : 'success';
 
       return {
         stageId: SUMMARIZE_BLOCK_BATCH_STAGE_ID,
-        status: failureStatus ? 'failed' : 'success',
+        status: failureStatus,
         inputCount: inputs.length,
         outputCount: result.outputs.length,
         artifactIds,
-        ...(failureStatus && typeof result.metadata?.error === 'string'
-          ? { error: result.metadata.error }
+        ...(failureStatus !== 'success'
+          ? {
+              error:
+                transcriptDerived && failures.length > 0
+                  ? failures
+                      .map((failure) => `[${failure.sessionId}] ${failure.error}`)
+                      .join('; ')
+                  : typeof result.metadata?.error === 'string'
+                    ? result.metadata.error
+                    : undefined,
+            }
           : {}),
       };
     },
@@ -117,22 +144,28 @@ const processTranscriptInputs = async (
   promptBuilder: (input: { sessionFilename: string; sessionTranscript: string }) => string,
 ): Promise<{
   outputs: string[];
+  outputIndexes: number[];
   metadata?: Record<string, unknown>;
+  failures: TranscriptFailureRecord[];
 }> => {
   const outputs: string[] = [];
+  const outputIndexes: number[] = [];
   const metadataByInput: ModelProcessorMetadata[] = [];
+  const failures: TranscriptFailureRecord[] = [];
   const claimedJobs = getClaimedRawSessionJobs(context.state);
 
   for (const [index, input] of inputs.entries()) {
     const job = claimedJobs[index];
+    const sessionId = job?.session.externalSessionId ?? job?.sessionKey ?? `session-${index + 1}`;
     const prompt = job
       ? promptBuilder({
           sessionFilename: `${job.session.externalSessionId}.md`,
           sessionTranscript: input,
         })
       : input;
-    const result = await processor.process(
-      [prompt],
+    const result = await processRawMemoryWithValidation(
+      processor,
+      prompt,
       buildTranscriptProcessOptions(job?.transcript ?? []),
     );
     if (result.metadata) {
@@ -145,35 +178,43 @@ const processTranscriptInputs = async (
       result.metadata?.status === 'timeout';
 
     if (failed) {
-      const providerError =
-        typeof result.metadata?.error === 'string' ? result.metadata.error : undefined;
-
-      return {
-        outputs,
-        metadata: {
-          ...(metadataByInput.length <= 1
-            ? (metadataByInput[0] ?? {})
-            : { items: metadataByInput }),
-          status: 'error',
-          error: providerError ?? 'raw session summarization did not return one output per job',
-        },
-      };
+      failures.push({
+        index,
+        sessionId,
+        provider: result.metadata?.provider,
+        status:
+          result.metadata?.status === 'timeout'
+            ? 'timeout'
+            : 'error',
+        error:
+          typeof result.metadata?.error === 'string'
+            ? result.metadata.error
+            : 'raw session summarization did not return one output per job',
+        ...(result.metadata?.diagnostics ? { diagnostics: result.metadata.diagnostics } : {}),
+      });
+      inputs[index] = prompt;
+      continue;
     }
 
     outputs.push(result.outputs[0]);
+    outputIndexes.push(index);
     inputs[index] = prompt;
   }
 
   const metadata: Record<string, unknown> | undefined =
     metadataByInput.length === 0
       ? undefined
-      : metadataByInput.every(
+      : failures.length === 0 &&
+          metadataByInput.every(
             (item) => JSON.stringify(item) === JSON.stringify(metadataByInput[0]),
           )
         ? { ...metadataByInput[0] }
-        : { items: metadataByInput };
+        : {
+            items: metadataByInput,
+            ...(failures.length > 0 ? { failures } : {}),
+          };
 
-  return { outputs, metadata };
+  return { outputs, outputIndexes, metadata, failures };
 };
 
 const buildTranscriptProcessOptions = (

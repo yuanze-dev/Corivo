@@ -11,25 +11,23 @@ import { ContextPusher } from '@/push/context.js';
 import { getServiceManager } from '@/infrastructure/platform/index.js';
 import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
 import { ConfigError } from '@/errors';
-import { createCliContext } from '../context/create-context.js';
+import type { CliOutput } from '@/cli/runtime';
+import { getCliOutput } from '@/cli/runtime';
 
 type StatusCommandOptions = {
   json?: boolean;
 };
 
 export const statusCommand = async (options: StatusCommandOptions) => {
-  const context = createCliContext();
   if (options.json) {
-    await jsonStatus(context);
+    await jsonStatus();
     return;
   }
   const { renderTui } = await import('@/tui/index.js');
   await renderTui();
 };
 
-
-const jsonStatus = async (context = createCliContext()) => {
-  const output = context.output;
+const jsonStatus = async (output: CliOutput = getCliOutput()) => {
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');
 

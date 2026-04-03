@@ -9,11 +9,10 @@ import path from 'node:path';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 import { KeyManager } from '../../crypto/keys.js';
 import { readPassword } from '../utils/password.js';
-import { createCliContext } from '../context/create-context.js';
+import { getCliOutput } from '@/cli/runtime';
 
 export async function doctorCommand(): Promise<void> {
-  const context = createCliContext();
-  const output = context.output;
+  const output = getCliOutput();
   output.info('\nRunning Corivo health checks...\n');
 
   const configDir = getConfigDir();

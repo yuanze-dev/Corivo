@@ -5,7 +5,7 @@
  */
 
 import type { CorivoDatabase } from '@/storage/database';
-import { SuggestionEngine, SuggestionContext } from '../engine/suggestion.js';
+import { SuggestionEngine, SuggestionContext } from '@/domain/memory/services/suggestion.js';
 import { ContextPusher } from './context.js';
 import {
   PushContext,

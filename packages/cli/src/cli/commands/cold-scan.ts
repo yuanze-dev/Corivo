@@ -10,7 +10,7 @@ import chalk from 'chalk';
 import { coldScan } from '@/cold-scan';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 import { printBanner } from '@/utils/banner';
-import { createCliContext } from '../context/create-context.js';
+import { getCliOutput } from '@/cli/runtime';
 
 export const coldScanCommand = new Command('cold-scan');
 
@@ -20,8 +20,7 @@ coldScanCommand
   .option('--dry-run', 'Do not save to the database')
   .option('--skip <sources...>', 'Skip specified scan sources')
   .action(async (options) => {
-    const context = createCliContext();
-    const output = context.output;
+    const output = getCliOutput();
     try {
       printBanner('Getting to know you...', {
         subtitle: chalk.gray('Let me take a look at your workspace...'),

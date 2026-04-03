@@ -13,9 +13,17 @@ export interface ExtractionInput {
   timeoutMs?: number;
 }
 
+export interface ExtractionDiagnostics {
+  timeoutMs?: number;
+  exitCode?: number | null;
+  stderr?: string;
+  stdout?: string;
+}
+
 export interface ExtractionResult {
   provider: ExtractionProvider;
   status: ExtractionStatus;
   result: string | null;
   error?: string;
+  diagnostics?: ExtractionDiagnostics;
 }

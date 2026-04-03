@@ -2,7 +2,18 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { ConfigError } from '@/errors';
-import { createConfiguredCliContext, createCliContext } from '@/cli/context';
+import {
+  createCliLogger,
+  createCliOutput,
+  createConfiguredCliLogger,
+  getCliDatabase,
+  getCliDatabasePath,
+  getCliHeartbeatPidPath,
+  getCliNow,
+  loadCliConfig,
+  removeCliFile,
+  writeCliText,
+} from '@/cli/runtime';
 import { createMemoryCommand } from '@/cli/commands/memory';
 import { createHostCommand } from '@/cli/commands/host';
 import { createDaemonCommand } from '@/cli/commands/daemon';
@@ -27,27 +38,28 @@ const LEGACY_CONFIG_ERROR =
   'Detected a legacy password-based config. Corivo v0.10+ no longer supports passwords here; please run: corivo init';
 
 export function createCliApp(): CliApp {
-  const bootstrapContext = createCliContext();
+  const logger = createCliLogger();
+  const output = createCliOutput(logger);
 
   const memoryCapabilities: MemoryCommandCapabilities = {
     executor: (mode, provider) => runMemoryPipeline({ mode, provider }),
     printer: (result) => {
       const stageIds = result.stages.map((stage) => stage.stageId);
       const stageSuffix = stageIds.length > 0 ? ` [stages: ${stageIds.join(', ')}]` : '';
-      bootstrapContext.output.info(
+      output.info(
         `Memory pipeline ${result.pipelineId} finished with status ${result.status} (run ${result.runId})${stageSuffix}`
       );
     },
-    logger: bootstrapContext.logger,
+    logger,
   };
 
   const hostCapabilities: HostCommandCapabilities = {
     listHosts: () => getAllHostAdapters(),
     installHost: async (input) => {
-      const config = await bootstrapContext.config.load();
-      const logger = config ? createConfiguredCliContext(config).logger : bootstrapContext.logger;
+      const config = await loadCliConfig();
+      const installLogger = config ? createConfiguredCliLogger(config) : logger;
       const installHost = createHostInstallUseCase({
-        logger,
+        logger: installLogger,
         isInteractive: isInteractiveTTY,
         confirmImport: (prompt) => readConfirmIfTTY(prompt, true),
       });
@@ -61,24 +73,24 @@ export function createCliApp(): CliApp {
       const uninstallHost = createHostUninstallUseCase();
       return uninstallHost(input);
     },
-    writeInfo: (text) => bootstrapContext.output.info(text),
-    writeError: (text) => bootstrapContext.output.error(text),
-    writeSuccess: (text) => bootstrapContext.output.success(text),
-    logger: bootstrapContext.logger,
+    writeInfo: (text) => output.info(text),
+    writeError: (text) => output.error(text),
+    writeSuccess: (text) => output.success(text),
+    logger,
     hostImportCommand,
   };
 
   const daemonCapabilities: DaemonCommandCapabilities = {
     runDaemon: async () => {
-      const pidPath = bootstrapContext.paths.heartbeatPidPath();
-      await bootstrapContext.fs.writeText(pidPath, String(process.pid));
+      const pidPath = getCliHeartbeatPidPath();
+      await writeCliText(pidPath, String(process.pid));
 
       const heartbeatPath = path.resolve(
         path.dirname(fileURLToPath(import.meta.url)),
         '../../engine/heartbeat.js',
       );
 
-      bootstrapContext.logger.log('[corivo] Starting heartbeat background worker...');
+      logger.log('[corivo] Starting heartbeat background worker...');
 
       const child = spawn(process.execPath, [heartbeatPath], {
         env: process.env,
@@ -92,17 +104,17 @@ export function createCliApp(): CliApp {
       process.once('SIGINT', () => cleanup('SIGINT'));
 
       child.once('exit', async (code) => {
-        await bootstrapContext.fs.remove(pidPath).catch(() => {});
+        await removeCliFile(pidPath).catch(() => {});
         process.exit(code ?? 1);
       });
 
       child.once('error', async (error) => {
-        bootstrapContext.logger.error('[corivo] Failed to start heartbeat child process:', error);
-        await bootstrapContext.fs.remove(pidPath).catch(() => {});
+        logger.error('[corivo] Failed to start heartbeat child process:', error);
+        await removeCliFile(pidPath).catch(() => {});
         process.exit(1);
       });
     },
-    logger: bootstrapContext.logger,
+    logger,
   };
 
   const queryCapabilities: QueryCommandCapabilities = {
@@ -110,25 +122,24 @@ export function createCliApp(): CliApp {
     runSearchQuery: (input) =>
       runSearchQueryCommand(input, {
         loadDb: async () => {
-          const config = await bootstrapContext.config.load();
+          const config = await loadCliConfig();
           if (!config) {
             throw new ConfigError('Corivo is not initialized. Please run: corivo init');
           }
           if ((config as { encrypted_db_key?: unknown }).encrypted_db_key) {
             throw new ConfigError(LEGACY_CONFIG_ERROR);
           }
-          const configuredContext = createConfiguredCliContext(config);
-          return configuredContext.db.get({
-            path: configuredContext.paths.databasePath(),
+          return getCliDatabase({
+            path: getCliDatabasePath(),
             enableEncryption: false,
           });
         },
-        writeOutput: (text) => bootstrapContext.output.info(text),
-        logger: bootstrapContext.logger,
-        now: () => bootstrapContext.clock.now(),
+        writeOutput: (text) => output.info(text),
+        logger,
+        now: () => getCliNow(),
       }),
-    writeOutput: (text) => bootstrapContext.output.info(text),
-    logger: bootstrapContext.logger,
+    writeOutput: (text) => output.info(text),
+    logger,
   };
 
   return {
@@ -139,7 +150,7 @@ export function createCliApp(): CliApp {
       query: createQueryCommand(queryCapabilities),
     },
     capabilities: {
-      logger: bootstrapContext.logger,
+      logger,
     },
   };
 }

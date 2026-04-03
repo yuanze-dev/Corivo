@@ -9,7 +9,7 @@ import path from 'node:path';
 import { getConfigDir } from '@/storage/database';
 import { printBanner } from '@/utils/banner';
 import { IdentityManager, FingerprintCollector } from '../../identity/index.js';
-import { createCliContext } from '../context/create-context.js';
+import { getCliOutput } from '@/cli/runtime';
 
 /**
  * Show identity information
@@ -17,8 +17,7 @@ import { createCliContext } from '../context/create-context.js';
 export async function identityCommand(options: {
   verbose?: boolean;
 }): Promise<void> {
-  const context = createCliContext();
-  const output = context.output;
+  const output = getCliOutput();
   const configDir = getConfigDir();
   const identityPath = path.join(configDir, 'identity.json');
 

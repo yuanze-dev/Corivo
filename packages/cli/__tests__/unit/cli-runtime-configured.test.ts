@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createConfiguredCliContext } from '../../src/cli/context/configured-context.js';
+import { createConfiguredCliLogger } from '../../src/cli/runtime.js';
 import type { CorivoConfig } from '../../src/config.js';
 import type { Logger } from '../../src/utils/logging.js';
 
@@ -15,7 +15,7 @@ function createMockLogger(): Logger {
   };
 }
 
-describe('createConfiguredCliContext', () => {
+describe('createConfiguredCliLogger', () => {
   it('reuses the provided logger facade while applying config logLevel', () => {
     const logger = createMockLogger();
     const config = {
@@ -27,8 +27,8 @@ describe('createConfiguredCliContext', () => {
       },
     } satisfies CorivoConfig;
 
-    const context = createConfiguredCliContext(config, { logger });
+    const configuredLogger = createConfiguredCliLogger(config, { logger });
 
-    expect(context.logger).toBe(logger);
+    expect(configuredLogger).toBe(logger);
   });
 });

@@ -12,15 +12,14 @@ import { getConfigDir } from '@/storage/database';
 import { printBanner } from '@/utils/banner';
 import { ConfigError, ValidationError } from '../../errors/index.js';
 import { readPassword } from '../utils/password.js';
-import { createCliContext } from '../context/create-context.js';
+import { getCliOutput } from '@/cli/runtime';
 
 interface SetupPasswordOptions {
   force?: boolean;
 }
 
 export async function setupPasswordCommand(options: SetupPasswordOptions = {}): Promise<void> {
-  const context = createCliContext();
-  const output = context.output;
+  const output = getCliOutput();
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');
 

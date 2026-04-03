@@ -1,4 +1,4 @@
-import { PushQueue } from '../engine/push-queue.js';
+import { PushQueue } from '@/infrastructure/output/push-queue.js';
 
 export function createRuntimePushQueue(): PushQueue {
   return new PushQueue();

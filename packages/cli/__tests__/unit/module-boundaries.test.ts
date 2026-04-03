@@ -23,7 +23,7 @@ describe('module boundaries baseline', () => {
     expect(content).toContain('runtime/*');
     expect(content).toContain('utils/*');
     expect(content).toContain('engine/*');
-    expect(content).toContain('cli/context/*');
+    expect(content).toContain('cli/runtime.ts');
     expect(content).toContain('memory-pipeline/*');
     expect(content).toContain('plugins/*/hooks/scripts/*.sh');
   });
@@ -48,12 +48,12 @@ describe('module boundaries baseline', () => {
     expect(hits).toEqual([]);
   });
 
-  it('forbids application imports from cli context modules', () => {
+  it('forbids application imports from cli runtime modules', () => {
     const allowedCompositionRoots = new Set([
       'packages/cli/src/application/bootstrap/create-cli-app.ts',
     ]);
     const hits = collectImports(['packages/cli/src/application'])
-      .filter((entry) => includesPathPair(entry.specifier, 'cli', 'context'))
+      .filter((entry) => includesPathPair(entry.specifier, 'cli', 'runtime'))
       .filter((entry) => !allowedCompositionRoots.has(entry.file));
 
     expect(hits).toEqual([]);

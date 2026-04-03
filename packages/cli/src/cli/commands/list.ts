@@ -11,7 +11,7 @@ import chalk from 'chalk';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 import { ConfigError } from '../../errors/index.js';
 import type { BlockFilter, BlockStatus } from '../../models/block.js';
-import { createCliContext } from '../context/create-context.js';
+import { getCliOutput } from '@/cli/runtime';
 
 const VALID_STATUSES: BlockStatus[] = ['active', 'cooling', 'cold', 'archived'];
 const VALID_SORTS = ['time', 'vitality'];
@@ -44,8 +44,7 @@ listCommand
     verbose?: boolean;
     json?: boolean;
   }) => {
-    const context = createCliContext();
-    const output = context.output;
+    const output = getCliOutput();
     // Parameter verification
     const limit = parseInt(options.limit, 10);
     if (isNaN(limit) || limit < 1) {

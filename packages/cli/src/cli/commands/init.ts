@@ -26,7 +26,7 @@ import os from 'node:os';
 import { startCommand } from './start.js';
 import { registerWithSolver } from './sync.js';
 import { post } from '../../runtime/sync-client.js';
-import { createCliContext } from '../context/create-context.js';
+import { createCliLogger, createCliOutput } from '@/cli/runtime';
 import { readConfirm } from '../utils/password.js';
 import { printBanner } from '@/utils/banner';
 
@@ -41,9 +41,8 @@ function exit(code = 0): never {
  * Main init command handler.
  */
 export async function initCommand(options: { join?: string; server?: string } = {}): Promise<void> {
-  const context = createCliContext();
-  const logger = context.logger;
-  const output = context.output;
+  const logger = createCliLogger();
+  const output = createCliOutput(logger);
 
   printBanner('Corivo - a digital companion that lives for you', { width: 55 });
 

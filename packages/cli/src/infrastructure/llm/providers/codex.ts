@@ -4,6 +4,18 @@ import path from 'node:path';
 import type { ExtractionInput, ExtractionResult } from '../types';
 import { DEFAULT_TIMEOUT_MS, normalizePrompt, runProviderCommand } from '../shared';
 
+const buildDiagnostics = (execution: {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  timeoutMs: number;
+}): NonNullable<ExtractionResult['diagnostics']> => ({
+  timeoutMs: execution.timeoutMs,
+  exitCode: execution.exitCode,
+  stderr: execution.stderr,
+  stdout: execution.stdout,
+});
+
 export async function extractWithCodex(
   input: Omit<ExtractionInput, 'provider'> & { provider?: 'codex' }
 ): Promise<ExtractionResult> {
@@ -35,6 +47,7 @@ export async function extractWithCodex(
         status: 'timeout',
         result: null,
         error: 'codex extraction timed out',
+        diagnostics: buildDiagnostics(execution),
       };
     }
 
@@ -44,6 +57,7 @@ export async function extractWithCodex(
         status: 'error',
         result: null,
         error: execution.stderr.trim() || `codex exited with code ${execution.exitCode}`,
+        diagnostics: buildDiagnostics(execution),
       };
     }
 
@@ -56,6 +70,7 @@ export async function extractWithCodex(
         status: 'error',
         result: null,
         error: `codex last-message output unavailable: ${error instanceof Error ? error.message : String(error)}`,
+        diagnostics: buildDiagnostics(execution),
       };
     }
 
@@ -65,6 +80,7 @@ export async function extractWithCodex(
         status: 'error',
         result: null,
         error: 'codex returned empty last-message output',
+        diagnostics: buildDiagnostics(execution),
       };
     }
 

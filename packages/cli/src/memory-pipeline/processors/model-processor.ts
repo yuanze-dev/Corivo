@@ -1,4 +1,5 @@
 import type {
+  ExtractionDiagnostics,
   ExtractionInput,
   ExtractionProvider,
   ExtractionResult,
@@ -9,11 +10,21 @@ export interface ModelProcessorMetadata {
   provider?: ExtractionProvider;
   status: 'success' | 'error' | 'timeout';
   error?: string;
+  diagnostics?: ExtractionDiagnostics;
 }
 
 export interface ModelProcessorResult {
   outputs: string[];
   metadata?: ModelProcessorMetadata;
+  outputIndexes?: number[];
+  failures?: Array<{
+    index: number;
+    sessionId: string;
+    provider?: ExtractionProvider;
+    status: 'error' | 'timeout';
+    error: string;
+    diagnostics?: ExtractionDiagnostics;
+  }>;
 }
 
 export interface ModelProcessorProcessOptions {
@@ -80,6 +91,10 @@ export class ExtractionBackedModelProcessor implements ModelProcessor {
 
       if (extraction.error) {
         metadata.error = extraction.error;
+      }
+
+      if (extraction.diagnostics) {
+        metadata.diagnostics = extraction.diagnostics;
       }
 
       return { outputs: [], metadata };

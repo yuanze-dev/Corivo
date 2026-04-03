@@ -199,6 +199,12 @@ describe('extractWithProvider', () => {
       status: 'error',
       result: null,
       error: 'command failed',
+      diagnostics: {
+        timeoutMs: 60000,
+        exitCode: 2,
+        stderr: 'command failed',
+        stdout: '',
+      },
     });
   });
 
@@ -273,6 +279,31 @@ describe('extractWithProvider', () => {
       status: 'timeout',
       result: null,
       error: 'claude extraction timed out',
+      diagnostics: {
+        timeoutMs: 5,
+        exitCode: null,
+        stderr: '',
+        stdout: '',
+      },
+    });
+  });
+
+  it('returns codex timeout diagnostics when the codex process exceeds timeoutMs', async () => {
+    mockSpawnTimeout();
+
+    const result = await extractWithProvider({ provider: 'codex', prompt: 'hello', timeoutMs: 5 });
+
+    expect(result).toEqual({
+      provider: 'codex',
+      status: 'timeout',
+      result: null,
+      error: 'codex extraction timed out',
+      diagnostics: {
+        timeoutMs: 5,
+        exitCode: null,
+        stderr: '',
+        stdout: '',
+      },
     });
   });
 });
@@ -326,6 +357,31 @@ describe('provider-specific wrappers', () => {
       status: 'error',
       result: null,
       error: expect.stringContaining('last-message'),
+      diagnostics: {
+        timeoutMs: 60000,
+        exitCode: 0,
+        stderr: '',
+        stdout: 'hook noise only',
+      },
+    });
+  });
+
+  it('returns codex error diagnostics when codex exits non-zero', async () => {
+    mockSpawnFailure('model crashed\nstack line', 2);
+
+    const result = await extractWithCodex({ prompt: 'hello' });
+
+    expect(result).toEqual({
+      provider: 'codex',
+      status: 'error',
+      result: null,
+      error: 'model crashed\nstack line',
+      diagnostics: {
+        timeoutMs: 60000,
+        exitCode: 2,
+        stderr: 'model crashed\nstack line',
+        stdout: '',
+      },
     });
   });
 });

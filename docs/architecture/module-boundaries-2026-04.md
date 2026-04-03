@@ -10,7 +10,7 @@
 
 2. `packages/cli/src/engine/*` 不能依赖 `packages/cli/src/cli/commands/*`。
 
-3. `packages/cli/src/application/*` 不能依赖 `packages/cli/src/cli/context/*`。
+3. `packages/cli/src/application/*` 不能依赖 `packages/cli/src/cli/runtime.ts`，组合根除外。
 唯一例外：CLI 组合根 `packages/cli/src/application/bootstrap/create-cli-app.ts`，用于装配命令运行时能力。
 
 4. `packages/cli/src/memory-pipeline/*` 不依赖任何 `packages/cli/src/cli/*` 模块。
@@ -23,7 +23,7 @@ Task 1 的单测当前直接强校验以下禁止模式：
 
 - `packages/cli/src/cli/commands/* -> engine/*` 禁止（全目录扫描）
 - `packages/cli/src/engine/* -> cli/commands/*` 禁止（全目录扫描）
-- `application/* -> cli/context/*` 禁止（`application/bootstrap/create-cli-app.ts` 组合根例外）
+- `application/* -> cli/runtime.ts` 禁止（`application/bootstrap/create-cli-app.ts` 组合根例外）
 - `memory-pipeline/* -> cli/*` 禁止
 - `packages/plugins/*/hooks/scripts/*.sh` 通过脚本扫描校验：
   - 必须调用 `corivo` CLI

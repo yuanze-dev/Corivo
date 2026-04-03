@@ -9,7 +9,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { generateFirstPush, getWelcomeMessage } from '../../first-push/index.js';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
-import { createCliContext } from '../context/create-context.js';
+import { getCliOutput } from '@/cli/runtime';
 
 export const pushCommand = new Command('push');
 
@@ -18,8 +18,7 @@ pushCommand
   .option('-f, --first-activation', 'Intro message for first activation')
   .option('-w, --welcome', 'Welcome message')
   .action(async (options) => {
-    const context = createCliContext();
-    const output = context.output;
+    const output = getCliOutput();
     try {
       if (options.welcome) {
         // Output welcome message

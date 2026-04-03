@@ -1,6 +1,6 @@
 import type { CorivoDatabase } from '@/storage/database';
 import type { Logger } from '../utils/logging.js';
-import { QueryHistoryTracker } from '../engine/query-history.js';
+import { QueryHistoryTracker } from '@/domain/memory/services/query-history.js';
 import {
   createSqlQueryHistoryStore,
   type QueryHistorySqlDb,

@@ -10,7 +10,7 @@ import chalk from 'chalk';
 import { runHeartbeatFirstRun } from '@/application/review/heartbeat-first-run.js';
 import { getConfigDir, getDefaultDatabasePath } from '@/storage/database';
 import { printBanner } from '@/utils/banner';
-import { createCliContext } from '../context/create-context.js';
+import { getCliOutput } from '@/cli/runtime';
 
 export const firstRunCommand = new Command('first-run');
 
@@ -21,8 +21,7 @@ firstRunCommand
   .option('--no-decay', 'Skip decay')
   .option('--no-cold-zone', 'Skip cold-zone consolidation')
   .action(async (options) => {
-    const context = createCliContext();
-    const output = context.output;
+    const output = getCliOutput();
     try {
       printBanner('Organizing memories...', { color: chalk.cyan });
 

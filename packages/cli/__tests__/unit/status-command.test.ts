@@ -51,14 +51,12 @@ vi.mock('@/push/context.js', () => ({
   },
 }));
 
-vi.mock('../../src/cli/context/create-context.js', () => ({
-  createCliContext: () => ({
-    output: {
-      info: outputInfo,
-      warn: vi.fn(),
-      error: vi.fn(),
-      success: vi.fn(),
-    },
+vi.mock('../../src/cli/runtime.js', () => ({
+  getCliOutput: () => ({
+    info: outputInfo,
+    warn: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
   }),
 }));
 

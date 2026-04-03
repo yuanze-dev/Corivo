@@ -24,6 +24,7 @@ export async function runProviderCommand(
   stderr: string;
   exitCode: number | null;
   timedOut: boolean;
+  timeoutMs: number;
 }> {
   return await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -40,6 +41,7 @@ export async function runProviderCommand(
       stderr: string;
       exitCode: number | null;
       timedOut: boolean;
+      timeoutMs: number;
     }) => {
       if (settled) return;
       settled = true;
@@ -72,6 +74,7 @@ export async function runProviderCommand(
         stderr,
         exitCode,
         timedOut,
+        timeoutMs,
       });
     });
 
@@ -94,6 +97,7 @@ export function mapExecutionResult(
     stderr: string;
     exitCode: number | null;
     timedOut: boolean;
+    timeoutMs: number;
   },
 ): ExtractionResult {
   if (execution.timedOut) {
@@ -102,6 +106,12 @@ export function mapExecutionResult(
       status: 'timeout',
       result: null,
       error: `${provider} extraction timed out`,
+      diagnostics: {
+        timeoutMs: execution.timeoutMs,
+        exitCode: execution.exitCode,
+        stderr: execution.stderr,
+        stdout: execution.stdout,
+      },
     };
   }
 
@@ -111,6 +121,12 @@ export function mapExecutionResult(
       status: 'error',
       result: null,
       error: execution.stderr.trim() || `${provider} exited with code ${execution.exitCode}`,
+      diagnostics: {
+        timeoutMs: execution.timeoutMs,
+        exitCode: execution.exitCode,
+        stderr: execution.stderr,
+        stdout: execution.stdout,
+      },
     };
   }
 

@@ -8,7 +8,8 @@ import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { getConfigDir } from '@/storage/database';
-import { createCliContext } from '../context/create-context.js';
+import type { CliOutput } from '@/cli/runtime';
+import { getCliOutput } from '@/cli/runtime';
 
 const REMINDERS_FILE = 'reminders.json';
 
@@ -22,30 +23,29 @@ remindersCommand
   .option('-c, --cleanup', 'Clean up expired reminders')
   .option('-j, --json', 'Output as JSON (for scripts)')
   .action(async (options) => {
-    const context = createCliContext();
-    const output = context.output;
+    const output = getCliOutput();
     try {
       const configDir = getConfigDir();
       const remindersPath = path.join(configDir, REMINDERS_FILE);
 
       // Handling ignore operations
       if (options.dismissAll) {
-        await dismissAll(remindersPath, context);
+        await dismissAll(remindersPath, output);
         return;
       }
 
       if (options.dismiss) {
-        await dismissReminder(remindersPath, options.dismiss, context);
+        await dismissReminder(remindersPath, options.dismiss, output);
         return;
       }
 
       if (options.cleanup) {
-        await cleanupReminders(remindersPath, context);
+        await cleanupReminders(remindersPath, output);
         return;
       }
 
       // Default: Show reminder list
-      await displayReminders(remindersPath, options, context);
+      await displayReminders(remindersPath, options, output);
     } catch (error) {
       output.error(chalk.red('Error:'), error);
       process.exit(1);
@@ -58,9 +58,8 @@ remindersCommand
 async function displayReminders(
   remindersPath: string,
   options: { pending?: boolean; json?: boolean },
-  context = createCliContext(),
+  output: CliOutput = getCliOutput(),
 ): Promise<void> {
-  const output = context.output;
   const store = await loadStore(remindersPath);
   const now = Math.floor(Date.now() / 1000);
 
@@ -112,8 +111,7 @@ async function displayReminders(
 /**
  * Ignore specific reminders
  */
-async function dismissReminder(remindersPath: string, id: string, context = createCliContext()): Promise<void> {
-  const output = context.output;
+async function dismissReminder(remindersPath: string, id: string, output: CliOutput = getCliOutput()): Promise<void> {
   const store = await loadStore(remindersPath);
   const reminder = store.reminders.find((r: any) => r.id === id);
 
@@ -137,8 +135,7 @@ async function dismissReminder(remindersPath: string, id: string, context = crea
 /**
  * Ignore all reminders
  */
-async function dismissAll(remindersPath: string, context = createCliContext()): Promise<void> {
-  const output = context.output;
+async function dismissAll(remindersPath: string, output: CliOutput = getCliOutput()): Promise<void> {
   const store = await loadStore(remindersPath);
   let count = 0;
 
@@ -162,8 +159,7 @@ async function dismissAll(remindersPath: string, context = createCliContext()): 
 /**
  * Clear expired reminders
  */
-async function cleanupReminders(remindersPath: string, context = createCliContext()): Promise<void> {
-  const output = context.output;
+async function cleanupReminders(remindersPath: string, output: CliOutput = getCliOutput()): Promise<void> {
   const store = await loadStore(remindersPath);
   const now = Math.floor(Date.now() / 1000);
   const retentionDays = 30;

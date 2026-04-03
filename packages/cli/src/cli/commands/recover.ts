@@ -11,11 +11,10 @@ import { printBanner } from '@/utils/banner';
 import { KeyManager } from '../../crypto/keys.js';
 import { ConfigError, ValidationError } from '../../errors/index.js';
 import { readPassword } from '../utils/password.js';
-import { createCliContext } from '../context/create-context.js';
+import { getCliOutput } from '@/cli/runtime';
 
 export async function recoverCommand(): Promise<void> {
-  const context = createCliContext();
-  const output = context.output;
+  const output = getCliOutput();
   printBanner('Data Recovery Wizard', { width: 55 });
 
   // Check configuration file

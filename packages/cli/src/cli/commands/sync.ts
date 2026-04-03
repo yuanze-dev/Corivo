@@ -7,8 +7,19 @@
 import { Command } from 'commander';
 import { randomBytes } from 'node:crypto';
 import os from 'node:os';
-import { createCliContext } from '../context/create-context.js';
-import { createConfiguredCliContext } from '../context/configured-context.js';
+import {
+  createCliLogger,
+  createCliOutput,
+  createConfiguredCliLogger,
+  getCliDatabase,
+  getCliDatabasePath,
+  getCliIdentityPath,
+  loadCliConfig,
+  loadCliSolver,
+  readCliJson,
+  saveCliSolver,
+  writeCliJson,
+} from '@/cli/runtime';
 import type { Logger as SyncLogger } from '../../utils/logging.js';
 import {
   applyPulledChangesets,
@@ -69,20 +80,19 @@ export function createSyncCommand(): Command {
   cmd.option('--pair', 'Generate a pairing code for a new device');
 
   cmd.action(async (options, command: Command) => {
-    const bootstrapContext = createCliContext();
-    const bootstrapOutput = bootstrapContext.output;
+    const bootstrapLogger = createCliLogger();
+    const bootstrapOutput = createCliOutput(bootstrapLogger);
 
     // --pair: generate pairing code
     if (options.pair) {
-      const config = await bootstrapContext.config.load();
+      const config = await loadCliConfig();
       if (!config) {
         bootstrapOutput.error('Corivo is not initialized, please run corivo init');
         process.exit(1);
       }
-      const context = createConfiguredCliContext(config);
-      const { logger } = context;
-      const output = context.output;
-      const solverConfig = await context.config.loadSolver();
+      const logger = createConfiguredCliLogger(config);
+      const output = createCliOutput(logger);
+      const solverConfig = await loadCliSolver();
       if (!solverConfig) {
         output.error('Not connected to a sync server, please run corivo sync --register');
         process.exit(1);
@@ -105,16 +115,15 @@ export function createSyncCommand(): Command {
       return;
     }
 
-    const config = await bootstrapContext.config.load();
+    const config = await loadCliConfig();
     if (!config) {
       bootstrapOutput.error('Corivo is not initialized, please run corivo init');
       process.exit(1);
     }
-    const context = createConfiguredCliContext(config);
-    const { logger } = context;
-    const output = context.output;
+    const logger = createConfiguredCliLogger(config);
+    const output = createCliOutput(logger);
 
-    let solverConfig = await context.config.loadSolver();
+    let solverConfig = await loadCliSolver();
 
     // If there is no solver.json or registration is explicitly required
     if (!solverConfig || options.register) {
@@ -153,7 +162,7 @@ export function createSyncCommand(): Command {
       };
 
       try {
-        await context.config.saveSolver(solverConfig);
+        await saveCliSolver(solverConfig);
       } catch (err: unknown) {
         output.error('Failed to save solver.json:', err instanceof Error ? err.message : String(err));
         // Continue execution without terminating the process
@@ -176,8 +185,8 @@ export function createSyncCommand(): Command {
     }
     output.success('Authentication successful');
 
-    const db = context.db.get({
-      path: context.paths.databasePath(),
+    const db = getCliDatabase({
+      path: getCliDatabasePath(),
     });
 
     // Push: Get local changes
@@ -211,7 +220,7 @@ export function createSyncCommand(): Command {
 
         solverConfig!.last_push_version = blocks.length;  // Record the total amount pushed and no longer add it up
         try {
-          await context.config.saveSolver(solverConfig!);
+          await saveCliSolver(solverConfig!);
           logger.debug(`[sync:cli] updated last_push_version=${solverConfig!.last_push_version}`);
         } catch (err: any) {
           output.error('Failed to save solver.json:', err.message);
@@ -243,7 +252,7 @@ export function createSyncCommand(): Command {
       if (pullResult.current_version > solverConfig!.last_pull_version) {
         solverConfig!.last_pull_version = pullResult.current_version;
         try {
-          await context.config.saveSolver(solverConfig!);
+          await saveCliSolver(solverConfig!);
           logger.debug(`[sync:cli] updated last_pull_version=${solverConfig!.last_pull_version}`);
         } catch (err: any) {
           output.error('Failed to save solver.json:', err.message);
@@ -264,9 +273,9 @@ export function createSyncCommand(): Command {
       })();
       logger.debug(`[sync:cli] fetched device list successfully devices=${devicesResult.devices.length}`);
 
-      const identityPath = context.paths.identityPath();
+      const identityPath = getCliIdentityPath();
       try {
-        const identity = await context.fs.readJson<{
+        const identity = await readCliJson<{
           devices?: Record<string, {
             id: string;
             name: string;
@@ -290,7 +299,7 @@ export function createSyncCommand(): Command {
           };
         }
         identity.updated_at = new Date().toISOString();
-        await context.fs.writeJson(identityPath, identity);
+        await writeCliJson(identityPath, identity);
       } catch { /* ignore if identity.json does not exist */ }
     } catch { /* failure to fetch devices does not affect the main flow */ }
 

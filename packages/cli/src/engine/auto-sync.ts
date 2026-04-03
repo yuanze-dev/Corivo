@@ -5,11 +5,20 @@
  * Prerequisite: The user has completed registration through `corivo sync --register`.
  */
 
-import type { CliContext } from '../cli/context/types.js';
 import { applyPulledChangesets, authenticate, post, type PulledChangeset } from '../runtime/sync-client.js';
 import type { CorivoDatabase } from '@/storage/database';
+import type { CorivoConfig, SolverConfig } from '@/config';
+import type { Logger } from '@/utils/logging.js';
 
 const TOKEN_TTL = 4 * 60 * 1000; // 4 minutes (server TTL 5 minutes)
+
+interface AutoSyncRuntime {
+  logger: Logger;
+  loadConfig: () => Promise<CorivoConfig | null>;
+  loadSolver: () => Promise<SolverConfig | null>;
+  saveSolver: (config: SolverConfig) => Promise<void>;
+  now: () => number;
+}
 
 export class AutoSync {
   private token: string | null = null;
@@ -17,7 +26,7 @@ export class AutoSync {
 
   constructor(
     private db: CorivoDatabase,
-    private readonly context: Pick<CliContext, 'logger' | 'config' | 'clock'>
+    private readonly runtime: AutoSyncRuntime
   ) {}
 
   /**
@@ -26,11 +35,11 @@ export class AutoSync {
    */
   async run(): Promise<{ pushed: number; pulled: number } | null> {
     try {
-      const config = await this.context.config.load();
+      const config = await this.runtime.loadConfig();
       if (!config) return null;
-      const logger = this.context.logger;
+      const logger = this.runtime.logger;
 
-      const solverConfig = await this.context.config.loadSolver();
+      const solverConfig = await this.runtime.loadSolver();
       if (!solverConfig) return null;
 
       const { server_url, shared_secret, site_id } = solverConfig;
@@ -67,7 +76,7 @@ export class AutoSync {
         logger.debug(`[sync:auto] push 完成 stored=${pushed} changesets=${changesets.length}`);
 
         solverConfig.last_push_version = blocks.length;
-        await this.context.config.saveSolver(solverConfig);
+        await this.runtime.saveSolver(solverConfig);
         logger.debug(`[sync:auto] 已更新 last_push_version=${solverConfig.last_push_version}`);
       }
 
@@ -92,14 +101,14 @@ export class AutoSync {
 
       if (pullResult.current_version > solverConfig.last_pull_version) {
         solverConfig.last_pull_version = pullResult.current_version;
-        await this.context.config.saveSolver(solverConfig);
+        await this.runtime.saveSolver(solverConfig);
         logger.debug(`[sync:auto] 已更新 last_pull_version=${solverConfig.last_pull_version}`);
       }
 
       logger.debug(`[sync:auto] 同步结束 push=${pushed} pull=${pulled}`);
       return { pushed, pulled };
     } catch (error) {
-      this.context.logger.error('[sync:auto] 同步失败:', error instanceof Error ? error.message : error);
+      this.runtime.logger.error('[sync:auto] 同步失败:', error instanceof Error ? error.message : error);
       // 401 Authentication failed: clear the cache token and obtain it again next time
       if (error instanceof Error && error.message.includes('401')) {
         this.token = null;
@@ -113,7 +122,7 @@ export class AutoSync {
     serverUrl: string,
     identityId: string,
     sharedSecret: string,
-    logger = this.context.logger
+    logger = this.runtime.logger
   ): Promise<string> {
     if (this.token && this.isTokenValid()) {
       logger.debug('[sync:auto] 复用缓存 token');
@@ -121,11 +130,11 @@ export class AutoSync {
     }
     logger.debug('[sync:auto] 重新获取 token');
     this.token = await authenticate(serverUrl, identityId, sharedSecret, logger);
-    this.tokenObtainedAt = this.context.clock.now();
+    this.tokenObtainedAt = this.runtime.now();
     return this.token;
   }
 
   private isTokenValid(): boolean {
-    return this.context.clock.now() - this.tokenObtainedAt < TOKEN_TTL;
+    return this.runtime.now() - this.tokenObtainedAt < TOKEN_TTL;
   }
 }

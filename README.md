@@ -248,8 +248,10 @@ Memory is modeled as blocks with vitality (`active -> cooling -> cold -> archive
 
 Corivo now follows a state/capability/flow split with explicit composition roots:
 
-- `packages/cli/src/cli/commands/*`: command adapters only (flag parsing and output).
+- `packages/cli/src/cli/*`: command adapters and presenters only. `cli/runtime.ts` contains modular CLI runtime helpers.
 - `packages/cli/src/application/*`: use-case and orchestration flow; `application/bootstrap/create-cli-app.ts` is the CLI composition root.
+- `packages/cli/src/domain/*`: durable business models and services.
+- `packages/cli/src/infrastructure/*`: SQLite, host adapters, provider integrations, service manager, and output-side persistence.
 - `packages/cli/src/runtime/*`: runtime capabilities and policy functions shared by commands/engine.
 - `packages/cli/src/memory-pipeline/*`: pipeline state, stage capabilities, and runner flow.
 - `packages/plugins/*`: host-specific integration assets/runtime, kept thin and delegated to CLI entrypoints.
@@ -257,7 +259,44 @@ Corivo now follows a state/capability/flow split with explicit composition roots
 - `packages/solver/src/application/*`: application-level contracts/use-cases.
 - `packages/solver/src/runtime/create-server.ts` + `packages/solver/src/server.ts`: solver runtime wiring/composition roots.
 
-Practical rule: command/routes adapt IO, application composes dependencies, runtime/storage/auth/sync implement capabilities, and runner/use-case modules own process flow.
+Practical rule: command/routes adapt IO, application composes dependencies, domain owns stable product logic, infrastructure talks to external systems, and runtime/runner modules own process flow.
+
+## CLI Layout Snapshot
+
+Current `packages/cli/src` layout:
+
+```text
+cli/
+  commands/
+  presenters/
+  runtime.ts
+application/
+domain/
+  memory/models/
+  memory/services/
+  host/contracts/
+infrastructure/
+  hosts/
+  llm/
+  platform/
+  storage/
+    lifecycle/
+    repositories/
+    schema/
+    search/
+  output/
+runtime/
+engine/
+  heartbeat.ts
+  auto-sync.ts
+  rules/
+```
+
+Notable changes from earlier versions:
+
+- `CliContext` has been removed in favor of direct runtime helper imports.
+- `storage/database.ts` is now a facade over storage lifecycle, repositories, search, schema, and mappers.
+- most former `engine/*` business modules were moved into `domain/*` or `infrastructure/*`.
 
 ## Plugin Directory Model
 

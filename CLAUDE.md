@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Corivo 是一个融入用户已有工作流的赛博**伙伴**。它不是一个独立的 App，而是寄生在 Claude Code、Cursor、飞书等工具中的后台服务——自动从用户的 AI 对话和消息中采集信息，持续整理和更新，在合适的时机以 `[corivo]` 的名义主动提醒用户。
 
-当前版本：**v0.11.0**
+当前版本请以各 package 的 `package.json` 为准（workspace 内版本独立演进）
 
 详细设计文档见 [README.md](./README.md)
 
@@ -31,8 +31,10 @@ Corivo 是一个融入用户已有工作流的赛博**伙伴**。它不是一个
 ```bash
 # packages/cli
 cd packages/cli
-npm run build          # tsc
-npm run dev            # tsc --watch
+npm run build          # tsdown
+npm run dev            # tsdown --watch
+npm run test           # vitest --run
+npm run typecheck      # tsc --noEmit
 
 # packages/solver
 cd packages/solver
@@ -42,20 +44,20 @@ npm run start          # node dist/index.js
 
 # packages/plugins/claude-code
 cd packages/plugins/claude-code
-npm run build          # tsc
+# 配置/文档型 package，无独立构建步骤
 ```
 
-**测试**（仅 cli package 有完整测试套件）：
+**测试**（当前以 cli package 的 Vitest 套件最完整）：
 
 ```bash
 cd packages/cli
-# 运行所有测试（Node.js 内置 test runner，需先 build）
-node --test
+# 运行所有测试
+npm run test
 
 # 运行单个测试文件
-node --test __tests__/unit/database.test.ts
-node --test __tests__/unit/heartbeat.test.ts
-node --test __tests__/integration/claude-code-ingestor.test.ts
+npm run test -- __tests__/unit/database.test.ts
+npm run test -- __tests__/integration/heartbeat.test.ts
+npm run test -- __tests__/integration/claude-code-ingestor.test.ts
 ```
 
 > 注意：`@corivo/cli` 是纯 ESM 模块。`better-sqlite3` 是 CJS，通过 `createRequire(import.meta.url)` 加载。
@@ -104,25 +106,49 @@ CLI Commands（save / query / status / push / inject …）
 - 可选 SQLCipher 加密，不可用时自动降级为应用层加密（`KeyManager`）
 - `CorivoDatabase.getInstance()` 单例，进程生命周期内不关闭
 
-**目录结构：**
+**当前 CLI 结构：**
 
 ```
 src/
-  cli/commands/     CLI 命令实现（commander）
-  cold-scan/        一次性扫描提取器（claude-code, cursor, git, package.json…）
-  engine/           核心引擎
+  cli/
+    commands/       CLI 命令实现
+    runtime.ts      CLI 运行时辅助函数（替代旧 CliContext）
+    presenters/     输出格式化
+  application/      use-case / orchestration
+  domain/
+    memory/models/  Block / Association / Pattern
+    memory/services/ 记忆服务
+    host/contracts/ 宿主契约
+  infrastructure/
+    hosts/          宿主适配、安装、导入
+    llm/            提取 provider
+    platform/       本地 service manager / 平台适配
+    storage/
+      lifecycle/    数据库路径与生命周期
+      repositories/ block / association / raw-memory / stats / session-record
+      schema/       schema / migration
+      search/       搜索
+    output/         push-queue / reminders
+  runtime/          recall / review / scoring / sync-client / process-state
+  engine/
     heartbeat.ts    后台守护进程主循环
-    rules/          规则引擎（当前只有 tech-choice 规则）
-    associations.ts 关联发现
-    consolidation.ts 去重与整合
-  ingestors/        实时摄取器（当前只有 claude-code）
+    auto-sync.ts    心跳内自动同步
+    rules/          规则入口
+  cold-scan/        一次性扫描提取器
+  ingestors/        实时摄取器
   identity/         身份标识（平台指纹，无需密码）
   crypto/           密钥管理与内容加密
-  storage/          数据库封装
-  models/           Block / Association / Pattern 类型定义
-  push/             上下文推送（注入到 AI 工具）
-  inject/           Claude Rules 注入
+  push/             上下文推送
 ```
+
+**当前边界约束：**
+
+- `cli/*` 只做 CLI 适配和输出
+- `application/*` 只做用例编排
+- `domain/*` 放稳定业务模型和服务
+- `infrastructure/*` 放 sqlite、host、llm、platform、output
+- `runtime/*` 放运行时策略和 runtime 支撑
+- `engine/*` 当前只应保留 heartbeat / auto-sync / rules
 
 **守护进程运行方式：**
 
@@ -159,11 +185,9 @@ Claude Code 插件包，让 AI 工具能读写 Corivo 记忆。
 
 **组成：**
 
-- `src/api.ts`：`CorivoAPI` 类，通过 `execSync('corivo ...')` 调用本地 CLI
-- `skills/corivo-save/skill.md`：教 Claude 如何保存记忆
-- `skills/corivo-query/skill.md`：教 Claude 如何查询记忆
-- `hooks/hooks.json`：Claude Code hook 配置（session-init 等）
-- `.claude-plugin/`：插件元数据与市场信息
+- `skills/`：Claude Code 保存/查询技能提示词
+- `hooks/`：Claude Code hook 资产
+- `README.md` / `CLAUDE.md`：插件本地说明
 
 ---
 

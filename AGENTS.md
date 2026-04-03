@@ -115,39 +115,60 @@ CLI Commands（save / query / status / push / inject …）
 - 可选 SQLCipher 加密，不可用时自动降级为应用层加密（`KeyManager`）
 - `CorivoDatabase.getInstance()` 单例，进程生命周期内不关闭
 
-**目录结构：**
+**当前 CLI 结构：**
 
 ```
 src/
-  cli/commands/     CLI 命令实现（commander）
-  application/hosts/ Host install / doctor / uninstall use case
-  cold-scan/        一次性扫描提取器（Codex, cursor, git, package.json…）
-  engine/           核心引擎
+  cli/
+    commands/       CLI 命令实现（commander）
+    runtime.ts      CLI 运行时辅助函数（logger/output/config/db/path）
+    presenters/     CLI 输出格式化
+  application/      use-case / orchestration
+  domain/
+    memory/models/  Block / Association / Pattern
+    memory/services/核心记忆服务（association / consolidation / suggestion / trigger ...）
+    host/contracts/ 宿主契约
+  infrastructure/
+    hosts/          宿主适配、安装、导入
+    llm/            Claude / Codex extraction provider
+    platform/       service manager / 本地平台适配
+    storage/
+      lifecycle/    数据库路径与生命周期
+      repositories/ block / association / raw-memory / stats / session-record
+      schema/       schema / migration
+      search/       FTS / LIKE 搜索
+    output/         push-queue / reminders 等输出侧持久化
+  runtime/          runtime policy / recall / scoring / sync-client / daemon state
+  engine/
     heartbeat.ts    后台守护进程主循环
+    auto-sync.ts    心跳内自动同步
     rules/          规则引擎（当前只有 tech-choice 规则）
-    associations.ts 关联发现
-    consolidation.ts 去重与整合
-  ingestors/        实时摄取器（当前只有 Codex）
+  cold-scan/        一次性扫描提取器
+  ingestors/        实时摄取器
   identity/         身份标识（平台指纹，无需密码）
   crypto/           密钥管理与内容加密
-  hosts/            HostAdapter / HostRegistry（Codex / Cursor / OpenCode / Claude）
-  storage/          数据库封装
-  models/           Block / Association / Pattern 类型定义
   push/             上下文推送（注入到 AI 工具）
-  inject/           具体宿主安装 helper（被 HostAdapter 复用）
 ```
 
 **守护进程运行方式：**
 
 `corivo start` 通过 service manager 将心跳进程注册为后台服务。当前只通过环境变量 `CORIVO_DB_PATH` 传入数据库路径，不再传递 `db_key`。
 
+**当前边界约束：**
+
+- `cli/*`：只做命令适配、参数解析、输出格式化
+- `application/*`：只做用例编排
+- `domain/*`：放稳定业务模型和服务
+- `infrastructure/*`：放 sqlite、host、llm、platform、output
+- `runtime/*`：放 recall/scoring/sync-client/process-state 等运行时策略
+- `engine/*`：当前应只保留 heartbeat / auto-sync / rules 这类运行循环或规则入口
+
 **宿主集成入口：**
 
 - `corivo host ...` 是新的宿主管理入口
 - `corivo inject ...` 保留为兼容 alias
-- `src/hosts/*` 负责宿主注册与薄适配层
-- `src/application/hosts/*` 负责 install / doctor / uninstall 编排
-- `src/inject/*` 保留具体宿主的安装实现，不再作为 CLI 主编排中心
+- `src/infrastructure/hosts/*` 负责宿主注册、安装、导入、薄适配层
+- `src/application/hosts/*` 负责 install / doctor / uninstall / import 编排
 
 ---
 

@@ -18,6 +18,7 @@ export async function runProviderCommand(
   command: string,
   args: string[],
   timeoutMs: number,
+  options: { stdinText?: string } = {},
 ): Promise<{
   stdout: string;
   stderr: string;
@@ -26,7 +27,7 @@ export async function runProviderCommand(
 }> {
   return await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: [options.stdinText !== undefined ? 'pipe' : 'ignore', 'pipe', 'pipe'],
     });
 
     let stdout = '';
@@ -73,6 +74,11 @@ export async function runProviderCommand(
         timedOut,
       });
     });
+
+    if (options.stdinText !== undefined) {
+      child.stdin?.write(options.stdinText);
+      child.stdin?.end();
+    }
 
     const timeout = setTimeout(() => {
       timedOut = true;

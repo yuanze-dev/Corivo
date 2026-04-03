@@ -1,11 +1,19 @@
 import { buildFinalMergePrompt } from '../prompts/final-merge-prompt.js';
 import type { ModelProcessor } from '../processors/model-processor.js';
-import { ExtractionBackedModelProcessor } from '../processors/model-processor.js';
-import { parseFinalMemoryFileBlocks, validateFinalMemoryFileBlocks } from '../markdown/memory-writer.js';
-import type { ExtractionProvider } from '../../extraction/types.js';
+import {
+  parseFinalMemoryFileBlocks,
+  renderFinalMemoryDocument,
+  renderMarkdownFileBlock,
+  renderMemoryIndex,
+  validateFinalMemoryFileBlocks,
+} from '../markdown/memory-writer.js';
+import { parseRawMemoryDocument } from '../markdown/raw-memory-parser.js';
+import { setMergedFinalOutputs } from '../pipeline-state.js';
 import type {
+  FinalMemoryFileBlock,
   FinalMemoryBatchArtifact,
   RawMemoryBatchArtifact,
+  RawMemoryDocument,
 } from '../contracts/memory-documents.js';
 import type {
   ArtifactDescriptor,
@@ -17,6 +25,7 @@ import type {
 
 const STAGE_ID = 'merge-final-memories';
 const RAW_STAGE_ID = 'extract-raw-memories';
+const MERGE_TIMEOUT_MS = 180_000;
 
 interface MemoryRootArtifactStore extends MemoryPipelineArtifactStore {
   writeMemoryFile(relativePath: string, body: string): Promise<string>;
@@ -25,16 +34,18 @@ interface MemoryRootArtifactStore extends MemoryPipelineArtifactStore {
 }
 
 export interface MergeFinalMemoriesStageOptions {
-  processor?: ModelProcessor;
-  provider?: ExtractionProvider;
+  processor: ModelProcessor;
 }
 
 export class MergeFinalMemoriesStage implements MemoryPipelineStage {
   readonly id = STAGE_ID;
   private readonly processor: ModelProcessor;
 
-  constructor(options: MergeFinalMemoriesStageOptions = {}) {
-    this.processor = options.processor ?? new ExtractionBackedModelProcessor({ provider: options.provider ?? 'claude' });
+  constructor(options: MergeFinalMemoriesStageOptions) {
+    if (!options?.processor || typeof options.processor.process !== 'function') {
+      throw new Error('MergeFinalMemoriesStage requires a ModelProcessor capability');
+    }
+    this.processor = options.processor;
   }
 
   async run(context: MemoryPipelineContext): Promise<PipelineStageResult> {
@@ -63,12 +74,24 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
     }
 
     const rawFiles = await Promise.all(
-      rawBatches.map(async ({ batch }) => {
+      rawBatches
+        .filter(({ batch }) => !parseRawMemoryDocument(batch.markdown).noMemories)
+        .map(async ({ batch }) => {
         const relativePath = `raw/${batch.sessionId}.memories.md`;
         await artifactStore.writeMemoryFile(relativePath, batch.markdown);
         return this.renderPromptInputFile(relativePath, batch.markdown);
-      }),
+        }),
     );
+
+    if (rawFiles.length === 0) {
+      return {
+        stageId: this.id,
+        status: 'success',
+        inputCount: rawArtifacts.length,
+        outputCount: 0,
+        artifactIds: [],
+      };
+    }
 
     const existingFinalPaths = await artifactStore.listMemoryFiles('final');
     const existingFinalFiles = await Promise.all(
@@ -77,11 +100,19 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
       ),
     );
 
+    const existingFinalDetailPaths = existingFinalPaths.filter((relativePath) => !relativePath.endsWith('/MEMORY.md'));
+    const rawDocuments = rawBatches.flatMap(({ batch }) => parseRawMemoryDocument(batch.markdown).documents);
+
+    if (existingFinalDetailPaths.length === 0 && rawFiles.length === 1) {
+      const files = this.buildDeterministicFinalFiles(rawDocuments);
+      return await this.persistFinalFiles(context, rawArtifacts, files);
+    }
+
     const prompt = buildFinalMergePrompt({
       rawFiles,
       existingFinalFiles,
     });
-    const result = await this.processor.process([prompt]);
+    const result = await this.processor.process([prompt], { timeoutMs: MERGE_TIMEOUT_MS });
     const failure = this.getProcessorFailure(result);
     if (failure) {
       return {
@@ -106,28 +137,21 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
       };
     }
 
-    const files = validateFinalMemoryFileBlocks(parseFinalMemoryFileBlocks(output));
-    const writtenFiles = await Promise.all(
-      files.map((file) => artifactStore.writeMemoryFile(file.filePath, file.content)),
-    );
-
-    const descriptor = await context.artifactStore.writeArtifact({
-      runId: context.runId,
-      kind: 'final-memory-batch',
-      source: this.id,
-      upstreamIds: rawArtifacts.map((artifact) => artifact.id),
-      body: JSON.stringify({
-        files: writtenFiles.map((relativePath) => `memory/${relativePath}`),
-      } satisfies FinalMemoryBatchArtifact),
-    });
-
-    return {
-      stageId: this.id,
-      status: 'success',
-      inputCount: rawArtifacts.length,
-      outputCount: files.length,
-      artifactIds: [descriptor.id],
-    };
+    let files: FinalMemoryFileBlock[];
+    try {
+      files = validateFinalMemoryFileBlocks(parseFinalMemoryFileBlocks(output));
+    } catch (error) {
+      if (
+        rawDocuments.length > 0 &&
+        error instanceof Error &&
+        error.message === 'Malformed final memory output: expected FILE comments followed by fenced markdown blocks.'
+      ) {
+        files = this.buildDeterministicFinalFiles(rawDocuments);
+      } else {
+        throw error;
+      }
+    }
+    return await this.persistFinalFiles(context, rawArtifacts, files);
   }
 
   private getMemoryStore(artifactStore: MemoryPipelineArtifactStore): MemoryRootArtifactStore {
@@ -165,6 +189,82 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
 
   private renderPromptInputFile(relativePath: string, content: string): string {
     return [`FILE: memories/${relativePath}`, content].join('\n');
+  }
+
+  private buildDeterministicFinalFiles(rawDocuments: RawMemoryDocument[]): FinalMemoryFileBlock[] {
+    const finalFiles: FinalMemoryFileBlock[] = rawDocuments.map((document) => ({
+      filePath: `final/${document.filePath}`,
+      content: renderFinalMemoryDocument({
+        filePath: `final/${document.filePath}`,
+        frontmatter: {
+          name: document.frontmatter.name,
+          description: document.frontmatter.description,
+          type: document.frontmatter.type,
+          scope: document.frontmatter.scope,
+          merged_from: [document.frontmatter.source_session.replace(/\.md$/, '')],
+        },
+        body: document.body,
+      }),
+    }));
+
+    const privateEntries = rawDocuments
+      .filter((document) => document.frontmatter.scope === 'private')
+      .map((document) => ({
+        title: document.frontmatter.name,
+        filename: document.filePath.split('/').pop() ?? document.filePath,
+        hook: document.frontmatter.description,
+      }));
+    const teamEntries = rawDocuments
+      .filter((document) => document.frontmatter.scope === 'team')
+      .map((document) => ({
+        title: document.frontmatter.name,
+        filename: document.filePath.split('/').pop() ?? document.filePath,
+        hook: document.frontmatter.description,
+      }));
+
+    finalFiles.push({
+      filePath: 'final/private/MEMORY.md',
+      content: renderMemoryIndex(privateEntries),
+    });
+    finalFiles.push({
+      filePath: 'final/team/MEMORY.md',
+      content: renderMemoryIndex(teamEntries),
+    });
+
+    return validateFinalMemoryFileBlocks(finalFiles);
+  }
+
+  private async persistFinalFiles(
+    context: MemoryPipelineContext,
+    rawArtifacts: ArtifactDescriptor[],
+    files: FinalMemoryFileBlock[],
+  ): Promise<PipelineStageResult> {
+    const artifactStore = this.getMemoryStore(context.artifactStore);
+    const writtenFiles = await Promise.all(
+      files.map((file) => artifactStore.writeMemoryFile(file.filePath, file.content)),
+    );
+
+    const descriptor = await context.artifactStore.writeArtifact({
+      runId: context.runId,
+      kind: 'final-memory-batch',
+      source: this.id,
+      upstreamIds: rawArtifacts.map((artifact) => artifact.id),
+      body: JSON.stringify({
+        files: writtenFiles.map((relativePath) => `memory/${relativePath}`),
+      } satisfies FinalMemoryBatchArtifact),
+    });
+    setMergedFinalOutputs(context.state, {
+      files: writtenFiles.map((relativePath) => `memory/${relativePath}`),
+      artifactId: descriptor.id,
+    });
+
+    return {
+      stageId: this.id,
+      status: 'success',
+      inputCount: rawArtifacts.length,
+      outputCount: files.length,
+      artifactIds: [descriptor.id],
+    };
   }
 
   private getProcessorFailure(result: Awaited<ReturnType<ModelProcessor['process']>>): string | null {

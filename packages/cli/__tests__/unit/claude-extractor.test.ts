@@ -17,14 +17,23 @@ vi.mock('node:child_process', () => ({
 function createSpawnProcess() {
   const stdout = new EventEmitter();
   const stderr = new EventEmitter();
+  const stdin = {
+    write: vi.fn(),
+    end: vi.fn(),
+  };
   const process = new EventEmitter() as EventEmitter & {
     stdout: EventEmitter;
     stderr: EventEmitter;
+    stdin: {
+      write: ReturnType<typeof vi.fn>;
+      end: ReturnType<typeof vi.fn>;
+    };
     kill: ReturnType<typeof vi.fn>;
   };
 
   process.stdout = stdout;
   process.stderr = stderr;
+  process.stdin = stdin;
   process.kill = vi.fn();
 
   return process;
@@ -143,7 +152,21 @@ describe('extractWithProvider', () => {
   });
 
   it('returns success with result content when using codex provider', async () => {
-    mockSpawnSuccess('codex-result\n');
+    spawnMock.mockImplementationOnce((_command, args) => {
+      const child = createSpawnProcess();
+
+      queueMicrotask(async () => {
+        const outputIndex = Array.isArray(args) ? args.indexOf('--output-last-message') : -1;
+        const outputPath =
+          outputIndex >= 0 && Array.isArray(args) ? String(args[outputIndex + 1]) : undefined;
+        if (outputPath) {
+          await import('node:fs/promises').then(({ writeFile }) => writeFile(outputPath, 'codex-result\n', 'utf8'));
+        }
+        child.emit('close', 0);
+      });
+
+      return child;
+    });
 
     const result = await extractWithProvider({ provider: 'codex', prompt: 'hello' });
 
@@ -208,18 +231,36 @@ describe('extractWithProvider', () => {
   });
 
   it('passes the normalized prompt to the codex runner', async () => {
-    mockSpawnSuccess('done');
+    spawnMock.mockImplementationOnce((_command, args) => {
+      const child = createSpawnProcess();
+
+      queueMicrotask(async () => {
+        const outputIndex = Array.isArray(args) ? args.indexOf('--output-last-message') : -1;
+        const outputPath =
+          outputIndex >= 0 && Array.isArray(args) ? String(args[outputIndex + 1]) : undefined;
+        if (outputPath) {
+          await import('node:fs/promises').then(({ writeFile }) => writeFile(outputPath, 'done\n', 'utf8'));
+        }
+        child.emit('close', 0);
+      });
+
+      return child;
+    });
 
     await extractWithProvider({ provider: 'codex', prompt: ['first', 'second'] });
 
     expect(spawnMock).toHaveBeenCalledTimes(1);
     expect(spawnMock).toHaveBeenCalledWith(
       'codex',
-      expect.arrayContaining(['exec', '--skip-git-repo-check', 'first\n\nsecond']),
+      expect.arrayContaining(['exec', '--skip-git-repo-check', '--output-last-message']),
       expect.objectContaining({
         stdio: expect.any(Array),
       }),
     );
+    expect(spawnMock.mock.calls[0]?.[1]).not.toContain('first\n\nsecond');
+    const child = spawnMock.mock.results[0]?.value;
+    expect(child.stdin.write).toHaveBeenCalledWith('first\n\nsecond');
+    expect(child.stdin.end).toHaveBeenCalled();
   });
 
   it('returns timeout when the claude process exceeds timeoutMs', async () => {
@@ -252,12 +293,39 @@ describe('provider-specific wrappers', () => {
   });
 
   it('exposes extractWithCodex directly', async () => {
-    mockSpawnSuccess('done');
+    spawnMock.mockImplementationOnce((_command, args) => {
+      const child = createSpawnProcess();
+
+      queueMicrotask(async () => {
+        const outputIndex = Array.isArray(args) ? args.indexOf('--output-last-message') : -1;
+        const outputPath =
+          outputIndex >= 0 && Array.isArray(args) ? String(args[outputIndex + 1]) : undefined;
+        if (outputPath) {
+          await import('node:fs/promises').then(({ writeFile }) => writeFile(outputPath, 'done\n', 'utf8'));
+        }
+        child.emit('close', 0);
+      });
+
+      return child;
+    });
 
     const result = await extractWithCodex({ prompt: 'hello' });
 
     expect(result.provider).toBe('codex');
     expect(result.status).toBe('success');
     expect(result.result).toBe('done');
+  });
+
+  it('returns an error when codex succeeds but does not write the last-message output file', async () => {
+    mockSpawnSuccess('hook noise only');
+
+    const result = await extractWithCodex({ prompt: 'hello' });
+
+    expect(result).toEqual({
+      provider: 'codex',
+      status: 'error',
+      result: null,
+      error: expect.stringContaining('last-message'),
+    });
   });
 });

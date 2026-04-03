@@ -1,191 +1,97 @@
 /**
  * CLI command - query
  *
- * Unified query entry point for both manual search and prompt-based runtime surface.
+ * Adapter-only command surface: parse args, validate flag combinations, delegate execution.
  */
 
-import chalk from 'chalk';
-import path from 'node:path';
-import type { Block } from '../../models/block.js';
-import { ConfigError } from '../../errors/index.js';
-import { QueryHistoryTracker } from '../../engine/query-history.js';
-import { ContextPusher } from '../../push/context.js';
-import { createQueryPack } from '../../runtime/query-pack.js';
-import { formatSurfaceItem, type RuntimeOutputFormat } from '../../runtime/render.js';
-import { generateRecall } from '../../runtime/recall.js';
-import { loadMemoryIndex } from '../../runtime/memory-index.js';
-import { generateRawTranscriptRecall } from '../../runtime/raw-recall.js';
-import { createCliContext } from '../context/create-context.js';
-import { createConfiguredCliContext } from '../context/configured-context.js';
-import type { CliContext } from '../context/types.js';
-import type { CorivoConfig } from '../../config.js';
-import type { RuntimeCommandOptions } from './runtime-support.js';
-import { loadRuntimeDb } from './runtime-support.js';
+import { Command } from 'commander';
+import type { Logger } from '@/utils/logging';
+import {
+  type PromptQueryCommandOptions,
+  type QueryOptions,
+  type SearchQueryCommandInput,
+} from '@/application/bootstrap/query-execution';
 
-export interface QueryOptions {
-  limit?: string;
-  verbose?: boolean;
-  pattern?: boolean;
-  prompt?: string;
-  format?: RuntimeOutputFormat;
+export {
+  type PromptQueryCommandOptions,
+  type QueryOptions,
+  type SearchQueryCommandInput,
+} from '@/application/bootstrap/query-execution';
+
+export interface QueryCommandDeps {
+  runPromptQuery?: (options: PromptQueryCommandOptions) => Promise<string>;
+  runSearchQuery?: (input: SearchQueryCommandInput) => Promise<void>;
+  writeOutput?: (text: string) => void;
+  logger?: Pick<Logger, 'debug'>;
 }
 
-type QueryConfig = CorivoConfig & {
-  encrypted_db_key?: unknown;
+const defaultQueryLogger: Pick<Logger, 'debug'> = {
+  debug: () => {},
 };
 
-interface SearchJsonResult {
-  mode: 'search';
-  query: string;
-  results: Block[];
-}
+const defaultWriteOutput = (text: string) => {
+  console.log(text);
+};
 
-export interface PromptQueryCommandOptions extends RuntimeCommandOptions {
-  prompt?: string;
-}
+const missingPromptExecutor = async (_options: PromptQueryCommandOptions): Promise<string> => {
+  throw new Error('query command requires injected runPromptQuery capability');
+};
 
-export async function runPromptQueryCommand(
-  options: PromptQueryCommandOptions = {},
-): Promise<string> {
-  const db = await loadRuntimeDb(options);
-  if (!db || !options.prompt) {
-    return '';
-  }
+const missingSearchExecutor = async (_input: SearchQueryCommandInput): Promise<void> => {
+  throw new Error('query command requires injected runSearchQuery capability');
+};
 
-  const queryPack = createQueryPack({ prompt: options.prompt });
-  const memoryIndex = await loadMemoryIndex();
-  const recall =
-    generateRecall(db, queryPack, { memoryIndex })
-    ?? await generateRawTranscriptRecall(db, queryPack);
-
-  return formatSurfaceItem(recall, options.format);
-}
-
-export async function queryCommand(rawQuery: string | undefined, options: QueryOptions): Promise<void> {
-  const commandContext = createCliContext();
+async function runQueryCommand(
+  rawQuery: string | undefined,
+  options: QueryOptions,
+  deps: Required<QueryCommandDeps>,
+): Promise<void> {
   const { query, prompt } = validateQueryInputs(rawQuery, options);
 
   if (prompt) {
     validatePromptQueryOptions(options);
-    const output = await runPromptQueryCommand({
+    deps.logger.debug(
+      `[query:command] prompt query format=${options.format ?? 'text'} promptLength=${prompt.length}`
+    );
+
+    const output = await deps.runPromptQuery({
       password: false,
       format: options.format ?? 'text',
       prompt,
     });
 
     if (output) {
-      commandContext.output.info(output);
+      deps.writeOutput(output);
     }
     return;
   }
 
-  const bootstrapContext = createCliContext();
-  const config = await loadQueryConfig(bootstrapContext);
-
-  if (!config) {
-    throw new ConfigError('Corivo is not initialized. Please run: corivo init');
-  }
-
-  const context = createConfiguredCliContext(config);
-  await runSearchQueryCommand(context, query, options, config);
+  deps.logger.debug(
+    `[query:command] search query="${query}" limit=${options.limit ?? '10'} format=${options.format ?? 'text'}`
+  );
+  await deps.runSearchQuery({ query, options });
 }
 
-async function runSearchQueryCommand(
-  context: CliContext,
-  query: string,
-  options: QueryOptions,
-  config: QueryConfig,
-): Promise<void> {
-  const output = context.output;
-  const format = options.format ?? 'text';
+export function createQueryCommand(deps: QueryCommandDeps = {}): Command {
+  const resolved: Required<QueryCommandDeps> = {
+    runPromptQuery: deps.runPromptQuery ?? missingPromptExecutor,
+    runSearchQuery: deps.runSearchQuery ?? missingSearchExecutor,
+    writeOutput: deps.writeOutput ?? defaultWriteOutput,
+    logger: deps.logger ?? defaultQueryLogger,
+  };
 
-  if (format === 'hook-text') {
-    throw new Error('--format hook-text is only supported with --prompt');
-  }
-
-  if (config.encrypted_db_key) {
-    throw new ConfigError('Detected a legacy password-based config. Corivo v0.10+ no longer supports passwords here; please run: corivo init');
-  }
-
-  const db = context.db.get({
-    path: context.paths.databasePath(),
-    enableEncryption: false,
-  });
-
-  const limit = parseLimit(options.limit);
-  const results = db.searchBlocks(query, limit);
-
-  if (format === 'json') {
-    output.info(JSON.stringify({
-      mode: 'search',
-      query,
-      results,
-    } satisfies SearchJsonResult));
-    return;
-  }
-
-  if (results.length === 0) {
-    output.info(chalk.yellow(`\nNo memories found related to "${query}"`));
-    return;
-  }
-
-  output.info(chalk.cyan(`\nFound ${results.length} related memories:\n`));
-
-  for (const block of results) {
-    output.info(chalk.gray(block.id) + ' ' + chalk.white(block.content));
-
-    const annotation = block.annotation || 'pending';
-    const statusColor = getStatusColor(block.status);
-    const statusText = statusColor(block.status);
-
-    output.info(
-      chalk.gray(`  Annotation: ${annotation} | Vitality: ${block.vitality} | Status: ${statusText}`)
-    );
-
-    if (options.verbose) {
-      output.info(chalk.gray(`  Access count: ${block.access_count}`));
-      if (block.last_accessed) {
-        const lastAccess = new Date(block.last_accessed);
-        const daysAgo = Math.floor((Date.now() - block.last_accessed) / 86400000);
-        output.info(chalk.gray(`  Last accessed: ${lastAccess.toLocaleString('en-US')} (${daysAgo} days ago)`));
-      }
-      if (block.pattern) {
-        output.info(chalk.gray(`  Pattern: ${block.pattern.type} - ${block.pattern.decision}`));
-      }
-    }
-
-    output.info('');
-  }
-
-  const pusher = new ContextPusher(db);
-  const queryTracker = new QueryHistoryTracker(db, {
-    logger: context.logger,
-    clock: context.clock,
-  });
-
-  queryTracker.recordQuery(query, results);
-
-  const similarReminder = queryTracker.findSimilarQueries(query);
-  if (similarReminder.hasSimilar) {
-    output.info(chalk.gray(similarReminder.message));
-  }
-
-  if (options.pattern) {
-    const patternContext = await pusher.pushPatterns(query, 3);
-    if (patternContext) {
-      output.info(patternContext);
-    }
-  }
-
-  const relatedContext = await pusher.pushContext(query, 5, {
-    showAnnotation: true,
-    showVitality: true,
-    showTime: options.verbose,
-  });
-
-  if (relatedContext) {
-    output.info(relatedContext);
-  }
+  return new Command('query')
+    .alias('recall')
+    .description('Query information')
+    .argument('[query]', 'Search keywords')
+    .option('-l, --limit <number>', 'Result limit')
+    .option('-v, --verbose', 'Show detailed information')
+    .option('-p, --pattern', 'Show decision patterns')
+    .option('--prompt <text>', 'Generate prompt-based query using the current user input')
+    .option('-f, --format <type>', 'Output format: text | json | hook-text', 'text')
+    .action(async (query, options: QueryOptions) => {
+      await runQueryCommand(query, options, resolved);
+    });
 }
 
 function validateQueryInputs(rawQuery: string | undefined, options: QueryOptions): {
@@ -221,43 +127,5 @@ function validatePromptQueryOptions(options: QueryOptions): void {
 
   if (options.pattern) {
     throw new Error('--pattern is only supported with <query>');
-  }
-}
-
-function parseLimit(limitOption?: string): number {
-  const limit = limitOption ? parseInt(limitOption, 10) : 10;
-  if (limitOption && isNaN(limit)) {
-    throw new Error('--limit must be a valid number');
-  }
-
-  return limit;
-}
-
-async function loadQueryConfig(context: CliContext): Promise<QueryConfig | null> {
-  const config = await context.config.load();
-  if (config) {
-    return config;
-  }
-
-  const configPath = path.join(context.paths.configDir(), 'config.json');
-  if (!(await context.fs.exists(configPath))) {
-    return null;
-  }
-
-  return context.fs.readJson<QueryConfig>(configPath);
-}
-
-function getStatusColor(status: string): (text: string) => string {
-  switch (status) {
-    case 'active':
-      return chalk.green;
-    case 'cooling':
-      return chalk.yellow;
-    case 'cold':
-      return chalk.hex('#FF9500');
-    case 'archived':
-      return chalk.gray;
-    default:
-      return chalk.gray;
   }
 }

@@ -2,61 +2,32 @@
  * Daemon command - internal use only, invoked by the service manager.
  */
 
-import { spawn } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
-import path from 'node:path'
-import { Command } from 'commander'
-import { createCliContext } from '../context/create-context.js'
+import { Command } from 'commander';
 
-export const daemonCommand = new Command('daemon')
+export interface DaemonCommandDeps {
+  runDaemon?: () => Promise<void>;
+  logger?: Pick<Console, 'log' | 'error'>;
+}
 
-daemonCommand
-  .description('Internal use only, invoked by the service manager')
+const defaultRunDaemon = async (): Promise<void> => {
+  throw new Error('daemon command requires injected runDaemon capability');
+};
 
-daemonCommand
-  .command('run')
-  .description('Run the heartbeat loop (invoked by the system, not intended for manual execution)')
-  .action(async () => {
-    const context = createCliContext({ fileLog: false })
-    const pidPath = context.paths.heartbeatPidPath()
+export function createDaemonCommand(deps: DaemonCommandDeps = {}): Command {
+  const runDaemon = deps.runDaemon ?? defaultRunDaemon;
+  const command = new Command('daemon');
 
-    // Write its own PID for TUI hook (useDaemon.ts) to detect the survival status
-    await context.fs.writeText(pidPath, String(process.pid))
+  command.description('Internal use only, invoked by the service manager');
+  command
+    .command('run')
+    .description('Run the heartbeat loop (invoked by the system, not intended for manual execution)')
+    .action(async () => {
+      await runDaemon();
+    });
 
-    // Parse the absolute path of dist/engine/heartbeat.js
-    // After tsup packaging, import.meta.url points to dist/cli/index.js
-    // ../engine/heartbeat.js is dist/engine/heartbeat.js
-    const heartbeatPath = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      '../engine/heartbeat.js'
-    )
+  return command;
+}
 
-    context.logger.log('[corivo] Starting heartbeat background worker...')
+export const daemonCommand = createDaemonCommand();
 
-    // Start heartbeat as an independent child process and inherit the environment variables injected by launchd
-    const child = spawn(process.execPath, [heartbeatPath], {
-      env: process.env,
-      stdio: 'inherit',
-    })
-
-    // When a signal is received, it is forwarded to the child process and the PID file is cleaned up.
-    const cleanup = (signal: NodeJS.Signals) => {
-      child.kill(signal)
-    }
-    process.once('SIGTERM', () => cleanup('SIGTERM'))
-    process.once('SIGINT', () => cleanup('SIGINT'))
-
-    // When the child process exits, clean the PID file and transparently transmit the exit code
-    child.once('exit', async (code) => {
-      await context.fs.remove(pidPath).catch(() => {})
-      process.exit(code ?? 1)
-    })
-
-    child.once('error', async (err) => {
-      context.logger.error('[corivo] Failed to start heartbeat child process:', err)
-      await context.fs.remove(pidPath).catch(() => {})
-      process.exit(1)
-    })
-  })
-
-export default daemonCommand
+export default daemonCommand;

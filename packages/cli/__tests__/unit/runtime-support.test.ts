@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ConfigError } from '../../src/errors/index.js';
-import { loadRuntimeDb } from '../../src/cli/commands/runtime-support.js';
+import { loadRuntimeDb } from '../../src/runtime/runtime-support.js';
 import {
   getConfigDir,
   getDefaultDatabasePath,

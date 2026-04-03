@@ -1,8 +1,8 @@
 import { Command } from 'commander';
 import { generateCarryOver } from '@/runtime/carry-over';
 import { formatSurfaceItem } from '@/runtime/render';
-import type { RuntimeCommandOptions } from './runtime-support.js';
-import { loadRuntimeDb } from './runtime-support.js';
+import type { RuntimeCommandOptions } from '@/runtime/runtime-support.js';
+import { loadRuntimeDb } from '@/runtime/runtime-support.js';
 import { createCliContext } from '../context/create-context.js';
 
 export async function runCarryOverCommand(

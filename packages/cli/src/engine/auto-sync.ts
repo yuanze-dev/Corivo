@@ -6,7 +6,7 @@
  */
 
 import type { CliContext } from '../cli/context/types.js';
-import { applyPulledChangesets, authenticate, post } from '../cli/commands/sync.js';
+import { applyPulledChangesets, authenticate, post, type PulledChangeset } from '../runtime/sync-client.js';
 import type { CorivoDatabase } from '../storage/database.js';
 
 const TOKEN_TTL = 4 * 60 * 1000; // 4 minutes (server TTL 5 minutes)
@@ -80,7 +80,7 @@ export class AutoSync {
         token,
         'pull'
       )) as {
-        changesets: import('../cli/commands/sync.js').PulledChangeset[];
+        changesets: PulledChangeset[];
         current_version: number;
       };
       logger.debug(

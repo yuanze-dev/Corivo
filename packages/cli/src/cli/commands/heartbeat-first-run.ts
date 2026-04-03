@@ -7,7 +7,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { Heartbeat } from '../../engine/heartbeat.js';
+import { runHeartbeatFirstRun } from '../../runtime/heartbeat-first-run.js';
 import { getConfigDir, getDefaultDatabasePath } from '@/storage/database';
 import { printBanner } from '@/utils/banner';
 import { createCliContext } from '../context/create-context.js';
@@ -42,9 +42,7 @@ firstRunCommand
       }
 
       const dbPath = process.env.CORIVO_DB_PATH || getDefaultDatabasePath();
-      const heartbeat = new Heartbeat({ dbPath });
-
-      const result = await heartbeat.runFirstRun({
+      const result = await runHeartbeatFirstRun(dbPath, {
         maxPendingBlocks: parseInt(options.maxPending, 10),
         timeLimit: parseInt(options.timeLimit, 10),
         skipDecay: options.decay === false,

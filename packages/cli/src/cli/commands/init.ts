@@ -24,7 +24,8 @@ import {
 import { saveConfig, saveSolverConfig, loadConfig, type CorivoConfig, type SolverConfig } from '../../config.js';
 import os from 'node:os';
 import { startCommand } from './start.js';
-import { registerWithSolver, post } from './sync.js';
+import { registerWithSolver } from './sync.js';
+import { post } from '../../runtime/sync-client.js';
 import { createCliContext } from '../context/create-context.js';
 import { readConfirm } from '../utils/password.js';
 import { printBanner } from '@/utils/banner';

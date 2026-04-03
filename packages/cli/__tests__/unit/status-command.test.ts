@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Command } from 'commander';
 
 const {
   readFile,
@@ -159,5 +160,83 @@ describe('statusCommand', () => {
         'corivo start | stop',
       ],
     });
+  });
+});
+
+describe('trial command constructors', () => {
+  it('host command delegates to injected capabilities', async () => {
+    const listHosts = vi.fn(() => [
+      { id: 'codex', displayName: 'Codex', capabilities: ['inject'] },
+    ]);
+    const installHost = vi.fn(async () => ({ success: true, host: 'codex', summary: 'installed' }));
+    const doctorHost = vi.fn(async () => ({ ok: true, host: 'codex', checks: [] }));
+    const uninstallHost = vi.fn(async () => ({ success: true, host: 'codex', summary: 'removed' }));
+    const writeInfo = vi.fn();
+    const writeError = vi.fn();
+    const writeSuccess = vi.fn();
+    const logger = { debug: vi.fn() };
+    const { createHostCommand } = await import('../../src/cli/commands/host.js');
+
+    const command = createHostCommand({
+      listHosts,
+      installHost,
+      doctorHost,
+      uninstallHost,
+      writeInfo,
+      writeError,
+      writeSuccess,
+      logger,
+      hostImportCommand: new Command('import'),
+    });
+
+    await command.parseAsync(['list'], { from: 'user' });
+    await command.parseAsync(['install', 'codex'], { from: 'user' });
+    await command.parseAsync(['doctor', 'codex'], { from: 'user' });
+    await command.parseAsync(['uninstall', 'codex'], { from: 'user' });
+
+    expect(listHosts).toHaveBeenCalledTimes(1);
+    expect(installHost).toHaveBeenCalledWith({ host: 'codex', target: undefined, force: undefined });
+    expect(doctorHost).toHaveBeenCalledWith({ host: 'codex', target: undefined });
+    expect(uninstallHost).toHaveBeenCalledWith({ host: 'codex', target: undefined });
+    expect(writeInfo).toHaveBeenCalled();
+  });
+
+  it('query command delegates to injected prompt/search executors', async () => {
+    const runPromptQuery = vi.fn(async () => '[corivo] prompt result');
+    const runSearchQuery = vi.fn(async () => {});
+    const writeOutput = vi.fn();
+    const logger = { debug: vi.fn() };
+    const { createQueryCommand } = await import('../../src/cli/commands/query.js');
+    const promptCommand = createQueryCommand({ runPromptQuery, runSearchQuery, writeOutput, logger });
+    const promptProgram = new Command();
+    promptProgram.addCommand(promptCommand);
+
+    await promptProgram.parseAsync(['node', 'corivo', 'query', '--prompt', 'hello']);
+
+    const searchCommand = createQueryCommand({ runPromptQuery, runSearchQuery, writeOutput, logger });
+    const searchProgram = new Command();
+    searchProgram.addCommand(searchCommand);
+    await searchProgram.parseAsync(['node', 'corivo', 'query', 'sqlite']);
+
+    expect(runPromptQuery).toHaveBeenCalledWith({
+      password: false,
+      format: 'text',
+      prompt: 'hello',
+    });
+    expect(runSearchQuery).toHaveBeenCalledWith({
+      query: 'sqlite',
+      options: { format: 'text' },
+    });
+    expect(writeOutput).toHaveBeenCalledWith('[corivo] prompt result');
+  });
+
+  it('daemon command delegates run behavior to injected executor', async () => {
+    const runDaemon = vi.fn(async () => {});
+    const logger = { log: vi.fn(), error: vi.fn() };
+    const { createDaemonCommand } = await import('../../src/cli/commands/daemon.js');
+    const command = createDaemonCommand({ runDaemon, logger });
+
+    await command.parseAsync(['run'], { from: 'user' });
+    expect(runDaemon).toHaveBeenCalledTimes(1);
   });
 });

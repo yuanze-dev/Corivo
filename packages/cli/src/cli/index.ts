@@ -12,12 +12,10 @@ import { dirname, join, resolve } from 'node:path';
 // import command
 import { initCommand } from './commands/init.js';
 import { saveCommand } from './commands/save.js';
-import { queryCommand } from './commands/query.js';
 import { startCommand } from './commands/start.js';
 import { stopCommand } from './commands/stop.js';
 import { doctorCommand } from './commands/doctor.js';
 import { recoverCommand } from './commands/recover.js';
-import { hostCommand } from './commands/host.js';
 import { identityCommand } from './commands/identity.js';
 import { setupPasswordCommand } from './commands/setup-password.js';
 import { unlockCommand } from './commands/unlock.js';
@@ -30,13 +28,13 @@ import { suggestCommand } from './commands/suggest.js';
 import { carryOverCommand } from './commands/carry-over.js';
 import { reviewCommand } from './commands/review.js';
 import { firstRunCommand } from './commands/heartbeat-first-run.js';
-import { daemonCommand } from './commands/daemon.js';
 import { updateCommand } from './commands/update.js';
 import { createSyncCommand } from './commands/sync.js';
 import { listCommand } from './commands/list.js';
-import { createMemoryCommand } from './commands/memory.js';
 import { ingestMessageCommand } from './commands/ingest-message.js';
-import { statusCommand } from '@/cli/commands/status';
+import { statusCommand } from './commands/status.js';
+import type { CliApp } from '@/application/bootstrap/types.js';
+import { createCliApp } from '@/application/bootstrap/create-cli-app.js';
 
 // Read version number
 const __filename = fileURLToPath(import.meta.url);
@@ -47,11 +45,13 @@ const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
 const VERSION = packageJson.version;
 
 type CliProgramOptions = {
+  app?: CliApp;
   memoryCommand?: Command;
 };
 
-export function createProgram({ memoryCommand = createMemoryCommand() }: CliProgramOptions = {}) {
+export function createProgram({ app = createCliApp(), memoryCommand }: CliProgramOptions = {}) {
   const program = new Command();
+  const resolvedMemoryCommand = memoryCommand ?? app.commands.memory;
 
   program.name('corivo').description('Your silicon teammate, alive only for you').version(VERSION);
 
@@ -71,17 +71,6 @@ export function createProgram({ memoryCommand = createMemoryCommand() }: CliProg
     .option('-s, --source <text>', 'Source')
     .option('--pending', 'Save in pending mode (the heartbeat process will annotate it later)')
     .action((options) => saveCommand(options));
-
-  program
-    .command('query')
-    .description('Query information')
-    .argument('[query]', 'Search keywords')
-    .option('-l, --limit <number>', 'Result limit', '10')
-    .option('-v, --verbose', 'Show detailed information')
-    .option('-p, --pattern', 'Show decision patterns')
-    .option('--prompt <text>', 'Generate prompt-based query using the current user input')
-    .option('-f, --format <type>', 'Output format: text | json | hook-text', 'text')
-    .action((query, options) => queryCommand(query, options));
 
   program
     .command('status')
@@ -119,9 +108,10 @@ export function createProgram({ memoryCommand = createMemoryCommand() }: CliProg
     .option('-v, --verbose', 'Show detailed information')
     .action((options) => verifyIdentityCommand(options));
 
+  program.addCommand(app.commands.query);
   program.addCommand(listCommand);
-  program.addCommand(memoryCommand);
-  program.addCommand(hostCommand);
+  program.addCommand(resolvedMemoryCommand);
+  program.addCommand(app.commands.host);
   program.addCommand(coldScanCommand);
   program.addCommand(pushCommand);
   program.addCommand(pushQueueCommand);
@@ -130,7 +120,7 @@ export function createProgram({ memoryCommand = createMemoryCommand() }: CliProg
   program.addCommand(reviewCommand);
   program.addCommand(suggestCommand);
   program.addCommand(firstRunCommand);
-  program.addCommand(daemonCommand);
+  program.addCommand(app.commands.daemon);
   program.addCommand(updateCommand);
   program.addCommand(createSyncCommand());
   program.addCommand(ingestMessageCommand);
@@ -148,8 +138,7 @@ export function createProgram({ memoryCommand = createMemoryCommand() }: CliProg
 
   return program;
 }
-
-const program = createProgram();
+let program: Command | undefined;
 
 const cliEntrypoint = join(__dirname, '../../bin/corivo.js');
 const parsedArgvOne = process.argv[1] ? resolve(process.argv[1]) : undefined;
@@ -158,6 +147,7 @@ const shouldParseCli = parsedArgvOne === __filename || parsedArgvOne === cliEntr
 export { program };
 
 if (shouldParseCli) {
+  program = createProgram();
   // Parse parameters
   program.parseAsync().catch((error) => {
     if (error instanceof Error) {

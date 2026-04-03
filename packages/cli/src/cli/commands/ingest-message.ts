@@ -7,7 +7,7 @@ import {
 } from '../../application/memory-ingest/ingest-realtime-message.js';
 import { MemoryProcessingJobQueue } from '../../raw-memory/job-queue.js';
 import { RawMemoryRepository } from '../../raw-memory/repository.js';
-import { loadRuntimeDb } from './runtime-support.js';
+import { loadRuntimeDb } from '@/runtime/runtime-support.js';
 
 const VALID_HOSTS = new Set([
   'claude-code',

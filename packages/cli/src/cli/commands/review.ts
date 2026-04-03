@@ -2,8 +2,8 @@ import { Command } from 'commander';
 import { createQueryPack } from '../../runtime/query-pack.js';
 import { formatSurfaceItem } from '../../runtime/render.js';
 import { generateReview } from '../../runtime/review.js';
-import type { RuntimeCommandOptions } from './runtime-support.js';
-import { loadRuntimeDb } from './runtime-support.js';
+import type { RuntimeCommandOptions } from '@/runtime/runtime-support.js';
+import { loadRuntimeDb } from '@/runtime/runtime-support.js';
 import { createCliContext } from '../context/create-context.js';
 
 export interface ReviewCommandOptions extends RuntimeCommandOptions {

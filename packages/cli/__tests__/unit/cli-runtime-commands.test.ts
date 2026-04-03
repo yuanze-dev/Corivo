@@ -4,7 +4,7 @@ import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Block } from '../../src/models/block.js';
 import { runCarryOverCommand } from '../../src/cli/commands/carry-over.js';
-import { runPromptQueryCommand } from '../../src/cli/commands/query.js';
+import { runPromptQueryCommand } from '../../src/application/bootstrap/query-execution.js';
 import { runReviewCommand } from '../../src/cli/commands/review.js';
 import { runSuggestCommand } from '../../src/cli/commands/suggest.js';
 
@@ -12,7 +12,7 @@ const { loadRuntimeDb } = vi.hoisted(() => ({
   loadRuntimeDb: vi.fn(),
 }));
 
-vi.mock('../../src/cli/commands/runtime-support.js', () => ({
+vi.mock('../../src/runtime/runtime-support.js', () => ({
   loadRuntimeDb,
 }));
 

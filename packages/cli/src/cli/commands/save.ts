@@ -10,7 +10,7 @@ import chalk from 'chalk';
 import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
 import { ConfigError, ValidationError } from '../../errors/index.js';
 import { validateAnnotation } from '../../models/index.js';
-import { ConflictDetector } from '../../engine/conflict-detector.js';
+import { detectConflictReminder } from '../../runtime/conflict-detection.js';
 import { createCliContext } from '../context/create-context.js';
 
 interface SaveOptions {
@@ -71,9 +71,8 @@ export async function saveCommand(options: SaveOptions): Promise<void> {
   });
 
   // Detect inconsistencies (alert like a friend)
-  const conflictDetector = new ConflictDetector();
   const existingBlocks = db.queryBlocks({ limit: 50 });
-  const conflictReminder = conflictDetector.detect(options.content, existingBlocks);
+  const conflictReminder = detectConflictReminder(options.content, existingBlocks);
 
   // Show results
   output.success(chalk.green('\n✅ Memory saved\n'));

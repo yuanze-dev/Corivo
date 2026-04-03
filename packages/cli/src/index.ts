@@ -4,6 +4,10 @@
  * it lives only for you
  */
 
+/**
+ * Root library entrypoint boundary:
+ * keep public runtime/library exports here; CLI command wiring stays in `src/cli/*`.
+ */
 export * from './models';
 export * from './errors';
 export * from './crypto/keys';

@@ -11,7 +11,7 @@ import type { HostImportRequest } from '@/application/hosts/import-host';
 import { HostImportCursorStore } from '@/raw-memory/import-cursors';
 import { MemoryProcessingJobQueue } from '@/raw-memory/job-queue';
 import { RawMemoryRepository } from '@/raw-memory/repository';
-import { loadRuntimeDb } from './runtime-support.js';
+import { loadRuntimeDb } from '@/runtime/runtime-support.js';
 import { createCliContext } from '@/cli/context';
 import { createConfiguredCliContext } from '@/cli/context';
 

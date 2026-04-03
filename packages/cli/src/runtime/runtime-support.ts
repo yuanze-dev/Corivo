@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
-import { ConfigError } from '../../errors/index.js';
+import { ConfigError } from '@/errors/index.js';
 
 export interface RuntimeCommandOptions {
   password?: boolean;

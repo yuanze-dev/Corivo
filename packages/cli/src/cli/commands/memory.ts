@@ -1,10 +1,8 @@
 import { Command } from 'commander';
-import { createCliContext } from '@/cli/context';
 import type { Logger } from '@/utils/logging';
 import type { ExtractionProvider } from '@/extraction/types';
 import {
   DEFAULT_MEMORY_PROVIDER,
-  runMemoryPipeline,
   type MemoryPipelineMode,
   type RunMemoryPipelineOptions,
 } from '@/application/memory/run-memory-pipeline';
@@ -12,7 +10,6 @@ import type { MemoryPipelineRunResult } from '@/memory-pipeline';
 
 export {
   DEFAULT_MEMORY_PROVIDER,
-  runMemoryPipeline,
   type MemoryPipelineExecutionDependencies,
   type MemoryPipelineMode,
   type RunMemoryPipelineOptions,
@@ -26,25 +23,27 @@ type MemoryCommandExecutor = (
 export interface MemoryCommandOptions {
   executor?: MemoryCommandExecutor;
   printer?: (result: MemoryPipelineRunResult) => void;
-  logger?: Logger;
+  logger?: Pick<Logger, 'debug'>;
 }
 
 function defaultPrinter(result: MemoryPipelineRunResult) {
-  const context = createCliContext();
   const stageIds = result.stages.map((stage) => stage.stageId);
   const stageSuffix = stageIds.length > 0 ? ` [stages: ${stageIds.join(', ')}]` : '';
-  context.output.info(
-    `Memory pipeline ${result.pipelineId} finished with status ${result.status} (run ${result.runId})${stageSuffix}`
-  );
+  console.log(`Memory pipeline ${result.pipelineId} finished with status ${result.status} (run ${result.runId})${stageSuffix}`);
 }
 
-const defaultExecutor: MemoryCommandExecutor = (mode, provider) =>
-  runMemoryPipeline({ mode, provider });
+const missingExecutor: MemoryCommandExecutor = async (_mode, _provider) => {
+  throw new Error('memory command requires injected executor capability');
+};
+
+const defaultLogger: Pick<Logger, 'debug'> = {
+  debug: () => {},
+};
 
 export function createMemoryCommand({
-  executor = defaultExecutor,
+  executor = missingExecutor,
   printer = defaultPrinter,
-  logger = createCliContext().logger,
+  logger = defaultLogger,
 }: MemoryCommandOptions = {}): Command {
   const memoryCommand = new Command('memory');
   memoryCommand.description('Manage memory pipelines');

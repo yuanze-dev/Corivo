@@ -7,8 +7,8 @@ import { AutoSync } from '../../src/engine/auto-sync.js';
 import type { CliContext } from '../../src/cli/context/types.js';
 import type { Logger } from '../../src/utils/logging.js';
 
-// Utility functions for the Mock sync command
-vi.mock('../../src/cli/commands/sync.js', () => ({
+// Utility functions for the mocked sync runtime seam
+vi.mock('../../src/runtime/sync-client.js', () => ({
   authenticate: vi.fn(),
   post: vi.fn(),
   applyPulledChangesets: vi.fn((db: { upsertBlock: (input: { id: string; content: string }) => void }, changesets: Array<{ table_name: string; pk: string; col_name: string | null; value: string | null }>) => {
@@ -23,7 +23,7 @@ vi.mock('../../src/cli/commands/sync.js', () => ({
   }),
 }));
 
-import { authenticate, post } from '../../src/cli/commands/sync.js';
+import { authenticate, post } from '../../src/runtime/sync-client.js';
 
 const mockAuthenticate = authenticate as ReturnType<typeof vi.fn>;
 const mockPost = post as ReturnType<typeof vi.fn>;

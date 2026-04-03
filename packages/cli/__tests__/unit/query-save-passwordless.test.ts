@@ -13,7 +13,8 @@ vi.mock('../../src/cli/utils/password.js', () => ({
 }));
 
 import { saveCommand } from '../../src/cli/commands/save.js';
-import { queryCommand } from '../../src/cli/commands/query.js';
+import { createQueryCommand } from '../../src/cli/commands/query.js';
+import { runSearchQueryCommand } from '../../src/application/bootstrap/query-execution.js';
 
 describe('save/query commands passwordless flow', () => {
   let tempHome: string;
@@ -55,13 +56,18 @@ describe('save/query commands passwordless flow', () => {
     expect(Object.keys(config)).not.toContain('db_key');
   });
 
-  it('queryCommand queries without prompting for a password', async () => {
+  it('query command queries without prompting for a password', async () => {
     await saveCommand({
       content: '决定继续使用 SQLite 作为本地存储',
       annotation: '决策 · project · storage',
     });
 
-    await queryCommand('SQLite', {});
+    const queryCommand = createQueryCommand({
+      runPromptQuery: async () => '',
+      runSearchQuery: (input) => runSearchQueryCommand(input),
+      writeOutput: () => {},
+    });
+    await queryCommand.parseAsync(['SQLite'], { from: 'user' });
 
     expect(readPassword).not.toHaveBeenCalled();
 

@@ -1,4 +1,5 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, expectTypeOf, it, vi, beforeEach } from 'vitest';
+import type { CliContext } from '../../src/cli/context/types.js';
 
 const { appendFile, access, readFile, writeFile, unlink, mkdir } = vi.hoisted(() => ({
   appendFile: vi.fn(),
@@ -59,6 +60,39 @@ describe('createCliContext', () => {
     expect(context.clock.now).toBeTypeOf('function');
     expect(context.output.info).toBeTypeOf('function');
     expect(context.db.get).toBeTypeOf('function');
+  });
+
+  it('keeps context limited to cross-cutting runtime capabilities only', () => {
+    const context = createCliContext({
+      logger: {
+        log: vi.fn(),
+        info: vi.fn(),
+        success: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+        isDebugEnabled: () => false,
+      },
+    });
+
+    expect(Object.keys(context).sort()).toEqual([
+      'clock',
+      'config',
+      'db',
+      'fs',
+      'logger',
+      'output',
+      'paths',
+    ]);
+  });
+
+  it('does not allow business actions on CliContext type', () => {
+    type AllowedCliContextKeys = 'logger' | 'config' | 'paths' | 'fs' | 'clock' | 'output' | 'db';
+    type UnexpectedKeys = Exclude<keyof CliContext, AllowedCliContextKeys>;
+    type MissingKeys = Exclude<AllowedCliContextKeys, keyof CliContext>;
+
+    expectTypeOf<UnexpectedKeys>().toEqualTypeOf<never>();
+    expectTypeOf<MissingKeys>().toEqualTypeOf<never>();
   });
 
   it('writes command output into cli.log by default', () => {

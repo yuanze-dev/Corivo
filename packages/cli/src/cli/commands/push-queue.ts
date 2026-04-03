@@ -4,11 +4,8 @@
  * Manages the push queue (internal command, called by hooks).
  */
 
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import { Command } from 'commander';
-import { getConfigDir } from '@/storage/database';
-import { PushQueue } from '../../engine/push-queue.js';
+import { createRuntimePushQueue } from '../../runtime/push-queue.js';
 import { createCliContext } from '../context/create-context.js';
 
 export const pushQueueCommand = new Command('push-queue');
@@ -24,7 +21,7 @@ pushQueueCommand
     const context = createCliContext();
     const output = context.output;
     try {
-      const queue = new PushQueue();
+      const queue = createRuntimePushQueue();
       await queue.load();
 
       // Handle clear
@@ -78,7 +75,8 @@ pushQueueCommand
         output.info('');
       }
     } catch (error) {
-      output.info('');
+      output.error('Push queue command failed:', error instanceof Error ? error.message : String(error));
+      process.exit(1);
     }
   });
 

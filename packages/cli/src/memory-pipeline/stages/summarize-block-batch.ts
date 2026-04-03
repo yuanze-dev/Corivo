@@ -1,4 +1,5 @@
 import type { MemoryPipelineContext, MemoryPipelineStage, PipelineStageResult } from '../types.js';
+import { parseRawMemoryDocument } from '../markdown/raw-memory-parser.js';
 import { getClaimedRawSessionJobs } from '../pipeline-state.js';
 import { buildRawExtractionPrompt } from '../prompts/raw-extraction-prompt.js';
 import type {
@@ -75,7 +76,7 @@ export const createSummarizeBlockBatchStage = (
       if (transcriptDerived) {
         const claimedJobs = getClaimedRawSessionJobs(context.state);
         const rawDescriptors = await Promise.all(
-          result.outputs.map((markdown, index) =>
+          result.outputs.map((rawPayload, index) =>
             context.artifactStore.writeArtifact({
               runId: context.runId,
               kind: 'raw-memory-batch',
@@ -85,7 +86,7 @@ export const createSummarizeBlockBatchStage = (
                   claimedJobs[outputIndexes[index] ?? index]?.session.externalSessionId ??
                   claimedJobs[outputIndexes[index] ?? index]?.sessionKey ??
                   `session-${(outputIndexes[index] ?? index) + 1}`,
-                markdown,
+                items: parseRawMemoryDocument(rawPayload).items,
               }),
             })
           )

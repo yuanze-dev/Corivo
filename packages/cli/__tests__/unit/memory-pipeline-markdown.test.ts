@@ -23,9 +23,8 @@ Keep PRs narrowly scoped and easy to review.
 `);
 
     expect(parsed.noMemories).toBe(false);
-    expect(parsed.documents).toHaveLength(1);
-    expect(parsed.documents[0]).toMatchObject({
-      filePath: 'private/user-short-prs.md',
+    expect(parsed.items).toHaveLength(1);
+    expect(parsed.items[0]).toMatchObject({
       frontmatter: {
         name: 'User prefers short PRs',
         description: 'User usually wants small reviewable pull requests',
@@ -53,9 +52,12 @@ The user explicitly asked to forget this memory.
 \`\`\`
 `);
 
-    expect(parsed.documents[0]?.frontmatter.forget).toBe(true);
+    expect(parsed.items[0]?.frontmatter.forget).toBe(true);
 
-    const rendered = renderRawMemoryDocument(parsed.documents[0]!);
+    const rendered = renderRawMemoryDocument({
+      filePath: 'private/user-short-prs.md',
+      ...parsed.items[0]!,
+    });
     expect(rendered).toContain('forget: true');
   });
 
@@ -64,7 +66,7 @@ The user explicitly asked to forget this memory.
 
     expect(parsed).toEqual({
       noMemories: true,
-      documents: [],
+      items: [],
     });
   });
 

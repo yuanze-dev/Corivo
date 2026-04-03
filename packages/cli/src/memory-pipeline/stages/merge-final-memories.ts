@@ -7,9 +7,11 @@ import type {
 } from '@/memory-pipeline';
 import {
   buildFinalMergePrompt,
+  materializeRawMemoryDocuments,
   parseFinalMemoryFileBlocks,
   parseRawMemoryDocument,
   renderFinalMemoryDocument,
+  renderRawMemoryDocument,
   renderMemoryIndex,
   validateFinalMemoryFileBlocks,
 } from '@/memory-pipeline';
@@ -30,6 +32,12 @@ interface MemoryRootArtifactStore extends MemoryPipelineArtifactStore {
   writeMemoryFile(relativePath: string, body: string): Promise<string>;
   readMemoryFile(relativePath: string): Promise<string>;
   listMemoryFiles(relativeDir?: string): Promise<string[]>;
+}
+
+interface ParsedRawBatch {
+  sessionId: string;
+  items: RawMemoryBatchArtifact['items'];
+  documents?: RawMemoryDocument[];
 }
 
 export interface MergeFinalMemoriesStageOptions {
@@ -74,11 +82,13 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
 
     const rawFiles = await Promise.all(
       rawBatches
-        .filter(({ batch }) => !parseRawMemoryDocument(batch.markdown).noMemories)
+        .filter(({ batch }) => batch.items.length > 0)
         .map(async ({ batch }) => {
           const relativePath = `raw/${batch.sessionId}.memories.md`;
-          await artifactStore.writeMemoryFile(relativePath, batch.markdown);
-          return this.renderPromptInputFile(relativePath, batch.markdown);
+          const rawDocuments = batch.documents ?? materializeRawMemoryDocuments(batch.items);
+          const content = rawDocuments.map((document) => renderRawMemoryDocument(document)).join('\n\n');
+          await artifactStore.writeMemoryFile(relativePath, content);
+          return this.renderPromptInputFile(relativePath, content);
         })
     );
 
@@ -102,8 +112,8 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
     const existingFinalDetailPaths = existingFinalPaths.filter(
       (relativePath) => !relativePath.endsWith('/MEMORY.md')
     );
-    const rawDocuments = rawBatches.flatMap(
-      ({ batch }) => parseRawMemoryDocument(batch.markdown).documents
+    const rawDocuments = rawBatches.flatMap(({ batch }) =>
+      batch.documents ?? materializeRawMemoryDocuments(batch.items)
     );
 
     if (existingFinalDetailPaths.length === 0 && rawFiles.length === 1) {
@@ -175,24 +185,35 @@ export class MergeFinalMemoriesStage implements MemoryPipelineStage {
   private async readRawBatch(
     context: MemoryPipelineContext,
     artifact: ArtifactDescriptor
-  ): Promise<RawMemoryBatchArtifact> {
+  ): Promise<ParsedRawBatch> {
     const body = await context.artifactStore.readArtifact(artifact.id);
-    const parsed = JSON.parse(body) as Partial<RawMemoryBatchArtifact>;
+    const parsed = JSON.parse(body) as Partial<RawMemoryBatchArtifact> & { markdown?: string };
 
-    if (
-      typeof parsed.sessionId !== 'string' ||
-      parsed.sessionId.trim().length === 0 ||
-      typeof parsed.markdown !== 'string'
-    ) {
+    if (typeof parsed.sessionId !== 'string' || parsed.sessionId.trim().length === 0) {
       throw new Error(
-        'MergeFinalMemoriesStage requires raw-memory-batch artifacts with sessionId and markdown'
+        'MergeFinalMemoriesStage requires raw-memory-batch artifacts with sessionId and items'
       );
     }
 
-    return {
-      sessionId: parsed.sessionId,
-      markdown: parsed.markdown,
-    };
+    if (Array.isArray(parsed.items)) {
+      return {
+        sessionId: parsed.sessionId,
+        items: parsed.items,
+      };
+    }
+
+    if (typeof parsed.markdown === 'string') {
+      const document = parseRawMemoryDocument(parsed.markdown);
+      return {
+        sessionId: parsed.sessionId,
+        items: document.items,
+        documents: document.documents,
+      };
+    }
+
+    throw new Error(
+      'MergeFinalMemoriesStage requires raw-memory-batch artifacts with sessionId and items',
+    );
   }
 
   private renderPromptInputFile(relativePath: string, content: string): string {

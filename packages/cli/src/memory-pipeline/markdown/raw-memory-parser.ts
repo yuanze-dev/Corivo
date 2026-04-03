@@ -3,25 +3,46 @@ import type {
   ParsedRawMemoryDocument,
   RawMemoryDocument,
   RawMemoryFrontmatter,
+  RawMemoryItem,
 } from '../contracts/memory-documents.js';
 import { MEMORY_SCOPES } from '../contracts/memory-documents.js';
 import { MEMORY_TYPES, type MemoryType } from '../prompts/memory-types.js';
 
-const NO_MEMORIES_MARKER = '<!-- NO_MEMORIES -->';
+const LEGACY_NO_MEMORIES_MARKER = '<!-- NO_MEMORIES -->';
+const JSON_NO_MEMORIES = '{"items":[]}';
 const FILE_BLOCK_PATTERN =
   /<!--\s*FILE:\s*([^\s].*?)\s*-->\s*```markdown\s*([\s\S]*?)\s*```/g;
 const FILE_PATH_PATTERN = /^(private|team)\/([A-Za-z0-9._-]+)\.md$/;
 
-export function parseRawMemoryDocument(markdown: string): ParsedRawMemoryDocument {
-  const trimmed = markdown.trim();
+export function parseRawMemoryDocument(payload: string): ParsedRawMemoryDocument {
+  const trimmed = payload.trim();
 
-  if (trimmed === NO_MEMORIES_MARKER) {
+  if (trimmed === LEGACY_NO_MEMORIES_MARKER || trimmed === JSON_NO_MEMORIES) {
     return {
       noMemories: true,
-      documents: [],
+      items: [],
     };
   }
 
+  if (trimmed.startsWith('<!-- FILE:')) {
+    return parseLegacyMarkdown(trimmed);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    throw new Error('Malformed raw memory document: expected JSON object payload with an "items" array.');
+  }
+
+  const items = parseItems(parsed);
+  return {
+    noMemories: items.length === 0,
+    items,
+  };
+}
+
+function parseLegacyMarkdown(trimmed: string): ParsedRawMemoryDocument {
   const documents: RawMemoryDocument[] = [];
   let matchedAny = false;
   let cursor = 0;
@@ -38,8 +59,8 @@ export function parseRawMemoryDocument(markdown: string): ParsedRawMemoryDocumen
     matchedAny = true;
     cursor = matchEnd;
     const normalizedFilePath = filePath.trim();
-    const parsedDocument = parseMarkdownBlock(blockBody);
-    validateFilePath(normalizedFilePath, parsedDocument.frontmatter.scope);
+    const parsedDocument = parseLegacyMarkdownBlock(blockBody);
+    validateLegacyFilePath(normalizedFilePath, parsedDocument.frontmatter.scope);
 
     documents.push({
       filePath: normalizedFilePath,
@@ -53,11 +74,58 @@ export function parseRawMemoryDocument(markdown: string): ParsedRawMemoryDocumen
 
   return {
     noMemories: false,
+    items: documents.map(({ frontmatter, body }) => ({ frontmatter, body })),
     documents,
   };
 }
 
-function parseMarkdownBlock(blockBody: string): Omit<RawMemoryDocument, 'filePath'> {
+export function materializeRawMemoryDocuments(items: RawMemoryItem[]): RawMemoryDocument[] {
+  const counters = new Map<string, number>();
+
+  return items.map((item) => {
+    const slugBase = slugify(item.frontmatter.name);
+    const key = `${item.frontmatter.scope}:${slugBase}`;
+    const nextCount = (counters.get(key) ?? 0) + 1;
+    counters.set(key, nextCount);
+    const slug = nextCount === 1 ? slugBase : `${slugBase}-${nextCount}`;
+
+    return {
+      filePath: `${item.frontmatter.scope}/${slug}.md`,
+      frontmatter: item.frontmatter,
+      body: item.body,
+    };
+  });
+}
+
+function parseItems(parsed: unknown): RawMemoryItem[] {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Malformed raw memory document: top-level payload must be an object.');
+  }
+
+  const itemsValue = (parsed as { items?: unknown }).items;
+  if (!Array.isArray(itemsValue)) {
+    throw new Error('Malformed raw memory document: expected top-level "items" array.');
+  }
+
+  return itemsValue.map((item, index) => parseItem(item, index));
+}
+
+function parseItem(item: unknown, index: number): RawMemoryItem {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    throw new Error(`Malformed raw memory document: item ${index} must be an object.`);
+  }
+
+  const record = item as Record<string, unknown>;
+  const frontmatter = parseFrontmatter(record.frontmatter, index);
+  const body = requireNonEmpty(asString(record.body), `items[${index}].body`);
+
+  return {
+    frontmatter,
+    body,
+  };
+}
+
+function parseLegacyMarkdownBlock(blockBody: string): Omit<RawMemoryDocument, 'filePath'> {
   const normalized = blockBody.trim();
 
   if (!normalized.startsWith('---')) {
@@ -73,13 +141,36 @@ function parseMarkdownBlock(blockBody: string): Omit<RawMemoryDocument, 'filePat
   const body = normalized.slice(frontmatterEnd + 4).trim();
 
   return {
-    frontmatter: parseFrontmatter(frontmatterBody),
+    frontmatter: parseFrontmatter(Object.fromEntries(parseFrontmatterEntries(frontmatterBody)), -1),
     body,
   };
 }
 
-function parseFrontmatter(frontmatterBody: string): RawMemoryFrontmatter {
-  const entries = frontmatterBody
+function parseFrontmatter(value: unknown, index: number): RawMemoryFrontmatter {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`Malformed raw memory document: items[${index}].frontmatter must be an object.`);
+  }
+
+  const frontmatter = value as Record<string, unknown>;
+  const name = requireNonEmpty(asString(frontmatter.name), 'name');
+  const description = requireNonEmpty(asString(frontmatter.description), 'description');
+  const type = parseMemoryType(asString(frontmatter.type));
+  const scope = parseMemoryScope(asString(frontmatter.scope));
+  const sourceSession = requireNonEmpty(asString(frontmatter.source_session), 'source_session');
+  const forget = frontmatter.forget;
+
+  return {
+    name,
+    description,
+    type,
+    scope,
+    source_session: sourceSession,
+    ...(forget === undefined ? {} : { forget: parseForgetValue(forget) }),
+  };
+}
+
+function parseFrontmatterEntries(frontmatterBody: string): Array<readonly [string, string]> {
+  return frontmatterBody
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
@@ -91,23 +182,10 @@ function parseFrontmatter(frontmatterBody: string): RawMemoryFrontmatter {
 
       return [line.slice(0, separator).trim(), line.slice(separator + 1).trim()] as const;
     });
+}
 
-  const frontmatter = Object.fromEntries(entries) as Record<string, string>;
-
-  const name = requireNonEmpty(frontmatter.name, 'name');
-  const description = requireNonEmpty(frontmatter.description, 'description');
-  const type = parseMemoryType(frontmatter.type);
-  const scope = parseMemoryScope(frontmatter.scope);
-  const sourceSession = requireNonEmpty(frontmatter.source_session, 'source_session');
-
-  return {
-    name,
-    description,
-    type,
-    scope,
-    source_session: sourceSession,
-    ...(frontmatter.forget ? { forget: parseForgetValue(frontmatter.forget) } : {}),
-  };
+function asString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
 }
 
 function requireNonEmpty(value: string | undefined, key: string): string {
@@ -138,9 +216,16 @@ function parseMemoryScope(value: string | undefined): MemoryScope {
   return normalized as MemoryScope;
 }
 
-function parseForgetValue(value: string): boolean | string {
-  const normalized = value.trim().toLowerCase();
+function parseForgetValue(value: unknown): boolean | string {
+  if (typeof value === 'boolean') {
+    return value;
+  }
 
+  if (typeof value !== 'string') {
+    throw new Error('Invalid raw memory frontmatter: forget must be a boolean or string.');
+  }
+
+  const normalized = value.trim().toLowerCase();
   if (normalized === 'true') {
     return true;
   }
@@ -152,7 +237,7 @@ function parseForgetValue(value: string): boolean | string {
   return value.trim();
 }
 
-function validateFilePath(filePath: string, scope: MemoryScope): void {
+function validateLegacyFilePath(filePath: string, scope: MemoryScope): void {
   const match = FILE_PATH_PATTERN.exec(filePath);
 
   if (!match) {
@@ -172,4 +257,13 @@ function validateFilePath(filePath: string, scope: MemoryScope): void {
   if (filename === '.' || filename === '..') {
     throw new Error('Invalid raw memory file path: traversal segments are not allowed.');
   }
+}
+
+function slugify(input: string): string {
+  const normalized = input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return normalized || 'memory';
 }

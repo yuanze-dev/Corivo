@@ -21,12 +21,15 @@ describe('memory pipeline prompts', () => {
     expect(prompt).toContain('If the user explicitly asks you to remember something');
     expect(prompt).toContain('If the user explicitly asks you to forget something');
     expect(prompt).toContain(
-      'If a session has NO memories worth extracting, output exactly: <!-- NO_MEMORIES -->',
+      'If a session has NO memories worth extracting, output exactly: {"items":[]}',
     );
-    expect(prompt).toContain('<!-- FILE: {scope}/{filename}.md -->');
-    expect(prompt).toContain('type: {user, feedback, project, reference}');
-    expect(prompt).toContain('scope: {private, team}');
-    expect(prompt).toContain('source_session: {session filename}');
+    expect(prompt).toContain('"items"');
+    expect(prompt).toContain('"frontmatter"');
+    expect(prompt).toContain('"body"');
+    expect(prompt).toContain('"type": "{user, feedback, project, reference}"');
+    expect(prompt).toContain('"scope": "{private, team}"');
+    expect(prompt).toContain('"source_session": "{session filename}"');
+    expect(prompt).toContain('Do not include any file path or directory fields.');
     expect(prompt).toContain(WHAT_NOT_TO_SAVE_SECTION);
     expect(prompt).toContain(
       'Do not save code patterns, coding conventions, architecture, file paths, or project structure as memories.',

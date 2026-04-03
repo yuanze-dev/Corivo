@@ -1,4 +1,5 @@
 import type { SessionRecord } from '../contracts/session-record.js';
+import { parseRawMemoryDocument } from '../markdown/raw-memory-parser.js';
 import { buildRawExtractionPrompt } from '../prompts/raw-extraction-prompt.js';
 import { recordExtractedRawMemory } from '../pipeline-state.js';
 import type { ModelProcessor } from '../processors/model-processor.js';
@@ -64,7 +65,7 @@ export const createExtractRawMemoriesStage = (
             failures.push(failure);
             continue;
           }
-          const markdown = resolveMarkdown(result.outputs);
+          const items = resolveItems(result.outputs);
           const descriptor = await context.artifactStore.writeArtifact({
             runId: context.runId,
             kind: 'raw-memory-batch',
@@ -72,7 +73,9 @@ export const createExtractRawMemoriesStage = (
             upstreamIds: [artifact.id],
             body: JSON.stringify({
               sessionId: session.sessionId,
-              markdown,
+              ...(items.length === 0
+                ? { markdown: '<!-- NO_MEMORIES -->' }
+                : { items }),
             }),
           });
           recordExtractedRawMemory(context.state, {
@@ -121,7 +124,7 @@ const normalizeRole = (role: string): string => {
   return role.charAt(0).toUpperCase() + role.slice(1);
 };
 
-const resolveMarkdown = (outputs: string[]): string => outputs[0] ?? '<!-- NO_MEMORIES -->';
+const resolveItems = (outputs: string[]) => parseRawMemoryDocument(outputs[0] ?? '{"items":[]}').items;
 
 const getValidatedSession = (workItem: SessionWorkItem): SessionRecord => {
   const session = workItem.metadata?.session;

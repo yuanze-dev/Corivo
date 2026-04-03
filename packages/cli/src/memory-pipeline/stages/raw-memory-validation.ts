@@ -7,7 +7,7 @@ import type {
 } from '../processors/model-processor.js';
 
 const RAW_OUTPUT_RETRY_LIMIT = 1;
-const NO_MEMORIES_MARKER = '<!-- NO_MEMORIES -->';
+const NO_MEMORIES_MARKER = '{"items":[]}';
 
 export interface RawMemoryValidationResult {
   outputs: string[];
@@ -30,11 +30,11 @@ export async function processRawMemoryWithValidation(
       return result;
     }
 
-    const markdown = resolveMarkdown(result.outputs);
-    const validationError = validateRawMarkdown(markdown);
+    const rawPayload = resolveRawPayload(result.outputs);
+    const validationError = validateRawPayload(rawPayload);
     if (!validationError) {
       return {
-        outputs: [markdown],
+        outputs: [rawPayload],
         metadata: result.metadata,
       };
     }
@@ -51,20 +51,20 @@ export async function processRawMemoryWithValidation(
       };
     }
 
-    currentPrompt = buildRawMemoryRetryPrompt(prompt, markdown, validationError.message);
+    currentPrompt = buildRawMemoryRetryPrompt(prompt, rawPayload, validationError.message);
   }
 
   return lastResult ?? { outputs: [] };
 }
 
-function resolveMarkdown(outputs: string[]): string {
+function resolveRawPayload(outputs: string[]): string {
   const firstOutput = outputs.find((output) => output.trim().length > 0);
   return (firstOutput ?? NO_MEMORIES_MARKER).trim();
 }
 
-function validateRawMarkdown(markdown: string): Error | null {
+function validateRawPayload(rawPayload: string): Error | null {
   try {
-    parseRawMemoryDocument(markdown);
+    parseRawMemoryDocument(rawPayload);
     return null;
   } catch (error) {
     return error instanceof Error ? error : new Error(String(error));
@@ -80,7 +80,7 @@ function isProcessorFailure(result: ModelProcessorResult): boolean {
 
 function buildRawMemoryRetryPrompt(
   originalPrompt: string,
-  invalidMarkdown: string,
+  invalidPayload: string,
   validationError: string,
 ): string {
   return [
@@ -88,11 +88,10 @@ function buildRawMemoryRetryPrompt(
     '## Correction required',
     'Your previous raw memory output was invalid.',
     `Validation error: ${validationError}`,
-    'Return the complete corrected raw memory output again.',
-    'Do not add commentary outside the required FILE markdown blocks.',
-    'Do not use paths like memories/final/... or any extra directories.',
-    'Use exactly {scope}/{filename}.md where scope is private or team.',
+    'Return the complete corrected JSON payload again.',
+    'Return only valid JSON with a top-level "items" array.',
+    'Do not return markdown fences, FILE comments, or file path fields.',
     'Previous invalid output:',
-    invalidMarkdown,
+    invalidPayload,
   ].join('\n\n');
 }

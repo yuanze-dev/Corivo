@@ -43,6 +43,28 @@ import {
 } from '../../src/memory-pipeline/pipeline-state.js';
 import { buildRawExtractionPrompt } from '../../src/memory-pipeline/prompts/raw-extraction-prompt.js';
 
+const buildRawMemoryItems = (input: {
+  name: string;
+  description: string;
+  type: 'user' | 'feedback' | 'project' | 'reference';
+  scope: 'private' | 'team';
+  sourceSession: string;
+  body: string;
+  forget?: boolean | string;
+}) => [
+  {
+    frontmatter: {
+      name: input.name,
+      description: input.description,
+      type: input.type,
+      scope: input.scope,
+      source_session: input.sourceSession,
+      ...(input.forget === undefined ? {} : { forget: input.forget }),
+    },
+    body: input.body,
+  },
+];
+
 const buildRawMemoryMarkdown = (input: {
   filePath: string;
   name: string;
@@ -803,7 +825,14 @@ Prefer small, reviewable pull requests by default.
     );
     expect(JSON.parse(store.writes[0].body)).toEqual({
       sessionId: 'sess-1',
-      markdown: expectedMarkdown,
+      items: buildRawMemoryItems({
+        name: 'Session memory',
+        description: 'Remembered from session transcript',
+        type: 'user',
+        scope: 'private',
+        sourceSession: 'sess-1.md',
+        body: 'remembered from transcript',
+      }),
     });
     expect(store.writes[0]).toMatchObject({
       runId: 'run-session-job-summary',
@@ -970,11 +999,25 @@ Prefer small, reviewable pull requests by default.
     expect(processor.process).toHaveBeenNthCalledWith(2, [expectedSecondPrompt], { timeoutMs: 34500 });
     expect(JSON.parse(store.writes[0].body)).toEqual({
       sessionId: 'sess-1',
-      markdown: expectedFirstMarkdown,
+      items: buildRawMemoryItems({
+        name: 'Session memory one',
+        description: 'Remembered from first transcript',
+        type: 'user',
+        scope: 'private',
+        sourceSession: 'sess-1.md',
+        body: 'summary one',
+      }),
     });
     expect(JSON.parse(store.writes[1].body)).toEqual({
       sessionId: 'sess-2',
-      markdown: expectedSecondMarkdown,
+      items: buildRawMemoryItems({
+        name: 'Session memory two',
+        description: 'Remembered from second transcript',
+        type: 'user',
+        scope: 'private',
+        sourceSession: 'sess-2.md',
+        body: 'summary two',
+      }),
     });
     expect(JSON.parse(store.writes[2].body)).toEqual({
       runId: 'run-session-job-summary-multi',
@@ -1434,8 +1477,7 @@ Prefer small, reviewable pull requests by default.
     });
     expect(JSON.parse(store.writes[0].body)).toEqual({
       sessionId: 'sess-partial-1',
-      markdown: buildRawMemoryMarkdown({
-        filePath: 'private/memory-1.md',
+      items: buildRawMemoryItems({
         name: 'Memory one',
         description: 'First recovered memory',
         type: 'user',
@@ -1446,8 +1488,7 @@ Prefer small, reviewable pull requests by default.
     });
     expect(JSON.parse(store.writes[1].body)).toEqual({
       sessionId: 'sess-partial-3',
-      markdown: buildRawMemoryMarkdown({
-        filePath: 'private/memory-3.md',
+      items: buildRawMemoryItems({
         name: 'Memory three',
         description: 'Third recovered memory',
         type: 'user',
@@ -1625,7 +1666,14 @@ The user says their English name is Sean.
     });
     expect(JSON.parse(store.writes[0].body)).toEqual({
       sessionId: 'sess-retry-path',
-      markdown: validMarkdown.trim(),
+      items: buildRawMemoryItems({
+        name: 'User english name',
+        description: 'User says their English name is Sean',
+        type: 'user',
+        scope: 'private',
+        sourceSession: 'sess-retry-path.md',
+        body: 'The user says their English name is Sean.',
+      }),
     });
   });
 
@@ -1917,8 +1965,7 @@ The user says their English name is Sean.
     ]);
     expect(JSON.parse(store.writes[1].body)).toEqual({
       sessionId: 'session-1',
-      markdown: buildRawMemoryMarkdown({
-        filePath: 'private/short-prs.md',
+      items: buildRawMemoryItems({
         name: 'Short PR preference',
         description: 'User prefers short PR descriptions',
         type: 'user',
@@ -1929,7 +1976,7 @@ The user says their English name is Sean.
     });
     expect(JSON.parse(store.writes[2].body)).toEqual({
       sessionId: 'session-2',
-      markdown: '<!-- NO_MEMORIES -->',
+      items: [],
     });
     expect(result).toMatchObject({
       stageId: stage.id,
@@ -2022,8 +2069,7 @@ The user says their English name is Sean.
     expect(store.writes).toHaveLength(2);
     expect(JSON.parse(store.writes[1].body)).toEqual({
       sessionId: 'session-1',
-      markdown: buildRawMemoryMarkdown({
-        filePath: 'private/pr-style.md',
+      items: buildRawMemoryItems({
         name: 'PR style preference',
         description: 'User prefers short PRs',
         type: 'user',
@@ -2113,7 +2159,14 @@ The user says their English name is Sean.
     });
     expect(JSON.parse(store.writes[1].body)).toEqual({
       sessionId: 'session-retry-1',
-      markdown: validMarkdown.trim(),
+      items: buildRawMemoryItems({
+        name: 'User english name',
+        description: 'User says their English name is Sean',
+        type: 'user',
+        scope: 'private',
+        sourceSession: 'session-retry-1.md',
+        body: 'The user says their English name is Sean.',
+      }),
     });
   });
 
@@ -2566,11 +2619,11 @@ Keep PRs narrowly scoped and easy to review.
     const result = await stage.run(createContext(store, 'run-merge-fallback'));
 
     await expect(
-      readFile(path.join(tempRoot, 'memory', 'final', 'private', 'user-short-prs.md'), 'utf8'),
+      readFile(path.join(tempRoot, 'memory', 'final', 'private', 'user-prefers-short-prs.md'), 'utf8'),
     ).resolves.toContain('merged_from: [session-001]');
     await expect(
       readFile(path.join(tempRoot, 'memory', 'final', 'private', 'MEMORY.md'), 'utf8'),
-    ).resolves.toContain('[User prefers short PRs](user-short-prs.md)');
+    ).resolves.toContain('[User prefers short PRs](user-prefers-short-prs.md)');
     await expect(
       readFile(path.join(tempRoot, 'memory', 'final', 'team', 'MEMORY.md'), 'utf8'),
     ).resolves.toBe('');

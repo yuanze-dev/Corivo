@@ -16,14 +16,17 @@ export interface RawMemoryFrontmatter extends BaseMemoryFrontmatter {
   forget?: boolean | string;
 }
 
+export interface RawMemoryItem {
+  frontmatter: RawMemoryFrontmatter;
+  body: string;
+}
+
 export interface FinalMemoryFrontmatter extends BaseMemoryFrontmatter {
   merged_from: string[];
 }
 
-export interface RawMemoryDocument {
+export interface RawMemoryDocument extends RawMemoryItem {
   filePath: string;
-  frontmatter: RawMemoryFrontmatter;
-  body: string;
 }
 
 export interface FinalMemoryDocument {
@@ -34,7 +37,8 @@ export interface FinalMemoryDocument {
 
 export interface ParsedRawMemoryDocument {
   noMemories: boolean;
-  documents: RawMemoryDocument[];
+  items: RawMemoryItem[];
+  documents?: RawMemoryDocument[];
 }
 
 export interface MemoryIndexEntry {
@@ -45,7 +49,7 @@ export interface MemoryIndexEntry {
 
 export interface RawMemoryBatchArtifact {
   sessionId: string;
-  markdown: string;
+  items: RawMemoryItem[];
 }
 
 export interface FinalMemoryFileBlock {

@@ -15,22 +15,29 @@ const TYPES_SECTION = [
 ].join('\n');
 
 const OUTPUT_FORMAT_SECTION = `## Output format
-For EACH memory worth saving, output a fenced markdown block with this exact structure:
+Return exactly one JSON object with this shape:
 
-<!-- FILE: {scope}/{filename}.md -->
-\`\`\`markdown
----
-name: {memory name}
-description: {one-line description}
-type: {${MEMORY_TYPES.join(', ')}}
-scope: {private, team}
-source_session: {session filename}
----
+{
+  "items": [
+    {
+      "frontmatter": {
+        "name": "{memory name}",
+        "description": "{one-line description}",
+        "type": "{${MEMORY_TYPES.join(', ')}}",
+        "scope": "{private, team}",
+        "source_session": "{session filename}",
+        "forget": true
+      },
+      "body": "{memory content}"
+    }
+  ]
+}
 
-{memory content}
-\`\`\`
-
-If a session has NO memories worth extracting, output exactly: <!-- NO_MEMORIES -->`;
+Rules:
+- Return only valid JSON. No markdown fences. No commentary.
+- Omit the "forget" field unless it is needed.
+- Do not include any file path or directory fields. The system will create filenames itself.
+- If a session has NO memories worth extracting, output exactly: {"items":[]}`;
 
 const REMEMBER_FORGET_SECTION = [
   '## Remember and forget instructions',

@@ -6,7 +6,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 // import command
@@ -140,9 +140,32 @@ export function createProgram({ app = createCliApp(), memoryCommand }: CliProgra
 }
 let program: Command | undefined;
 
-const cliEntrypoint = join(__dirname, '../../bin/corivo.js');
-const parsedArgvOne = process.argv[1] ? resolve(process.argv[1]) : undefined;
-const shouldParseCli = parsedArgvOne === __filename || parsedArgvOne === cliEntrypoint;
+export function isCliEntrypoint(
+  argvOne: string | undefined,
+  moduleFilename: string = __filename,
+  cliEntrypoint: string = join(__dirname, '../../bin/corivo.js'),
+): boolean {
+  if (!argvOne) {
+    return false;
+  }
+
+  const normalizedArgvOne = normalizeEntrypointPath(argvOne);
+  const candidates = [moduleFilename, cliEntrypoint].map((candidate) => normalizeEntrypointPath(candidate));
+
+  return candidates.includes(normalizedArgvOne);
+}
+
+function normalizeEntrypointPath(filePath: string): string {
+  const resolvedPath = resolve(filePath);
+
+  try {
+    return realpathSync(resolvedPath);
+  } catch {
+    return resolvedPath;
+  }
+}
+
+const shouldParseCli = isCliEntrypoint(process.argv[1]);
 
 export { program };
 

@@ -1,6 +1,6 @@
 {
   "name": "@corivo-ai/claude-code",
-  "version": "0.12.7",
+  "version": "0.12.9",
   "description": "Corivo Claude Code host integration bundle assets",
   "files": [
     ".claude-plugin",

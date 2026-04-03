@@ -1,6 +1,5 @@
-import type { FastifyInstance } from 'fastify';
-import { authPreHandler } from '../auth/auth-plugin.js';
-import { pushChangesets, pullChangesets, getSyncStatus } from '../sync/sync-handler.js';
+import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+import type { SyncRepository } from '../application/sync/sync-ports.js';
 import '../types.js';
 
 const changesetSchema = {
@@ -17,10 +16,14 @@ const changesetSchema = {
   },
 };
 
-export async function syncRoutes(app: FastifyInstance): Promise<void> {
-  // POST /sync/push
+interface SyncRouteDeps {
+  syncRepository: SyncRepository;
+  authPreHandler: preHandlerHookHandler;
+}
+
+export async function syncRoutes(app: FastifyInstance, deps: SyncRouteDeps): Promise<void> {
   app.post('/sync/push', {
-    preHandler: authPreHandler,
+    preHandler: deps.authPreHandler,
     schema: {
       body: {
         type: 'object',
@@ -44,7 +47,7 @@ export async function syncRoutes(app: FastifyInstance): Promise<void> {
       changesets: any[];
     };
 
-    const result = pushChangesets(identityId, {
+    const result = deps.syncRepository.pushChangesets(identityId, {
       site_id: body.site_id,
       db_version: body.db_version ?? 0,
       changesets: body.changesets,
@@ -53,9 +56,8 @@ export async function syncRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({ ok: true, stored: result.stored });
   });
 
-  // POST /sync/pull
   app.post('/sync/pull', {
-    preHandler: authPreHandler,
+    preHandler: deps.authPreHandler,
     schema: {
       body: {
         type: 'object',
@@ -70,7 +72,7 @@ export async function syncRoutes(app: FastifyInstance): Promise<void> {
     const identityId = req.identityId!;
     const body = req.body as { site_id: string; since_version: number };
 
-    const result = pullChangesets(identityId, {
+    const result = deps.syncRepository.pullChangesets(identityId, {
       site_id: body.site_id,
       since_version: body.since_version,
     });
@@ -78,9 +80,8 @@ export async function syncRoutes(app: FastifyInstance): Promise<void> {
     return reply.send(result);
   });
 
-  // GET /sync/status
   app.get('/sync/status', {
-    preHandler: authPreHandler,
+    preHandler: deps.authPreHandler,
     schema: {
       querystring: {
         type: 'object',
@@ -95,7 +96,7 @@ export async function syncRoutes(app: FastifyInstance): Promise<void> {
     const query = req.query as { device_id?: string };
     const deviceId = query.device_id ?? '';
 
-    const status = getSyncStatus(identityId, deviceId);
+    const status = deps.syncRepository.getSyncStatus(identityId, deviceId);
     return reply.send(status);
   });
 }

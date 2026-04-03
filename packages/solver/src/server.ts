@@ -1,59 +1,42 @@
-import Fastify from 'fastify';
-import { randomUUID } from 'node:crypto';
-import cors from '@fastify/cors';
-import { healthRoutes } from './routes/health.routes.js';
-import { authRoutes } from './routes/auth.routes.js';
-import { syncRoutes } from './routes/sync.routes.js';
+import { config } from './config.js';
+import { getDb } from './db/server-db.js';
+import { createChallengeService } from './auth/challenge.js';
+import { createPairingService } from './auth/pairing.js';
+import { createAuthPreHandler } from './auth/auth-plugin.js';
+import { createAuthUseCases } from './application/auth/auth-use-cases.js';
+import { createTokenLifecycleService } from './application/auth/token-lifecycle-service.js';
+import { createSyncRepository } from './sync/sync-handler.js';
+import { createServer } from './runtime/create-server.js';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
 export async function buildServer() {
-  const app = Fastify({
-    genReqId: () => randomUUID(),
-    disableRequestLogging: true,
-    logger: {
-      level: isDev ? 'debug' : 'info',
-      ...(isDev
-        ? {
-            transport: {
-              target: 'pino-pretty',
-              options: {
-                colorize: true,
-                translateTime: 'SYS:HH:MM:ss',
-                ignore: 'pid,hostname',
-                singleLine: true,
-              },
-            },
-          }
-        : {
-            base: { pid: process.pid },
-          }),
-      serializers: {
-        req(request) {
-          return {
-            method: request.method,
-            url: request.url,
-            remoteAddress: request.socket?.remoteAddress,
-          };
-        },
-      },
-    },
+  const db = getDb();
+  const tokenLifecycleService = createTokenLifecycleService({
+    tokenTtlMs: config.tokenTtlMs,
   });
-
-  app.addHook('onRequest', (req, _reply, done) => {
-    req.log.debug({ req }, 'IncomingRequest');
-    done();
+  const challengeService = createChallengeService({
+    challengeTtlMs: config.challengeTtlMs,
   });
+  const pairingService = createPairingService();
+  const authPreHandler = createAuthPreHandler(tokenLifecycleService);
 
-  app.addHook('onResponse', (req, reply, done) => {
-    req.log.debug({ req, res: reply, responseTime: reply.elapsedTime }, 'RequestCompleted');
-    done();
+  const authUseCases = createAuthUseCases({
+    db,
+    issueToken: (identityId) => tokenLifecycleService.issueToken(identityId),
+    generateChallenge: (identityId) => challengeService.generateChallenge(identityId),
+    verifyChallengeResponse: (identityId, challenge, response, sharedSecret) =>
+      challengeService.verifyChallengeResponse(identityId, challenge, response, sharedSecret),
+    generateSharedSecret: () => challengeService.generateSharedSecret(),
+    generatePairingCode: (identityId) => pairingService.generatePairingCode(identityId),
+    redeemPairingCode: (code) => pairingService.redeemPairingCode(code),
   });
+  const syncRepository = createSyncRepository({ db });
 
-  await app.register(cors, { origin: false });
-  await app.register(healthRoutes);
-  await app.register(authRoutes);
-  await app.register(syncRoutes);
-
-  return app;
+  return createServer({
+    isDev,
+    authUseCases,
+    syncRepository,
+    authPreHandler,
+  });
 }

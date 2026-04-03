@@ -1,11 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import '../types.js';
-import { getDb } from '../db/server-db.js';
-import { accounts, devices } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
-import { generateChallenge, verifyChallengeResponse, generateSharedSecret } from '../auth/challenge.js';
-import { generateToken, authPreHandler } from '../auth/auth-plugin.js';
-import { generatePairingCode, redeemPairingCode } from '../auth/pairing.js';
+import type { preHandlerHookHandler } from 'fastify';
+import type { AuthUseCases } from '../application/auth/auth-use-cases.js';
 
 interface RegisterBody {
   identity_id: string;
@@ -44,7 +40,12 @@ interface RedeemPairBody {
   site_id: string;
 }
 
-export async function authRoutes(app: FastifyInstance): Promise<void> {
+interface AuthRouteDeps {
+  authUseCases: AuthUseCases;
+  authPreHandler: preHandlerHookHandler;
+}
+
+export async function authRoutes(app: FastifyInstance, deps: AuthRouteDeps): Promise<void> {
   // POST /auth/register
   app.post<{ Body: RegisterBody }>('/auth/register', {
     schema: {
@@ -56,45 +57,27 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           fingerprints: { type: 'array', maxItems: 20, items: { type: 'string', maxLength: 512 } },
           device_id: { type: 'string', maxLength: 256 },
           device_name: { type: 'string' },
+          platform: { type: 'string' },
+          arch: { type: 'string' },
           site_id: { type: 'string', maxLength: 256 },
         },
       },
     },
   }, async (req, reply) => {
-    const { identity_id, fingerprints, device_id, device_name, platform, arch, site_id } = req.body;
-    const db = getDb();
-    const now = Date.now();
-
-    const existing = db.select({ identityId: accounts.identityId })
-      .from(accounts)
-      .where(eq(accounts.identityId, identity_id))
-      .get();
-    if (existing) {
+    const result = deps.authUseCases.registerAccount({
+      identityId: req.body.identity_id,
+      fingerprints: req.body.fingerprints,
+      deviceId: req.body.device_id,
+      deviceName: req.body.device_name,
+      platform: req.body.platform,
+      arch: req.body.arch,
+      siteId: req.body.site_id,
+    });
+    if (!result.ok) {
       return reply.code(409).send({ error: 'Already registered' });
     }
 
-    const sharedSecret = generateSharedSecret();
-
-    db.insert(accounts).values({
-      identityId: identity_id,
-      fingerprints: JSON.stringify(fingerprints),
-      sharedSecret,
-      createdAt: now,
-      lastSeenAt: now,
-    }).run();
-
-    db.insert(devices).values({
-      deviceId: device_id,
-      identityId: identity_id,
-      deviceName: device_name ?? null,
-      platform: platform ?? null,
-      arch: arch ?? null,
-      siteId: site_id,
-      createdAt: now,
-      lastSeenAt: now,
-    }).run();
-
-    return reply.code(201).send({ shared_secret: sharedSecret });
+    return reply.code(201).send({ shared_secret: result.sharedSecret });
   });
 
   // POST /auth/challenge
@@ -109,19 +92,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
     },
   }, async (req, reply) => {
-    const { identity_id } = req.body;
-    const db = getDb();
-
-    const account = db.select({ identityId: accounts.identityId })
-      .from(accounts)
-      .where(eq(accounts.identityId, identity_id))
-      .get();
-    if (!account) {
+    const result = deps.authUseCases.createChallenge(req.body.identity_id);
+    if (!result.ok) {
       return reply.code(404).send({ error: 'Account not found' });
     }
 
-    const { challenge, expiresAt } = generateChallenge(identity_id);
-    return reply.send({ challenge, expires_at: expiresAt });
+    return reply.send({ challenge: result.challenge, expires_at: result.expiresAt });
   });
 
   // POST /auth/verify
@@ -138,35 +114,24 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
     },
   }, async (req, reply) => {
-    const { identity_id, challenge, response } = req.body;
-    const db = getDb();
-
-    const account = db.select({ sharedSecret: accounts.sharedSecret })
-      .from(accounts)
-      .where(eq(accounts.identityId, identity_id))
-      .get();
-
-    if (!account) {
-      return reply.code(404).send({ error: 'Account not found' });
-    }
-
-    const valid = verifyChallengeResponse(identity_id, challenge, response, account.sharedSecret);
-    if (!valid) {
+    const result = deps.authUseCases.verifyChallenge({
+      identityId: req.body.identity_id,
+      challenge: req.body.challenge,
+      response: req.body.response,
+    });
+    if (!result.ok) {
+      if (result.code === 'ACCOUNT_NOT_FOUND') {
+        return reply.code(404).send({ error: 'Account not found' });
+      }
       return reply.code(401).send({ error: 'Invalid challenge response' });
     }
 
-    db.update(accounts)
-      .set({ lastSeenAt: Date.now() })
-      .where(eq(accounts.identityId, identity_id))
-      .run();
-
-    const token = generateToken(identity_id);
-    return reply.send({ token });
+    return reply.send({ token: result.token });
   });
 
   // POST /auth/add-device
   app.post<{ Body: AddDeviceBody }>('/auth/add-device', {
-    preHandler: authPreHandler,
+    preHandler: deps.authPreHandler,
     schema: {
       body: {
         type: 'object',
@@ -174,45 +139,34 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         properties: {
           device_id: { type: 'string', maxLength: 256 },
           device_name: { type: 'string' },
+          platform: { type: 'string' },
+          arch: { type: 'string' },
           site_id: { type: 'string', maxLength: 256 },
         },
       },
     },
   }, async (req, reply) => {
-    const identityId = req.identityId!;
-    const { device_id, device_name, platform, arch, site_id } = req.body;
-    const db = getDb();
-    const now = Date.now();
-
-    const existing = db.select({ deviceId: devices.deviceId })
-      .from(devices)
-      .where(eq(devices.deviceId, device_id))
-      .get();
-    if (existing) {
+    const result = deps.authUseCases.addDevice({
+      identityId: req.identityId!,
+      deviceId: req.body.device_id,
+      deviceName: req.body.device_name,
+      platform: req.body.platform,
+      arch: req.body.arch,
+      siteId: req.body.site_id,
+    });
+    if (!result.ok) {
       return reply.code(409).send({ error: 'Device already registered' });
     }
-
-    db.insert(devices).values({
-      deviceId: device_id,
-      identityId,
-      deviceName: device_name ?? null,
-      platform: platform ?? null,
-      arch: arch ?? null,
-      siteId: site_id,
-      createdAt: now,
-      lastSeenAt: now,
-    }).run();
 
     return reply.code(201).send({ ok: true });
   });
 
   // POST /auth/pair — generate a pairing code (requires authentication)
   app.post('/auth/pair', {
-    preHandler: authPreHandler,
+    preHandler: deps.authPreHandler,
   }, async (req, reply) => {
-    const identityId = req.identityId!;
-    const { code, expiresAt } = generatePairingCode(identityId);
-    return reply.send({ pairing_code: code, expires_at: expiresAt });
+    const result = deps.authUseCases.createPairingCode(req.identityId!);
+    return reply.send({ pairing_code: result.code, expires_at: result.expiresAt });
   });
 
   // POST /auth/redeem-pair — redeem a pairing code to register a new device (no authentication required)
@@ -225,69 +179,39 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           pairing_code: { type: 'string', maxLength: 16 },
           device_id: { type: 'string', maxLength: 256 },
           device_name: { type: 'string' },
+          platform: { type: 'string' },
+          arch: { type: 'string' },
           site_id: { type: 'string', maxLength: 256 },
         },
       },
     },
   }, async (req, reply) => {
-    const { pairing_code, device_id, device_name, platform, arch, site_id } = req.body;
-    const db = getDb();
-
-    const identityId = redeemPairingCode(pairing_code);
-    if (!identityId) {
+    const result = deps.authUseCases.redeemPairing({
+      pairingCode: req.body.pairing_code,
+      deviceId: req.body.device_id,
+      deviceName: req.body.device_name,
+      platform: req.body.platform,
+      arch: req.body.arch,
+      siteId: req.body.site_id,
+    });
+    if (!result.ok) {
+      if (result.code === 'DEVICE_ALREADY_REGISTERED') {
+        return reply.code(409).send({ error: 'Device already registered' });
+      }
+      if (result.code === 'ACCOUNT_NOT_FOUND') {
+        return reply.code(404).send({ error: 'Account not found' });
+      }
       return reply.code(404).send({ error: 'Pairing code invalid or expired' });
     }
 
-    const account = db.select({ sharedSecret: accounts.sharedSecret })
-      .from(accounts)
-      .where(eq(accounts.identityId, identityId))
-      .get();
-    if (!account) {
-      return reply.code(404).send({ error: 'Account not found' });
-    }
-
-    const existingDevice = db.select({ deviceId: devices.deviceId })
-      .from(devices)
-      .where(eq(devices.deviceId, device_id))
-      .get();
-    if (existingDevice) {
-      return reply.code(409).send({ error: 'Device already registered' });
-    }
-
-    const now = Date.now();
-    db.insert(devices).values({
-      deviceId: device_id,
-      identityId,
-      deviceName: device_name ?? null,
-      platform: platform ?? null,
-      arch: arch ?? null,
-      siteId: site_id,
-      createdAt: now,
-      lastSeenAt: now,
-    }).run();
-
-    return reply.code(201).send({ identity_id: identityId, shared_secret: account.sharedSecret });
+    return reply.code(201).send({ identity_id: result.identityId, shared_secret: result.sharedSecret });
   });
 
   // GET /auth/devices — list all devices belonging to the current identity (requires authentication)
   app.get('/auth/devices', {
-    preHandler: authPreHandler,
+    preHandler: deps.authPreHandler,
   }, async (req, reply) => {
-    const identityId = req.identityId!;
-    const db = getDb();
-
-    const rows = db.select({
-      deviceId: devices.deviceId,
-      deviceName: devices.deviceName,
-      platform: devices.platform,
-      arch: devices.arch,
-      createdAt: devices.createdAt,
-      lastSeenAt: devices.lastSeenAt,
-    })
-      .from(devices)
-      .where(eq(devices.identityId, identityId))
-      .all();
-
+    const rows = deps.authUseCases.listDevices(req.identityId!);
     return reply.send({ devices: rows });
   });
 }

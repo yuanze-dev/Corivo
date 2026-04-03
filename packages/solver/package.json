@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
-    "start": "node --env-file-if-exists=.env dist/index.js"
+    "start": "node --env-file-if-exists=.env dist/index.js",
+    "test": "tsx --test test/routes-http-adapter.test.ts test/sync-semantics-regression.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.0",

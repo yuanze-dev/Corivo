@@ -7,11 +7,13 @@ const DB_PATH = path.join(TMP_DIR, 'solver.db');
 
 process.env.SOLVER_DB_PATH = DB_PATH;
 
-const [{ getDb, getServerDb }, { accounts, devices, changesets }, { pushChangesets, pullChangesets }] = await Promise.all([
+const [{ getDb, getServerDb }, { accounts, devices, changesets }, { createSyncRepository }] = await Promise.all([
   import('../src/db/server-db.js'),
   import('../src/db/schema.js'),
   import('../src/sync/sync-handler.js'),
 ]);
+
+const syncRepository = createSyncRepository({ db: getDb() });
 
 describe('sync-handler', () => {
   beforeEach(() => {
@@ -59,7 +61,7 @@ describe('sync-handler', () => {
   });
 
   it('does not lose later changes from another site when their local db_version restarts at 1', () => {
-    pushChangesets('identity-1', {
+    syncRepository.pushChangesets('identity-1', {
       site_id: 'site-a',
       db_version: 3,
       changesets: [
@@ -93,7 +95,7 @@ describe('sync-handler', () => {
       ],
     });
 
-    const initialPullForB = pullChangesets('identity-1', {
+    const initialPullForB = syncRepository.pullChangesets('identity-1', {
       site_id: 'site-b',
       since_version: 0,
     });
@@ -101,7 +103,7 @@ describe('sync-handler', () => {
     expect(initialPullForB.changesets).toHaveLength(3);
     expect(initialPullForB.current_version).toBe(3);
 
-    pushChangesets('identity-1', {
+    syncRepository.pushChangesets('identity-1', {
       site_id: 'site-b',
       db_version: 1,
       changesets: [
@@ -117,7 +119,7 @@ describe('sync-handler', () => {
       ],
     });
 
-    const followupPullForA = pullChangesets('identity-1', {
+    const followupPullForA = syncRepository.pullChangesets('identity-1', {
       site_id: 'site-a',
       since_version: initialPullForB.current_version,
     });

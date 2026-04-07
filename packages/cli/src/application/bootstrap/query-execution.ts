@@ -2,18 +2,21 @@ import chalk from 'chalk';
 import type { Block } from '@/domain/memory/models/block';
 import { ConfigError } from '@/errors';
 import { ContextPusher } from '@/push/context.js';
-import { createQueryPack } from '@/application/query/query-pack.js';
 import {
   createRuntimeQueryHistoryStore,
   createRuntimeQueryHistoryTracker,
 } from '@/runtime/query-history.js';
 import { formatSurfaceItem, type RuntimeOutputFormat } from '@/cli/presenters/query-renderer.js';
-import { generateRecall } from '@/application/query/generate-recall.js';
-import { loadMemoryIndex } from '@/runtime/memory-index.js';
-import { generateRawTranscriptRecall } from '@/application/query/generate-raw-recall.js';
 import type { RuntimeCommandOptions } from '@/runtime/runtime-support';
 import { loadRuntimeDb } from '@/runtime/runtime-support';
 import type { Logger } from '@/utils/logging';
+import { loadConfig } from '@/config.js';
+import { createLocalMemoryProvider } from '@/domain/memory/providers/local-memory-provider.js';
+import { resolveMemoryProvider } from '@/domain/memory/providers/resolve-memory-provider.js';
+import { isMemoryProviderUnavailableError } from '@/domain/memory/providers/types.js';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { getConfigDir } from '@/storage/database';
 
 export interface QueryOptions {
   limit?: string;
@@ -56,16 +59,37 @@ const defaultWriteOutput = (text: string) => {
 export async function runPromptQueryCommand(
   options: PromptQueryCommandOptions = {},
 ): Promise<string> {
-  const db = await loadRuntimeDb(options);
-  if (!db || !options.prompt) {
+  if (!options.prompt) {
     return '';
   }
 
-  const queryPack = createQueryPack({ prompt: options.prompt });
-  const memoryIndex = await loadMemoryIndex();
-  const recall =
-    generateRecall(db, queryPack, { memoryIndex })
-    ?? await generateRawTranscriptRecall(db, queryPack);
+  const config = await loadProviderConfigOrThrow();
+  const provider = resolveMemoryProvider(config);
+  const localProvider = createLocalMemoryProvider();
+  const db = await loadRuntimeDb(options);
+
+  if (!db && provider.provider === 'local') {
+    return '';
+  }
+
+  let recall = null;
+  try {
+    recall = await provider.recall({ prompt: options.prompt, db: db ?? undefined });
+  } catch (error) {
+    if (isMemoryProviderUnavailableError(error)) {
+      if (db) {
+        recall = await localProvider.recall({ prompt: options.prompt, db });
+      } else {
+        recall = null;
+      }
+    } else {
+      throw error;
+    }
+  }
+  // Provider miss: preserve legacy local recall chain as fallback.
+  if (!recall && provider.provider !== 'local' && db) {
+    recall = await localProvider.recall({ prompt: options.prompt, db });
+  }
 
   return formatSurfaceItem(recall, options.format);
 }
@@ -85,13 +109,35 @@ export async function runSearchQueryCommand(
     throw new Error('--format hook-text is only supported with --prompt');
   }
 
+  const config = await loadProviderConfigOrThrow();
+  const provider = resolveMemoryProvider(config);
+  const localProvider = createLocalMemoryProvider();
   const db = await loadDb({ password: false });
-  if (!db) {
+
+  if (!db && provider.provider === 'local') {
     throw new ConfigError('Corivo is not initialized. Please run: corivo init');
   }
 
   const limit = parseLimit(options.limit);
-  const results = db.searchBlocks(query, limit);
+
+  let results: Block[] = [];
+  try {
+    results = await provider.search({ query, limit, db: db ?? undefined });
+  } catch (error) {
+    if (isMemoryProviderUnavailableError(error)) {
+      if (db) {
+        results = await localProvider.search({ query, limit, db });
+      } else {
+        results = [];
+      }
+    } else {
+      throw error;
+    }
+  }
+  // Provider miss: preserve legacy local search fallback behavior.
+  if (results.length === 0 && provider.provider !== 'local' && db) {
+    results = await localProvider.search({ query, limit, db });
+  }
 
   if (format === 'json') {
     writeOutput(JSON.stringify({
@@ -135,6 +181,10 @@ export async function runSearchQueryCommand(
     writeOutput('');
   }
 
+  if (!db) {
+    return;
+  }
+
   const pusher = new ContextPusher(db);
   const queryHistoryStore = createRuntimeQueryHistoryStore(db);
   const queryTracker = createRuntimeQueryHistoryTracker(queryHistoryStore, {
@@ -165,6 +215,24 @@ export async function runSearchQueryCommand(
   if (relatedContext) {
     writeOutput(relatedContext);
   }
+}
+
+async function loadProviderConfigOrThrow() {
+  const config = await loadConfig();
+  if (config) {
+    return config;
+  }
+
+  // If config.json exists but failed validation, treat as a config error rather than
+  // silently falling back to local behavior.
+  const configPath = path.join(getConfigDir(), 'config.json');
+  try {
+    await fs.access(configPath);
+  } catch {
+    return null;
+  }
+
+  throw new ConfigError('Corivo config is invalid. Please re-run: corivo init');
 }
 
 function parseLimit(limitOption?: string): number {

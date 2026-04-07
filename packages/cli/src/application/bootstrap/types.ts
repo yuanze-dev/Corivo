@@ -14,6 +14,8 @@ export interface CliAppCommands {
   host: Command;
   daemon: Command;
   query: Command;
+  save: Command;
+  supermemory: Command;
 }
 
 export interface CliAppCapabilities {

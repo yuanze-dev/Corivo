@@ -37,7 +37,8 @@
     "consola": "^3.4.2",
     "ink": "^5.2.1",
     "ink-table": "^3.1.0",
-    "react": "^18.3.1"
+    "react": "^18.3.1",
+    "supermemory": "^4.21.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

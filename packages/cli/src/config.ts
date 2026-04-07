@@ -52,6 +52,24 @@ export interface CorivoSettings {
   logLevel?: 'error' | 'info' | 'debug';
 }
 
+export type MemoryEngineProvider = 'local' | 'supermemory';
+
+export interface SupermemoryConfig {
+  apiKey: string;
+  containerTag: string;
+}
+
+export interface LocalMemoryEngineConfig {
+  provider: 'local';
+}
+
+export interface SupermemoryEngineConfig {
+  provider: 'supermemory';
+  supermemory: SupermemoryConfig;
+}
+
+export type MemoryEngineConfig = LocalMemoryEngineConfig | SupermemoryEngineConfig;
+
 /**
  * Corivo configuration
  */
@@ -66,6 +84,33 @@ export interface CorivoConfig {
   settings?: CorivoSettings;
   /** Enabled plugin package names (installed globally via `npm install -g <pkg>`) */
   plugins?: string[];
+  memoryEngine?: MemoryEngineConfig;
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isValidSupermemoryConfig(supermemory: unknown): supermemory is SupermemoryConfig {
+  if (typeof supermemory !== 'object' || supermemory === null) {
+    return false;
+  }
+  const candidate = supermemory as Partial<SupermemoryConfig>;
+  return isNonEmptyString(candidate.apiKey) && isNonEmptyString(candidate.containerTag);
+}
+
+function isValidMemoryEngineConfig(engine: unknown): engine is MemoryEngineConfig {
+  if (typeof engine !== 'object' || engine === null) {
+    return false;
+  }
+  const candidate = engine as Partial<MemoryEngineConfig>;
+  if (candidate.provider === 'local') {
+    return true;
+  }
+  if (candidate.provider === 'supermemory') {
+    return isValidSupermemoryConfig(candidate.supermemory);
+  }
+  return false;
 }
 
 /**
@@ -84,6 +129,10 @@ export async function loadConfig(configDir?: string): Promise<CorivoConfig | nul
 
     // Validate required fields
     if (!config.identity_id) {
+      return null;
+    }
+
+    if (typeof config.memoryEngine !== 'undefined' && !isValidMemoryEngineConfig(config.memoryEngine)) {
       return null;
     }
 

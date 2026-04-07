@@ -4,16 +4,24 @@ import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Block } from '../../src/domain/memory/models/block.js';
 import { runCarryOverCommand } from '../../src/cli/commands/carry-over.js';
-import { runPromptQueryCommand } from '../../src/application/bootstrap/query-execution.js';
+import { runPromptQueryCommand, runSearchQueryCommand } from '../../src/application/bootstrap/query-execution.js';
 import { runReviewCommand } from '../../src/cli/commands/review.js';
 import { runSuggestCommand } from '../../src/cli/commands/suggest.js';
+import { createLocalMemoryProvider } from '../../src/domain/memory/providers/local-memory-provider.js';
+import { MemoryProviderUnavailableError } from '../../src/domain/memory/providers/types.js';
+import { ConfigError } from '../../src/errors/index.js';
 
-const { loadRuntimeDb } = vi.hoisted(() => ({
+const { loadRuntimeDb, resolveMemoryProvider } = vi.hoisted(() => ({
   loadRuntimeDb: vi.fn(),
+  resolveMemoryProvider: vi.fn(),
 }));
 
 vi.mock('../../src/runtime/runtime-support.js', () => ({
   loadRuntimeDb,
+}));
+
+vi.mock('../../src/domain/memory/providers/resolve-memory-provider.js', () => ({
+  resolveMemoryProvider,
 }));
 
 interface RuntimeDbStub {
@@ -58,6 +66,8 @@ describe('runtime CLI command helpers', () => {
 
   beforeEach(() => {
     loadRuntimeDb.mockReset();
+    resolveMemoryProvider.mockReset();
+    resolveMemoryProvider.mockImplementation(() => createLocalMemoryProvider());
   });
 
   beforeEach(async () => {
@@ -104,6 +114,343 @@ describe('runtime CLI command helpers', () => {
       mode: 'recall',
       confidence: 'high',
     });
+  });
+
+  it('falls back to local recall when provider is explicitly unavailable', async () => {
+    resolveMemoryProvider.mockReturnValue({
+      provider: 'supermemory',
+      recall: vi.fn(async () => {
+        throw new MemoryProviderUnavailableError('Supermemory provider is not implemented yet.');
+      }),
+      search: vi.fn(async () => []),
+      save: vi.fn(async () => {
+        throw new Error('not implemented');
+      }),
+      healthcheck: vi.fn(async () => ({ ok: false, provider: 'supermemory', message: 'not implemented' })),
+    });
+
+    loadRuntimeDb.mockResolvedValue(createDb([
+      createBlock({
+        id: 'blk_local_only',
+        content: 'Prefer small, reviewable pull requests by default.',
+        annotation: '指令 · self · style',
+      }),
+    ]));
+
+    const output = await runPromptQueryCommand({
+      password: false,
+      format: 'text',
+      prompt: 'What do I prefer about pull requests?',
+    });
+
+    expect(resolveMemoryProvider).toHaveBeenCalledTimes(1);
+    expect(output).toContain('[corivo]');
+    expect(output).toContain('Prefer small, reviewable pull requests by default.');
+  });
+
+  it('falls back to local when a non-local provider returns a successful empty recall (provider miss)', async () => {
+    resolveMemoryProvider.mockReturnValue({
+      provider: 'supermemory',
+      recall: vi.fn(async () => null),
+      search: vi.fn(async () => []),
+      save: vi.fn(async () => {
+        throw new Error('not implemented');
+      }),
+      healthcheck: vi.fn(async () => ({ ok: true, provider: 'supermemory' })),
+    });
+
+    loadRuntimeDb.mockResolvedValue(createDb([
+      createBlock({
+        id: 'blk_local_only',
+        content: 'Prefer small, reviewable pull requests by default.',
+        annotation: '指令 · self · style',
+      }),
+    ]));
+
+    const output = await runPromptQueryCommand({
+      password: false,
+      format: 'text',
+      prompt: 'What do I prefer about pull requests?',
+    });
+
+    expect(output).toContain('[corivo]');
+    expect(output).toContain('Prefer small, reviewable pull requests by default.');
+  });
+
+  it('falls back to local when a non-local provider returns a successful empty search (provider miss)', async () => {
+    resolveMemoryProvider.mockReturnValue({
+      provider: 'supermemory',
+      recall: vi.fn(async () => null),
+      search: vi.fn(async () => []),
+      save: vi.fn(async () => {
+        throw new Error('not implemented');
+      }),
+      healthcheck: vi.fn(async () => ({ ok: true, provider: 'supermemory' })),
+    });
+
+    const writeOutput = vi.fn();
+    await runSearchQueryCommand(
+      {
+        query: 'pull requests',
+        options: { format: 'json' },
+      },
+      {
+        loadDb: async () =>
+          createDb([
+            createBlock({
+              id: 'blk_local_match',
+              content: 'Prefer small, reviewable pull requests by default.',
+              annotation: '指令 · self · style',
+            }),
+          ]),
+        writeOutput,
+      },
+    );
+
+    const combined = writeOutput.mock.calls.map((call) => String(call[0])).join('\n');
+    const parsed = JSON.parse(combined);
+    expect(parsed.mode).toBe('search');
+    expect(parsed.results).toHaveLength(1);
+    expect(parsed.results[0].content).toContain('Prefer small, reviewable pull requests');
+  });
+
+  it('falls back to local search when provider search is explicitly unavailable', async () => {
+    resolveMemoryProvider.mockReturnValue({
+      provider: 'supermemory',
+      recall: vi.fn(async () => null),
+      search: vi.fn(async () => {
+        throw new MemoryProviderUnavailableError('supermemory down');
+      }),
+      save: vi.fn(async () => {
+        throw new Error('not implemented');
+      }),
+      healthcheck: vi.fn(async () => ({ ok: false, provider: 'supermemory', message: 'down' })),
+    });
+
+    const writeOutput = vi.fn();
+    await runSearchQueryCommand(
+      {
+        query: 'pull requests',
+        options: { format: 'json' },
+      },
+      {
+        loadDb: async () =>
+          createDb([
+            createBlock({
+              id: 'blk_local_match',
+              content: 'Prefer small, reviewable pull requests by default.',
+              annotation: '指令 · self · style',
+            }),
+          ]),
+        writeOutput,
+      },
+    );
+
+    const combined = writeOutput.mock.calls.map((call) => String(call[0])).join('\n');
+    const parsed = JSON.parse(combined);
+    expect(parsed.mode).toBe('search');
+    expect(parsed.results).toHaveLength(1);
+    expect(parsed.results[0].content).toContain('Prefer small, reviewable pull requests');
+  });
+
+  it('surfaces a config error when config file exists but is invalid (no silent local downgrade)', async () => {
+    await fs.mkdir(path.join(tempHome, '.corivo'), { recursive: true });
+    await fs.writeFile(
+      path.join(tempHome, '.corivo', 'config.json'),
+      JSON.stringify({
+        version: '1',
+        created_at: '2026-01-01',
+        identity_id: 'sm-test',
+        memoryEngine: { provider: 'supermemory', supermemory: { apiKey: '' } },
+      }),
+    );
+
+    loadRuntimeDb.mockResolvedValue(createDb([
+      createBlock({
+        id: 'blk_pg',
+        content: 'We should keep PostgreSQL.',
+        annotation: '决策 · project · database',
+      }),
+    ]));
+
+    await expect(
+      runPromptQueryCommand({
+        password: false,
+        format: 'text',
+        prompt: 'Should we keep PostgreSQL?',
+      }),
+    ).rejects.toThrow(ConfigError);
+  });
+
+  it('surfaces a config error for invalid existing config even when runtime DB is unavailable', async () => {
+    await fs.mkdir(path.join(tempHome, '.corivo'), { recursive: true });
+    await fs.writeFile(
+      path.join(tempHome, '.corivo', 'config.json'),
+      JSON.stringify({
+        version: '1',
+        created_at: '2026-01-01',
+        identity_id: 'sm-test',
+        memoryEngine: { provider: 'supermemory', supermemory: { apiKey: '' } },
+      }),
+    );
+
+    loadRuntimeDb.mockResolvedValue(null);
+
+    await expect(
+      runPromptQueryCommand({
+        password: false,
+        format: 'text',
+        prompt: 'Should we keep PostgreSQL?',
+      }),
+    ).rejects.toThrow(ConfigError);
+  });
+
+  it('falls back to local search when provider is explicitly unavailable', async () => {
+    resolveMemoryProvider.mockReturnValue({
+      provider: 'supermemory',
+      recall: vi.fn(async () => null),
+      search: vi.fn(async () => {
+        throw new MemoryProviderUnavailableError('Supermemory provider is not implemented yet.');
+      }),
+      save: vi.fn(async () => {
+        throw new Error('not implemented');
+      }),
+      healthcheck: vi.fn(async () => ({ ok: false, provider: 'supermemory', message: 'not implemented' })),
+    });
+
+    const writeOutput = vi.fn();
+    await runSearchQueryCommand(
+      {
+        query: 'pull requests',
+        options: { format: 'json' },
+      },
+      {
+        loadDb: async () =>
+          createDb([
+            createBlock({
+              id: 'blk_local_match',
+              content: 'Prefer small, reviewable pull requests by default.',
+              annotation: '指令 · self · style',
+            }),
+          ]),
+        writeOutput,
+      },
+    );
+
+    const combined = writeOutput.mock.calls.map((call) => String(call[0])).join('\n');
+    const parsed = JSON.parse(combined);
+    expect(parsed.mode).toBe('search');
+    expect(parsed.results).toHaveLength(1);
+    expect(parsed.results[0].content).toContain('Prefer small, reviewable pull requests');
+  });
+
+  it('surfaces a config error for invalid existing config on the search path (no masking as uninitialized)', async () => {
+    await fs.mkdir(path.join(tempHome, '.corivo'), { recursive: true });
+    await fs.writeFile(
+      path.join(tempHome, '.corivo', 'config.json'),
+      JSON.stringify({
+        version: '1',
+        created_at: '2026-01-01',
+        identity_id: 'sm-test',
+        memoryEngine: { provider: 'supermemory', supermemory: { apiKey: '' } },
+      }),
+    );
+
+    const loadDb = vi.fn(async () => null);
+    await expect(
+      runSearchQueryCommand(
+        { query: 'anything', options: { format: 'json' } },
+        { loadDb, writeOutput: vi.fn() },
+      ),
+    ).rejects.toThrow(ConfigError);
+    await expect(
+      runSearchQueryCommand(
+        { query: 'anything', options: { format: 'json' } },
+        { loadDb, writeOutput: vi.fn() },
+      ),
+    ).rejects.toThrow('Corivo config is invalid');
+  });
+
+  it('invokes non-local provider recall even when local runtime DB is unavailable', async () => {
+    await fs.mkdir(path.join(tempHome, '.corivo'), { recursive: true });
+    await fs.writeFile(
+      path.join(tempHome, '.corivo', 'config.json'),
+      JSON.stringify({
+        version: '1',
+        created_at: '2026-01-01',
+        identity_id: 'sm-test',
+        memoryEngine: { provider: 'supermemory', supermemory: { apiKey: 'sm_test', containerTag: 'project.test' } },
+      }),
+    );
+
+    resolveMemoryProvider.mockReturnValue({
+      provider: 'supermemory',
+      recall: vi.fn(async () => ({
+        mode: 'recall',
+        confidence: 'high',
+        whyNow: 'remote hit',
+        claim: 'REMOTE: keep PRs small',
+        evidence: ['supermemory:1'],
+        memoryIds: ['sm:1'],
+      })),
+      search: vi.fn(async () => []),
+      save: vi.fn(async () => {
+        throw new Error('not implemented');
+      }),
+      healthcheck: vi.fn(async () => ({ ok: true, provider: 'supermemory' })),
+    });
+
+    loadRuntimeDb.mockResolvedValue(null);
+
+    const output = await runPromptQueryCommand({
+      password: false,
+      format: 'text',
+      prompt: 'What do I prefer about pull requests?',
+    });
+
+    expect(output).toContain('[corivo]');
+    expect(output).toContain('REMOTE: keep PRs small');
+  });
+
+  it('invokes non-local provider search even when local runtime DB is unavailable', async () => {
+    await fs.mkdir(path.join(tempHome, '.corivo'), { recursive: true });
+    await fs.writeFile(
+      path.join(tempHome, '.corivo', 'config.json'),
+      JSON.stringify({
+        version: '1',
+        created_at: '2026-01-01',
+        identity_id: 'sm-test',
+        memoryEngine: { provider: 'supermemory', supermemory: { apiKey: 'sm_test', containerTag: 'project.test' } },
+      }),
+    );
+
+    resolveMemoryProvider.mockReturnValue({
+      provider: 'supermemory',
+      recall: vi.fn(async () => null),
+      search: vi.fn(async () => [
+        createBlock({
+          id: 'blk_remote',
+          content: 'REMOTE: prefer small reviewable PRs',
+          annotation: '指令 · self · style',
+        }),
+      ]),
+      save: vi.fn(async () => {
+        throw new Error('not implemented');
+      }),
+      healthcheck: vi.fn(async () => ({ ok: true, provider: 'supermemory' })),
+    });
+
+    const writeOutput = vi.fn();
+    await runSearchQueryCommand(
+      { query: 'pull requests', options: { format: 'json' } },
+      { loadDb: async () => null, writeOutput },
+    );
+
+    const combined = writeOutput.mock.calls.map((call) => String(call[0])).join('\n');
+    const parsed = JSON.parse(combined);
+    expect(parsed.mode).toBe('search');
+    expect(parsed.results).toHaveLength(1);
+    expect(parsed.results[0].content).toContain('REMOTE: prefer small reviewable PRs');
   });
 
   it('prefers markdown memory index for query --prompt when available', async () => {

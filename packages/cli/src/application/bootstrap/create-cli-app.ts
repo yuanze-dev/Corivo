@@ -18,6 +18,8 @@ import { createMemoryCommand } from '@/cli/commands/memory';
 import { createHostCommand } from '@/cli/commands/host';
 import { createDaemonCommand } from '@/cli/commands/daemon';
 import { createQueryCommand } from '@/cli/commands/query';
+import { createSaveCommand } from '@/cli/commands/save';
+import { createSupermemoryCommand } from '@/cli/commands/supermemory';
 import { hostImportCommand } from '@/cli/commands/host-import';
 import { isInteractiveTTY, readConfirmIfTTY } from '@/cli/utils/password';
 import { runMemoryPipeline } from '@/application/memory/run-memory-pipeline';
@@ -26,6 +28,7 @@ import { createHostDoctorUseCase } from '@/application/hosts/doctor-host';
 import { createHostUninstallUseCase } from '@/application/hosts/uninstall-host';
 import { runPromptQueryCommand, runSearchQueryCommand } from '@/application/bootstrap/query-execution';
 import { getAllHostAdapters } from '@/infrastructure/hosts';
+import { createSaveMemoryUseCase } from '@/application/memory/save-memory';
 import type {
   CliApp,
   DaemonCommandCapabilities,
@@ -129,6 +132,11 @@ export function createCliApp(): CliApp {
           if ((config as { encrypted_db_key?: unknown }).encrypted_db_key) {
             throw new ConfigError(LEGACY_CONFIG_ERROR);
           }
+          // Remote engine: avoid creating/opening the local SQLite DB just to execute provider-backed search.
+          // In supermemory mode, query execution should work without a local DB instance.
+          if ((config as any)?.memoryEngine?.provider === 'supermemory') {
+            return null;
+          }
           return getCliDatabase({
             path: getCliDatabasePath(),
             enableEncryption: false,
@@ -148,6 +156,17 @@ export function createCliApp(): CliApp {
       host: createHostCommand(hostCapabilities),
       daemon: createDaemonCommand(daemonCapabilities),
       query: createQueryCommand(queryCapabilities),
+      save: createSaveCommand({
+        saveMemory: createSaveMemoryUseCase(),
+        output,
+        logger,
+      }),
+      supermemory: createSupermemoryCommand({
+        writeInfo: (text) => output.info(text),
+        writeError: (text) => output.error(text),
+        writeSuccess: (text) => output.success(text),
+        logger,
+      }),
     },
     capabilities: {
       logger,

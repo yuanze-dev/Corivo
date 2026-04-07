@@ -11,6 +11,7 @@ import { ContextPusher } from '@/push/context.js';
 import { getServiceManager } from '@/infrastructure/platform/index.js';
 import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
 import { ConfigError } from '@/errors';
+import { resolveMemoryProvider } from '@/domain/memory/providers/resolve-memory-provider.js';
 import type { CliOutput } from '@/cli/runtime';
 import { getCliOutput } from '@/cli/runtime';
 
@@ -27,14 +28,35 @@ export const statusCommand = async (options: StatusCommandOptions) => {
   await renderTui();
 };
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function getSupermemoryConfigured(config: any): boolean {
+  const supermemory = config?.memoryEngine?.supermemory;
+  if (!supermemory || typeof supermemory !== 'object') {
+    return false;
+  }
+  // Match resolver semantics by forcing provider resolution.
+  try {
+    const provider = resolveMemoryProvider({
+      ...(typeof config === 'object' && config !== null ? config : {}),
+      memoryEngine: { provider: 'supermemory', supermemory },
+    } as any);
+    return provider.provider === 'supermemory';
+  } catch {
+    return false;
+  }
+}
+
 const jsonStatus = async (output: CliOutput = getCliOutput()) => {
   const configDir = getConfigDir();
   const configPath = path.join(configDir, 'config.json');
 
-  let config: { encrypted_db_key?: unknown };
+  let config: any;
   try {
     const content = await fs.readFile(configPath, 'utf-8');
-    config = JSON.parse(content) as { encrypted_db_key?: unknown };
+    config = JSON.parse(content) as any;
   } catch {
     throw new ConfigError('Corivo is not initialized. Please run: corivo init');
   }
@@ -46,37 +68,93 @@ const jsonStatus = async (output: CliOutput = getCliOutput()) => {
   }
 
   const dbPath = getDefaultDatabasePath();
-  const db = CorivoDatabase.getInstance({
-    path: dbPath,
-    enableEncryption: false,
-  });
 
-  const [serviceStatus, solverConfig, attentionMessage] = await Promise.all([
+  const activeProviderRaw = config?.memoryEngine?.provider;
+  const activeProvider = isNonEmptyString(activeProviderRaw) ? activeProviderRaw : 'local';
+  const isRemoteOnly = activeProvider === 'supermemory';
+
+  const [serviceStatus, solverConfig] = await Promise.all([
     getServiceManager().getStatus(),
     loadSolverConfig(configDir),
-    new ContextPusher(db).pushNeedsAttention(),
   ]);
 
-  const stats = db.getStats();
-  const health = db.checkHealth();
-  const encryption = db.getEncryptionInfo();
+  let attentionMessage: string | null = null;
+  let memoryStats:
+    | { total: number; byStatus: unknown; byAnnotation: unknown }
+    | { total: null; byStatus: Record<string, never>; byAnnotation: Record<string, never> };
+  let databaseInfo:
+    | {
+        path: string;
+        healthy: boolean;
+        integrity: unknown;
+        sizeBytes: number;
+        blockCount: number;
+        encryption: unknown;
+      }
+    | {
+        path: string;
+        healthy: null;
+        integrity: null;
+        sizeBytes: 0;
+        blockCount: null;
+        encryption: null;
+      };
+
+  if (isRemoteOnly) {
+    memoryStats = { total: null, byStatus: {}, byAnnotation: {} };
+    databaseInfo = {
+      path: dbPath,
+      healthy: null,
+      integrity: null,
+      sizeBytes: 0,
+      blockCount: null,
+      encryption: null,
+    };
+  } else {
+    const db = CorivoDatabase.getInstance({
+      path: dbPath,
+      enableEncryption: false,
+    });
+
+    const stats = db.getStats();
+    const health = db.checkHealth();
+    const encryption = db.getEncryptionInfo();
+    attentionMessage = await new ContextPusher(db).pushNeedsAttention();
+
+    memoryStats = {
+      total: stats.total,
+      byStatus: stats.byStatus,
+      byAnnotation: stats.byAnnotation,
+    };
+    databaseInfo = {
+      path: dbPath,
+      healthy: health.ok,
+      integrity: health.integrity,
+      sizeBytes: health.size ?? 0,
+      blockCount: health.blockCount ?? stats.total,
+      encryption,
+    };
+  }
+
+  const supermemoryConfigured = getSupermemoryConfigured(config);
+
+  let providerHealthcheck: { ok: boolean; provider: string; message?: string };
+  try {
+    const provider = resolveMemoryProvider(config);
+    providerHealthcheck = await provider.healthcheck();
+  } catch (error) {
+    providerHealthcheck = {
+      ok: false,
+      provider: activeProvider,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
 
   output.info(
     JSON.stringify(
       {
-        memory: {
-          total: stats.total,
-          byStatus: stats.byStatus,
-          byAnnotation: stats.byAnnotation,
-        },
-        database: {
-          path: dbPath,
-          healthy: health.ok,
-          integrity: health.integrity,
-          sizeBytes: health.size ?? 0,
-          blockCount: health.blockCount ?? stats.total,
-          encryption,
-        },
+        memory: memoryStats,
+        database: databaseInfo,
         daemon: serviceStatus,
         sync: solverConfig
           ? {
@@ -88,6 +166,13 @@ const jsonStatus = async (output: CliOutput = getCliOutput()) => {
           : {
               configured: false,
             },
+        memoryEngine: {
+          activeProvider,
+          supermemory: {
+            configured: supermemoryConfigured,
+          },
+          providerHealthcheck,
+        },
         attention: {
           message: attentionMessage,
         },

@@ -42,4 +42,5 @@ describe('CorivoSettings', () => {
     };
     expect(config.plugins).toBeUndefined();
   });
+
 });

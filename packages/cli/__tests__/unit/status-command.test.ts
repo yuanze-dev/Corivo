@@ -27,6 +27,29 @@ vi.mock('node:fs/promises', () => ({
   },
 }));
 
+const supermemoryProfile = vi.fn();
+vi.mock('supermemory', () => {
+  class APIConnectionError extends Error {}
+  class APIConnectionTimeoutError extends Error {}
+  class InternalServerError extends Error {}
+  class RateLimitError extends Error {}
+
+  class SupermemoryMock {
+    profile = supermemoryProfile;
+    documents = { add: vi.fn() };
+    search = { memories: vi.fn() };
+    constructor(_args: unknown) {}
+  }
+
+  return {
+    default: SupermemoryMock,
+    APIConnectionError,
+    APIConnectionTimeoutError,
+    InternalServerError,
+    RateLimitError,
+  };
+});
+
 vi.mock('@/storage/database', () => ({
   CorivoDatabase: {
     getInstance,
@@ -39,6 +62,10 @@ vi.mock('@/config', () => ({
   loadConfig,
   loadSolverConfig,
   saveSolverConfig,
+}));
+
+vi.mock('@/runtime/runtime-support.js', () => ({
+  loadRuntimeDb: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock('@/infrastructure/platform/index.js', () => ({
@@ -63,7 +90,13 @@ vi.mock('../../src/cli/runtime.js', () => ({
 describe('statusCommand', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    readFile.mockResolvedValue(JSON.stringify({ version: '0.12.6' }));
+    readFile.mockResolvedValue(
+      JSON.stringify({
+        version: '1',
+        created_at: '2026-01-01',
+        identity_id: 'local-test',
+      }),
+    );
     getInstance.mockReturnValue({
       getStats: () => ({
         total: 5,
@@ -105,6 +138,7 @@ describe('statusCommand', () => {
       last_pull_version: 9,
     });
     pushNeedsAttention.mockResolvedValue('--- attention ---');
+    supermemoryProfile.mockResolvedValue({ ok: true });
   });
 
   it('prints legacy status data as structured json', async () => {
@@ -148,6 +182,16 @@ describe('statusCommand', () => {
         lastPushVersion: 12,
         lastPullVersion: 9,
       },
+      memoryEngine: {
+        activeProvider: 'local',
+        supermemory: {
+          configured: false,
+        },
+        providerHealthcheck: {
+          ok: true,
+          provider: 'local',
+        },
+      },
       attention: {
         message: '--- attention ---',
       },
@@ -158,6 +202,72 @@ describe('statusCommand', () => {
         'corivo start | stop',
       ],
     });
+  });
+
+  it('does not open local sqlite when active engine is supermemory (remote-only)', async () => {
+    readFile.mockResolvedValue(
+      JSON.stringify({
+        version: '1',
+        created_at: '2026-01-01',
+        identity_id: 'sm-test',
+        memoryEngine: {
+          provider: 'supermemory',
+          supermemory: { apiKey: 'sm_test', containerTag: 'project.test' },
+        },
+      }),
+    );
+
+    const { statusCommand } = await import('../../src/cli/commands/status.js');
+    await statusCommand({ json: true });
+
+    expect(getInstance).not.toHaveBeenCalled();
+    expect(pushNeedsAttention).not.toHaveBeenCalled();
+
+    expect(JSON.parse(outputInfo.mock.calls[0]?.[0] as string)).toMatchObject({
+      memory: {
+        total: null,
+      },
+      database: {
+        healthy: null,
+      },
+      memoryEngine: {
+        activeProvider: 'supermemory',
+        supermemory: {
+          configured: true,
+        },
+        providerHealthcheck: {
+          ok: true,
+          provider: 'supermemory',
+        },
+      },
+      attention: {
+        message: null,
+      },
+    });
+  });
+
+  it('treats invalid supermemory config as not configured even when non-empty', async () => {
+    readFile.mockResolvedValue(
+      JSON.stringify({
+        version: '1',
+        created_at: '2026-01-01',
+        identity_id: 'sm-test',
+        memoryEngine: {
+          provider: 'supermemory',
+          supermemory: { apiKey: 'sm_test', containerTag: 'project:invalid' },
+        },
+      }),
+    );
+
+    const { statusCommand } = await import('../../src/cli/commands/status.js');
+    await statusCommand({ json: true });
+
+    expect(getInstance).not.toHaveBeenCalled();
+    expect(pushNeedsAttention).not.toHaveBeenCalled();
+
+    const parsed = JSON.parse(outputInfo.mock.calls[0]?.[0] as string) as any;
+    expect(parsed.memoryEngine.supermemory.configured).toBe(false);
+    expect(parsed.memoryEngine.providerHealthcheck.ok).toBe(false);
   });
 });
 

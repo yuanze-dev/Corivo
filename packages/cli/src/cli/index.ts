@@ -11,7 +11,6 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 // import command
 import { initCommand } from './commands/init.js';
-import { saveCommand } from './commands/save.js';
 import { startCommand } from './commands/start.js';
 import { stopCommand } from './commands/stop.js';
 import { doctorCommand } from './commands/doctor.js';
@@ -64,15 +63,6 @@ export function createProgram({ app = createCliApp(), memoryCommand }: CliProgra
     .action(initCommand);
 
   program
-    .command('save')
-    .description('Save information')
-    .option('-c, --content <text>', 'Content')
-    .option('-a, --annotation <text>', 'Annotation (type · domain · tag)')
-    .option('-s, --source <text>', 'Source')
-    .option('--pending', 'Save in pending mode (the heartbeat process will annotate it later)')
-    .action((options) => saveCommand(options));
-
-  program
     .command('status')
     .description('View status')
     .option('--json', 'Output JSON formate')
@@ -110,6 +100,7 @@ export function createProgram({ app = createCliApp(), memoryCommand }: CliProgra
 
   program.addCommand(app.commands.query);
   program.addCommand(listCommand);
+  program.addCommand(app.commands.save);
   program.addCommand(resolvedMemoryCommand);
   program.addCommand(app.commands.host);
   program.addCommand(coldScanCommand);
@@ -124,6 +115,7 @@ export function createProgram({ app = createCliApp(), memoryCommand }: CliProgra
   program.addCommand(updateCommand);
   program.addCommand(createSyncCommand());
   program.addCommand(ingestMessageCommand);
+  program.addCommand(app.commands.supermemory);
 
   // Error handling
   program.configureOutput({

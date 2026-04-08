@@ -9,7 +9,8 @@ import path from 'node:path';
 import { loadSolverConfig } from '@/config';
 import { ContextPusher } from '@/push/context.js';
 import { getServiceManager } from '@/infrastructure/platform/index.js';
-import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
+import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
+import { openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import { ConfigError } from '@/errors';
 import { resolveMemoryProvider } from '@/domain/memory/providers/resolve-memory-provider.js';
 import type { CliOutput } from '@/cli/runtime';
@@ -111,7 +112,7 @@ const jsonStatus = async (output: CliOutput = getCliOutput()) => {
       encryption: null,
     };
   } else {
-    const db = CorivoDatabase.getInstance({
+    const db = openCorivoDatabase({
       path: dbPath,
       enableEncryption: false,
     });

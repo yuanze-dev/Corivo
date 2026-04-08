@@ -4,7 +4,7 @@
  * Send a short summary every Monday: "3 decisions made last week"
  */
 
-import type { CorivoDatabase } from '@/storage/database';
+import type { MemoryServiceDatabase } from '@/domain/memory/contracts/service-database.js';
 
 /**
  * Weekly Statistics
@@ -20,7 +20,7 @@ export interface WeeklyStats {
  * Weekly summary
  */
 export class WeeklySummary {
-  constructor(private db: CorivoDatabase) {}
+  constructor(private db: MemoryServiceDatabase) {}
 
   /**
    * Generate weekly summary

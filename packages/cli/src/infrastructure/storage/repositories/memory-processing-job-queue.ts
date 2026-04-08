@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { DatabaseError } from '@/errors';
-import type { CorivoDatabase } from '@/storage/database';
+import type { CorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import type {
   EnsureExtractSessionJobInput,
   MemoryProcessingJobRecord,

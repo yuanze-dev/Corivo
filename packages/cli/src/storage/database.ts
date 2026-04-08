@@ -54,15 +54,9 @@ import {
   getDefaultDatabasePath,
   getPidFilePath,
 } from '@/infrastructure/storage/lifecycle/database-paths.js';
-import { ensureDatabaseSchema } from '@/infrastructure/storage/schema/database-schema.js';
-import { BlockRepository } from '@/infrastructure/storage/repositories/block-repository.js';
-import { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-memory-repository.js';
-import { HostImportCursorStore } from '@/infrastructure/storage/repositories/host-import-cursor-store.js';
-import { MemoryProcessingJobQueue } from '@/infrastructure/storage/repositories/memory-processing-job-queue.js';
-import { AssociationRepository } from '@/infrastructure/storage/repositories/association-repository.js';
-import { DatabaseStatsRepository } from '@/infrastructure/storage/repositories/database-stats-repository.js';
+import { initializeCorivoSqliteDatabase } from '@/infrastructure/storage/lifecycle/database-initializer.js';
+import { createCorivoRepositoryBundle } from '@/infrastructure/storage/lifecycle/repository-bundle.js';
 import { searchBlocksWithRuntime } from '@/infrastructure/storage/search/block-search.js';
-import { SessionRecordRepository } from '@/infrastructure/storage/repositories/session-record-repository.js';
 import {
   mapRowToAssociation,
   mapRowToBlock,
@@ -157,40 +151,34 @@ export class CorivoDatabase {
     // Detect and clean up stale WAL locks before startup
     this.detectAndCleanupStaleLock();
     this.db = new Database(config.path);
-    this.blockRepository = new BlockRepository({
+    this.useSQLCipher = initializeCorivoSqliteDatabase({
       db: this.db as any,
       enableEncryption: this.enableEncryption,
-      useSQLCipher: this.useSQLCipher,
-      getContentKey: () => this.getContentKey(),
-      rowToBlock: (row: unknown) => this.rowToBlock(row),
-    });
-    this.associationRepository = new AssociationRepository({
-      db: this.db as any,
-      rowToAssociation: (row: unknown) => this.rowToAssociation(row),
-    });
-    this.rawMemoryRepository = new RawMemoryRepository({
-      db: this.db as any,
-      rowToRawSession: (row: unknown) => this.rowToRawSession(row),
-      rowToRawMessage: (row: unknown) => this.rowToRawMessage(row),
-    });
-    this.hostImportCursorStore = new HostImportCursorStore(this.db as any);
-    this.memoryProcessingJobQueue = new MemoryProcessingJobQueue(
-      this.db as any,
-      (row: unknown) => this.rowToMemoryProcessingJob(row),
-    );
-    this.databaseStatsRepository = new DatabaseStatsRepository({
+      key: this.config.key,
+    }).useSQLCipher;
+
+    const repositoryBundle = createCorivoRepositoryBundle({
       db: this.db as any,
       path: this.config.path,
       enableEncryption: this.enableEncryption,
       useSQLCipher: this.useSQLCipher,
       getContentKey: () => this.getContentKey(),
       rowToBlock: (row: unknown) => this.rowToBlock(row),
+      rowToAssociation: (row: unknown) => this.rowToAssociation(row),
+      rowToRawSession: (row: unknown) => this.rowToRawSession(row),
+      rowToRawMessage: (row: unknown) => this.rowToRawMessage(row),
+      rowToMemoryProcessingJob: (row: unknown) => this.rowToMemoryProcessingJob(row),
+      rowToSessionRecord: (row: unknown, messages: unknown[]) =>
+        this.rowToSessionRecord(row, messages as any[]),
     });
-    this.sessionRecordRepository = new SessionRecordRepository({
-      db: this.db as any,
-      rowToSessionRecord: (row: unknown, messages: unknown[]) => this.rowToSessionRecord(row, messages as any[]),
-    });
-    this.initialize();
+
+    this.blockRepository = repositoryBundle.blockRepository;
+    this.associationRepository = repositoryBundle.associationRepository;
+    this.rawMemoryRepository = repositoryBundle.rawMemoryRepository;
+    this.hostImportCursorStore = repositoryBundle.hostImportCursorStore;
+    this.memoryProcessingJobQueue = repositoryBundle.memoryProcessingJobQueue;
+    this.databaseStatsRepository = repositoryBundle.databaseStatsRepository;
+    this.sessionRecordRepository = repositoryBundle.sessionRecordRepository;
   }
 
   /**
@@ -240,72 +228,11 @@ export class CorivoDatabase {
     // Manual deletion of WAL will result in loss of uncheckpointed data.
   }
 
-  /**
-   * Initialize database
-   */
-  private initialize(): void {
-    // If encryption is enabled, try using SQLCipher
-    if (this.enableEncryption) {
-      this.useSQLCipher = this.trySetupSQLCipher();
-    }
-
-    // Enable WAL mode (supports concurrent reading and writing)
-    this.db.pragma('journal_mode = WAL');
-
-    // Other configurations
-    this.db.pragma('foreign_keys = OFF'); // Do not use foreign keys
-    this.db.pragma('synchronous = NORMAL'); // Balance performance and security
-    this.db.pragma('cache_size = -64000'); // 64MB cache
-    this.db.pragma('temp_store = MEMORY');
-
-    this.createSchema();
-  }
-
   private getContentKey(): Buffer {
     if (!this.config.key) {
       throw new DatabaseError('Missing database key for encrypted content operations');
     }
     return this.config.key;
-  }
-
-  /**
-   * Try setting up SQLCipher encryption
-   *
-   * @returns Whether SQLCipher was successfully set up
-   */
-  private trySetupSQLCipher(): boolean {
-    try {
-      if (!this.config.key) {
-        throw new Error('Missing database key');
-      }
-      const hexKey = this.config.key.toString('hex');
-
-      // Set encryption key
-      this.db.pragma(`key = "x'${hexKey}'"`);
-
-      // Try querying cipher_version to verify that SQLCipher is available
-      const result = this.db.pragma('cipher_version');
-      this.useSQLCipher = result !== undefined;
-
-      if (this.useSQLCipher) {
-        // SQLCipher is available, configure encryption parameters
-        // Strengthening key derivation using PBKDF2
-        this.db.pragma('kdf_iter = 256000'); // PBKDF2 iteration number
-        this.db.pragma('cipher_page_size = 4096');
-      }
-
-      return this.useSQLCipher;
-    } catch {
-      // SQLCipher is unavailable, falling back to application layer encryption
-      return false;
-    }
-  }
-
-  /**
-   * Create database table structure
-   */
-  private createSchema(): void {
-    ensureDatabaseSchema({ db: this.db as any });
   }
 
   /**

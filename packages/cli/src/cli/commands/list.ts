@@ -8,7 +8,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
+import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
+import { openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import { ConfigError } from '../../errors/index.js';
 import type { BlockFilter, BlockStatus } from '@/domain/memory/models/block.js';
 import { getCliOutput } from '@/cli/runtime';
@@ -79,7 +80,7 @@ listCommand
     }
 
     const dbPath = getDefaultDatabasePath();
-    const db = CorivoDatabase.getInstance({
+    const db = openCorivoDatabase({
       path: dbPath,
       enableEncryption: false,
     });

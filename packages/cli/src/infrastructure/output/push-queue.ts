@@ -6,7 +6,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { getConfigDir } from '@/storage/database';
+import { getConfigDir } from '@/infrastructure/storage/lifecycle/database-paths.js';
 import type { PushItem } from '@/domain/memory/services/trigger-decision.js';
 
 /**

@@ -1,4 +1,5 @@
-import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
+import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
+import { CorivoDatabase, openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import {
   ArtifactStore,
   createInitMemoryPipeline,
@@ -62,7 +63,7 @@ const defaultRuntimeDependencies: MemoryPipelineRuntimeDependencies = {
   resolveDatabasePath: getDefaultDatabasePath,
   createLogger: createLogger,
   readConfig: readMemoryPipelineConfig,
-  openDatabase: (dbPath) => CorivoDatabase.getInstance({ path: dbPath, enableEncryption: false }),
+  openDatabase: (dbPath) => openCorivoDatabase({ path: dbPath, enableEncryption: false }),
   closeDatabase: () => {
     // No-op; the CorivoDatabase lifecycle is managed at the process level.
   },

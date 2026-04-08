@@ -7,7 +7,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { getConfigDir } from '@/storage/database';
+import { getConfigDir } from '@/infrastructure/storage/lifecycle/database-paths.js';
 import type { CliOutput } from '@/cli/runtime';
 import { getCliOutput } from '@/cli/runtime';
 

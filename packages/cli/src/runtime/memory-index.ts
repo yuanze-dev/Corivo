@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { getConfigDir } from '@/storage/database';
+import { getConfigDir } from '@/infrastructure/storage/lifecycle/database-paths.js';
 import type { QueryPack } from './query-pack.js';
 import type { CorivoSurfaceItem } from './types.js';
 

@@ -6,7 +6,8 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
+import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
+import { openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import { KeyManager } from '../../crypto/keys.js';
 import { readPassword } from '../utils/password.js';
 import { getCliOutput } from '@/cli/runtime';
@@ -50,7 +51,7 @@ export async function doctorCommand(): Promise<void> {
       const encryptedDbKey = config.encrypted_db_key;
       const dbKey = KeyManager.decryptDatabaseKey(encryptedDbKey, masterKey);
 
-      const db = CorivoDatabase.getInstance({ path: dbPath, key: dbKey });
+      const db = openCorivoDatabase({ path: dbPath, key: dbKey });
       const health = db.checkHealth();
 
       if (health.ok) {

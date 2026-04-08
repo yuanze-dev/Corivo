@@ -4,7 +4,7 @@
  * Unified entry point for all Corivo push logic
  */
 
-import type { CorivoDatabase } from '@/storage/database';
+import type { CorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import { SuggestionEngine, SuggestionContext } from '@/domain/memory/services/suggestion.js';
 import { ContextPusher } from './context.js';
 import {

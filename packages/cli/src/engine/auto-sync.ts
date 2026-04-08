@@ -6,7 +6,7 @@
  */
 
 import { applyPulledChangesets, authenticate, post, type PulledChangeset } from '../runtime/sync-client.js';
-import type { CorivoDatabase } from '@/storage/database';
+import type { CorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import type { CorivoConfig, SolverConfig } from '@/config';
 import type { Logger } from '@/utils/logging.js';
 

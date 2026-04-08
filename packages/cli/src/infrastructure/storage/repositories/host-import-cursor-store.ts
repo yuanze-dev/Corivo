@@ -1,6 +1,6 @@
 import { DatabaseError } from '@/errors';
 import type { HostId } from '@/domain/host/contracts/types.js';
-import type { CorivoDatabase } from '@/storage/database';
+import type { CorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 
 interface StorageSqliteDb {
   prepare(sql: string): any;

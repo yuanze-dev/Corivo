@@ -8,7 +8,8 @@ import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { coldScan } from '@/cold-scan';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
+import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
+import { openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import { printBanner } from '@/utils/banner';
 import { getCliOutput } from '@/cli/runtime';
 
@@ -51,7 +52,7 @@ coldScanCommand
 
         if (config && !config.encrypted_db_key) {
           const dbPath = process.env.CORIVO_DB_PATH || getDefaultDatabasePath();
-          const db = CorivoDatabase.getInstance({ path: dbPath, enableEncryption: false });
+          const db = openCorivoDatabase({ path: dbPath, enableEncryption: false });
 
           // Use transactions to save blocks in batches to ensure data persistence
           let saved = 0;

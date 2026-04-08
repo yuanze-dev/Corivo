@@ -6,7 +6,7 @@
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { getConfigDir, getDefaultDatabasePath } from '@/storage/database'
+import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js'
 import { ConfigError } from '../../errors/index.js'
 import { getServiceManager, resolveCorivoBin } from '@/infrastructure/platform/index.js'
 import { getCliOutput } from '@/cli/runtime'

@@ -8,7 +8,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
 import { KeyManager } from '../../crypto/keys.js';
-import { getConfigDir } from '@/storage/database';
+import { getConfigDir } from '@/infrastructure/storage/lifecycle/database-paths.js';
 import { printBanner } from '@/utils/banner';
 import { ConfigError, ValidationError } from '../../errors/index.js';
 import { readPassword } from '../utils/password.js';

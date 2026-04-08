@@ -6,7 +6,7 @@ import { ConfigError, ValidationError } from '@/errors/index.js';
 import { validateAnnotation, type Block } from '@/domain/memory/models/block.js';
 import { resolveMemoryProvider } from '@/domain/memory/providers/resolve-memory-provider.js';
 import type { MemoryProvider, MemoryProviderName } from '@/domain/memory/providers/types.js';
-import { getConfigDir } from '@/storage/database.js';
+import { getConfigDir } from '@/infrastructure/storage/lifecycle/database-paths.js';
 import type { ConflictReminder } from '@/domain/memory/services/conflict-detector.js';
 
 const LEGACY_CONFIG_ERROR =

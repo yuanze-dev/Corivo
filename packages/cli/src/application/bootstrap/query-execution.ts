@@ -16,7 +16,7 @@ import { resolveMemoryProvider } from '@/domain/memory/providers/resolve-memory-
 import { isMemoryProviderUnavailableError } from '@/domain/memory/providers/types.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { getConfigDir } from '@/storage/database';
+import { getConfigDir } from '@/infrastructure/storage/lifecycle/database-paths.js';
 
 export interface QueryOptions {
   limit?: string;

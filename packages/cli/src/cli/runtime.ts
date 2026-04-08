@@ -2,7 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { CorivoConfig, SolverConfig } from '@/config';
 import { loadConfig, loadSolverConfig, saveSolverConfig } from '@/config';
-import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
+import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
+import { CorivoDatabase, openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import {
   createLogger,
   resolveRuntimeLogLevel,
@@ -104,7 +105,7 @@ export async function saveCliSolver(config: SolverConfig, configDir?: string): P
 }
 
 export function getCliDatabase(options: { path?: string; enableEncryption?: boolean } = {}): CorivoDatabase {
-  return CorivoDatabase.getInstance({
+  return openCorivoDatabase({
     path: options.path ?? getDefaultDatabasePath(),
     enableEncryption: options.enableEncryption,
   });

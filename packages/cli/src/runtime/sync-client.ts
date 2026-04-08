@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import type { CorivoDatabase } from '@/storage/database';
+import type { CorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import type { Logger as SyncLogger } from '../utils/logging.js';
 
 export interface PulledChangeset {

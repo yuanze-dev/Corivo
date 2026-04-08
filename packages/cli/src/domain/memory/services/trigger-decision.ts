@@ -4,7 +4,7 @@
  * Let Corivo decide when it needs to tell the user what
  */
 
-import type { CorivoDatabase } from '@/storage/database';
+import type { MemoryServiceDatabase } from '@/domain/memory/contracts/service-database.js';
 import type { Block } from '@/domain/memory/models/block.js';
 import {
   collectAttentionBlocks,
@@ -65,7 +65,7 @@ export class TriggerDecision {
   private readonly renderPolicy: TriggerPushRenderPolicy;
 
   constructor(
-    private readonly db: CorivoDatabase,
+    private readonly db: MemoryServiceDatabase,
     runtime: {
       policy?: Partial<TriggerPolicy>;
       outputPolicy?: Partial<TriggerOutputPolicy>;

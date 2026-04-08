@@ -8,7 +8,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
 import { KeyManager } from '../../crypto/keys.js';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
+import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
+import { openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import { ConfigError, ValidationError } from '../../errors/index.js';
 import { readPassword } from '../utils/password.js';
 import { getCliOutput } from '@/cli/runtime';
@@ -80,7 +81,7 @@ export async function unlockCommand(options: UnlockOptions = {}): Promise<void> 
 
   // Open database
   const dbPath = getDefaultDatabasePath();
-  const db = CorivoDatabase.getInstance({
+  const db = openCorivoDatabase({
     path: dbPath,
     key: dbKey,
     enableEncryption: needsPassword,

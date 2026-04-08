@@ -1,7 +1,8 @@
 import React from 'react';
 import { render } from 'ink';
 import path from 'node:path';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '../storage/database.js';
+import { getConfigDir, getDefaultDatabasePath } from '../infrastructure/storage/lifecycle/database-paths.js';
+import { openCorivoDatabase } from '../infrastructure/storage/lifecycle/database.js';
 import { loadConfig } from '../config.js';
 import { App } from './App.js';
 
@@ -32,7 +33,7 @@ export async function renderTui(): Promise<void> {
     process.exit(1);
   }
 
-  const db = CorivoDatabase.getInstance({
+  const db = openCorivoDatabase({
     path: dbPath,
     enableEncryption: false,
   });

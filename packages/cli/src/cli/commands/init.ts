@@ -13,7 +13,8 @@
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
+import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
+import { openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import { FileSystemError } from '../../errors/index.js';
 import {
   initializeIdentity,
@@ -131,7 +132,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
 
     if (!existingConfig || existingConfig.identity_id !== identityId) {
       output.info('\nCreating encrypted database...');
-      const db = CorivoDatabase.getInstance({ path: dbPath });
+      const db = openCorivoDatabase({ path: dbPath });
       const health = db.checkHealth();
       if (!health.ok) {
         output.error('❌ Failed to create database');
@@ -221,7 +222,7 @@ export async function initCommand(options: { join?: string; server?: string } = 
 
   output.info('Creating local database...');
 
-  const db = CorivoDatabase.getInstance({ path: dbPath });
+  const db = openCorivoDatabase({ path: dbPath });
 
   // Verify that the database was created and is healthy.
   const health = db.checkHealth();

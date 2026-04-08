@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
+import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
+import { CorivoDatabase, openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import { ConfigError } from '@/errors/index.js';
 
 export interface RuntimeCommandOptions {
@@ -25,7 +26,7 @@ export async function loadRuntimeDb(_options: RuntimeCommandOptions = {}): Promi
     throw new ConfigError('Detected a legacy password-based config. Corivo v0.10+ no longer supports passwords here; please run: corivo init');
   }
 
-  return CorivoDatabase.getInstance({
+  return openCorivoDatabase({
     path: dbPath,
     enableEncryption: false,
   });

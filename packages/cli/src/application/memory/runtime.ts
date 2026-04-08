@@ -1,11 +1,11 @@
 import path from 'node:path';
-import { CorivoDatabase } from '@/storage/database';
 import {
   ArtifactStore,
   FileRunLock,
   MemoryPipelineRunner,
   type MemoryPipelineArtifactStore,
 } from '@/memory-pipeline';
+import { CorivoDatabase, openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import type { Logger } from '@/utils/logging';
 
 export function getMemoryPipelineRunRoot(configDir: string): string {
@@ -30,7 +30,7 @@ export function createMemoryPipelineRunner(options: {
 }
 
 export function openMemoryPipelineDatabase(dbPath: string): CorivoDatabase {
-  return CorivoDatabase.getInstance({ path: dbPath, enableEncryption: false });
+  return openCorivoDatabase({ path: dbPath, enableEncryption: false });
 }
 
 export function closeMemoryPipelineDatabase(): void {

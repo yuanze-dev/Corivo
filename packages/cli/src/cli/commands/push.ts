@@ -8,7 +8,8 @@ import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { generateFirstPush, getWelcomeMessage } from '../../first-push/index.js';
-import { CorivoDatabase, getDefaultDatabasePath, getConfigDir } from '@/storage/database';
+import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
+import { openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import { getCliOutput } from '@/cli/runtime';
 
 export const pushCommand = new Command('push');
@@ -52,7 +53,7 @@ pushCommand
         return;
       }
 
-      const db = CorivoDatabase.getInstance({ path: dbPath, enableEncryption: false });
+      const db = openCorivoDatabase({ path: dbPath, enableEncryption: false });
 
       if (options.firstActivation) {
         // Output self-introduction for first activation

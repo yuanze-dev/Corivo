@@ -24,6 +24,9 @@ vi.mock('@/storage/database', () => ({
   CorivoDatabase: {
     getInstance: vi.fn(),
   },
+}));
+
+vi.mock('@/infrastructure/storage/lifecycle/database-paths.js', () => ({
   getConfigDir: () => '/tmp/test-home/.corivo',
   getDefaultDatabasePath: () => '/tmp/test-home/.corivo/corivo.db',
 }));

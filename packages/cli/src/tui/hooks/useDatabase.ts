@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import type { CorivoDatabase } from '@/storage/database';
+import type { CorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import type { Block } from '@/domain/memory/models/index.js';
 
 export interface DbStats {

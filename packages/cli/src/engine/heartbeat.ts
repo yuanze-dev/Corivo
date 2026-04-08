@@ -7,7 +7,8 @@
  */
 
 import fs from 'node:fs/promises';
-import { CorivoDatabase, getConfigDir } from '@/storage/database';
+import { getConfigDir } from '@/infrastructure/storage/lifecycle/database-paths.js';
+import { CorivoDatabase, openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import { RuleEngine } from './rules/index.js';
 import { TechChoiceRule } from './rules/tech-choice.js';
 import { AssociationEngine } from '@/domain/memory/services/associations.js';
@@ -149,7 +150,7 @@ export class Heartbeat {
       }
 
       // Open the database
-      this.db = CorivoDatabase.getInstance({ path: dbPath });
+      this.db = openCorivoDatabase({ path: dbPath });
 
       // Initialize managers that depend on the database
       this.weeklySummary = new WeeklySummary(this.db);
@@ -360,7 +361,7 @@ export class Heartbeat {
           throw new Error('缺少环境变量：CORIVO_DB_PATH');
         }
 
-        this.db = CorivoDatabase.getInstance({ path: dbPath });
+        this.db = openCorivoDatabase({ path: dbPath });
       }
 
       // Process pending blocks with a relaxed count limit

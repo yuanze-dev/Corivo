@@ -4,7 +4,7 @@
  * Provide gentle progress reminders for pending decisions: "What happened to that xxx?"
  */
 
-import type { CorivoDatabase } from '@/storage/database';
+import type { MemoryServiceDatabase } from '@/domain/memory/contracts/service-database.js';
 import type { Block } from '@/domain/memory/models/index.js';
 import {
   collectFollowUpReminderItems,
@@ -35,7 +35,7 @@ export class FollowUpManager {
   private readonly renderPolicy: FollowUpRenderPolicy;
 
   constructor(
-    private readonly db: CorivoDatabase,
+    private readonly db: MemoryServiceDatabase,
     options: {
       retrievalPolicy?: Partial<FollowUpRetrievalPolicy>;
       renderPolicy?: Partial<FollowUpRenderPolicy>;

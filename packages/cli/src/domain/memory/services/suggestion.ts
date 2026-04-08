@@ -7,7 +7,7 @@
  * "Predict what the user will type, not what you think they should do."
  */
 
-import type { CorivoDatabase } from '@/storage/database';
+import type { MemoryServiceDatabase } from '@/domain/memory/contracts/service-database.js';
 import type { Block } from '@/domain/memory/models/block.js';
 
 /**
@@ -46,10 +46,10 @@ export interface Suggestion {
  * Suggestion engine
  */
 export class SuggestionEngine {
-  private db: CorivoDatabase;
+  private db: MemoryServiceDatabase;
   private config: Required<SuggestionConfig>;
 
-  constructor(db: CorivoDatabase, config: SuggestionConfig = {}) {
+  constructor(db: MemoryServiceDatabase, config: SuggestionConfig = {}) {
     this.db = db;
     this.config = {
       maxSuggestions: config.maxSuggestions ?? 1,

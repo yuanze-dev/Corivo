@@ -1,6 +1,6 @@
 import { MemoryProcessingJobQueue } from '@/infrastructure/storage/repositories/memory-processing-job-queue';
 import { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-memory-repository';
-import { type CorivoDatabase } from '@/storage/database';
+import { type CorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import {
   DatabaseRawSessionJobSource,
   DatabaseRawSessionRecordSource,

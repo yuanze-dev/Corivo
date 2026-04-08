@@ -4,7 +4,7 @@
  * Push relevant memories alongside query results
  */
 
-import type { CorivoDatabase } from '@/storage/database';
+import type { CorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import type { Block, Association } from '@/domain/memory/models/index.js';
 import { AssociationType } from '@/domain/memory/models/association.js';
 

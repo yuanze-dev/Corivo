@@ -18,14 +18,60 @@ describe('module boundaries baseline', () => {
     expect(existsSync(docPath)).toBe(true);
 
     const content = readFileSync(docPath, 'utf8');
-    expect(content).toContain('cli/commands');
-    expect(content).toContain('application/*');
-    expect(content).toContain('runtime/*');
-    expect(content).toContain('utils/*');
-    expect(content).toContain('engine/*');
-    expect(content).toContain('cli/runtime.ts');
-    expect(content).toContain('memory-pipeline/*');
-    expect(content).toContain('plugins/*/hooks/scripts/*.sh');
+    expect(content).toContain('cli -> application -> domain');
+    expect(content).toContain('application -> infrastructure');
+    expect(content).toContain('runtime -> application / domain / infrastructure');
+    expect(content).toContain('infrastructure -> domain');
+    expect(content).toContain('domain -> infrastructure');
+    expect(content).toContain('domain -> cli');
+    expect(content).toContain('application -> runtime');
+    expect(content).toContain('engine/');
+    expect(content).toContain('service/');
+    expect(content).toContain('storage/');
+    expect(content).toContain('hosts/');
+    expect(content).toContain('models/');
+    expect(content).toContain('type/');
+    expect(content).toContain('memory-pipeline/');
+    expect(content).toContain('packages/plugins/*/hooks/scripts/*.sh');
+  });
+
+  it('keeps the de-monolith architecture spec present with the phase 1 baseline', () => {
+    const docPath = path.join(repoRoot, 'docs/architecture/cli-de-monolith-layering-plan-2026-04.md');
+    expect(existsSync(docPath)).toBe(true);
+
+    const content = readFileSync(docPath, 'utf8');
+    expect(content).toContain('Phase 1：建立唯一有效的层语义');
+    expect(content).toContain('cli/');
+    expect(content).toContain('application/');
+    expect(content).toContain('domain/');
+    expect(content).toContain('infrastructure/');
+    expect(content).toContain('runtime/');
+    expect(content).toContain('freeze');
+    expect(content).toContain('identity/');
+    expect(content).toContain('push/');
+    expect(content).toContain('cold-scan/');
+    expect(content).toContain('raw-memory/');
+    expect(content).toContain('first-push/');
+    expect(content).toContain('ingestors/');
+    expect(content).toContain('update/');
+  });
+
+  it('keeps per-layer readmes present', () => {
+    const layerReadmes = [
+      'packages/cli/src/application/README.md',
+      'packages/cli/src/domain/README.md',
+      'packages/cli/src/infrastructure/README.md',
+      'packages/cli/src/runtime/README.md',
+    ];
+
+    for (const relativePath of layerReadmes) {
+      const absolutePath = path.join(repoRoot, relativePath);
+      expect(existsSync(absolutePath)).toBe(true);
+      const content = readFileSync(absolutePath, 'utf8');
+      expect(content).toContain('负责什么');
+      expect(content).toContain('不负责什么');
+      expect(content).toContain('常见误放');
+    }
   });
 
   it('forbids cli command imports from engine modules', () => {

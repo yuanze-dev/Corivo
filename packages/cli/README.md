@@ -79,8 +79,36 @@ The current package is being migrated toward a second-generation split:
 - `src/domain/*`: core business logic, durable models, rules, and contracts
 - `src/infrastructure/*`: SQLite, config/filesystem, platform services, host implementations, LLM/provider adapters
 - `src/runtime/*`: daemon lifecycle, scheduling, and runtime policy glue
+- `src/memory-pipeline/*`: a controlled top-level subsystem, not a general-purpose spillover area
 
 When adding or moving code, prefer the target split above over older catch-all directories such as `service`, `engine`, or `type`.
+
+## Freeze Policy
+
+The following directories are in freeze mode and must not receive new feature code:
+
+- `src/engine/`
+- `src/service/`
+- `src/storage/`
+- `src/hosts/`
+- `src/models/`
+- `src/type/`
+
+Freeze means:
+
+- bugfixes are allowed
+- migration edits are allowed
+- new responsibilities must not be added
+- any temporary compatibility shim should be removed in the same task batch or the immediately following cleanup
+
+Additional top-level directories such as `src/identity/`, `src/push/`, `src/cold-scan/`, `src/raw-memory/`, `src/first-push/`, `src/ingestors/`, and `src/update/` are controlled exceptions, not long-term bucket directories.
+
+## Boundary Docs
+
+Use these docs as the source of truth before placing new code:
+
+- `docs/architecture/cli-de-monolith-layering-plan-2026-04.md`
+- `docs/architecture/module-boundaries-2026-04.md`
 
 ## Memory Pipeline
 

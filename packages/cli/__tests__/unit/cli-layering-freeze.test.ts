@@ -31,24 +31,20 @@ const APPROVED_TOP_LEVEL_DIRECTORIES = [
   'engine',
   'errors',
   'first-push',
-  'hosts',
   'identity',
   'infrastructure',
   'ingestors',
   'memory-pipeline',
-  'models',
   'push',
   'raw-memory',
   'runtime',
-  'service',
   'storage',
   'tui',
-  'type',
   'update',
   'utils',
 ] as const;
 
-const FROZEN_DIRECTORIES = ['engine', 'service', 'storage', 'hosts', 'models', 'type'] as const;
+const FROZEN_DIRECTORIES = ['engine', 'storage'] as const;
 
 const ALLOWED_CROSS_LAYER_IMPORTS = new Set<string>([
   'packages/cli/src/domain/memory/models/index.ts:@/runtime/types.js',

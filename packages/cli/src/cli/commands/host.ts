@@ -4,8 +4,7 @@ import type { HostDoctorRequest } from '@/application/hosts/doctor-host';
 import type { HostInstallRequest } from '@/application/hosts/install-host';
 import type { HostUninstallRequest } from '@/application/hosts/uninstall-host';
 import { hostImportCommand } from './host-import.js';
-import type { HostDoctorResult, HostId, HostInstallResult } from '@/hosts';
-import type { HostAdapter } from '@/hosts';
+import type { HostDoctorResult, HostId, HostInstallResult, HostAdapter } from '@/infrastructure/hosts/index.js';
 
 export interface HostCommandDeps {
   listHosts?: () => readonly HostAdapter[];

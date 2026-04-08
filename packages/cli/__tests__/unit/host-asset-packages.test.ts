@@ -29,7 +29,7 @@ describe('host asset package installer', () => {
   });
 
   it('returns the versioned cache install root for a host package', async () => {
-    const { getHostAssetPackageInstallRoot } = await import('../../src/hosts/installers/host-asset-packages.js');
+    const { getHostAssetPackageInstallRoot } = await import('../../src/infrastructure/hosts/installers/host-asset-packages.js');
 
     expect(getHostAssetPackageInstallRoot('codex', { homeDir: tempHome, version: '0.12.7' })).toBe(
       path.join(tempHome, '.corivo', 'host-assets', 'packages', 'codex', '0.12.7'),
@@ -44,7 +44,7 @@ describe('host asset package installer', () => {
     await fs.mkdir(cachedPackageRoot, { recursive: true });
     await fs.writeFile(path.join(cachedPackageRoot, 'package.json'), '{"name":"@corivo-ai/codex"}\n', 'utf8');
 
-    const { ensureHostAssetPackage } = await import('../../src/hosts/installers/host-asset-packages.js');
+    const { ensureHostAssetPackage } = await import('../../src/infrastructure/hosts/installers/host-asset-packages.js');
     const result = await ensureHostAssetPackage('codex', { homeDir: tempHome, packageRoot, version: '0.12.7' });
 
     expect(result.packageRoot).toBe(cachedPackageRoot);
@@ -65,7 +65,7 @@ describe('host asset package installer', () => {
     const packageRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'corivo-host-asset-install-root-'));
     await fs.writeFile(path.join(packageRoot, 'package.json'), '{"name":"test-cli","version":"0.12.7"}\n', 'utf8');
 
-    const { ensureHostAssetPackage } = await import('../../src/hosts/installers/host-asset-packages.js');
+    const { ensureHostAssetPackage } = await import('../../src/infrastructure/hosts/installers/host-asset-packages.js');
     const result = await ensureHostAssetPackage('codex', { homeDir: tempHome, packageRoot, version: '0.12.7' });
 
     expect(result.installed).toBe(true);

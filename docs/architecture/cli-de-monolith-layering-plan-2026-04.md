@@ -45,6 +45,12 @@ Draft
 - `hosts/`
 - `models/`
 - `type/`
+
+其中：
+
+- `service/` 与 `hosts/` 已经迁移完并删除
+- `models/` 与 `type/` 作为历史桶目录已经清空并移除
+- 后续若再出现同类顶层目录，应视为新增架构回退
 - `utils/`
 - 以及多组按 feature 平铺的顶层目录
 
@@ -348,11 +354,13 @@ domain -> 无外层依赖
 以下目录进入 **freeze** 状态：
 
 - `engine/`
-- `service/`
 - `storage/`
-- `hosts/`
 - `models/`
 - `type/`
+
+说明：
+
+- `service/` 与 `hosts/` 已完成迁移并删除，不再作为保留中的 freeze 目录存在
 
 freeze 的定义是：
 

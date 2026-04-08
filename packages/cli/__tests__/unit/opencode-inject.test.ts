@@ -7,7 +7,7 @@ import { generateOpencodePluginAsset } from '../../../plugins/opencode/scripts/s
 import {
   injectGlobalOpencodePlugin,
   resolvePackagedOpencodePluginAssetPath,
-} from '../../src/hosts/installers/opencode-plugin.js';
+} from '../../src/infrastructure/hosts/installers/opencode-plugin.js';
 
 const PACKAGED_OPENCODE_PLUGIN_ASSET = fileURLToPath(
   new URL('../../../plugins/opencode/assets/corivo.ts', import.meta.url),

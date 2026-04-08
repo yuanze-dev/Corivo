@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 import {
   importClaudeHistory,
   parseClaudeSessionFile,
-} from '../../src/hosts/importers/claude-history.js';
-import { claudeCodeHostAdapter } from '../../src/hosts/adapters/claude-code.js';
+} from '../../src/infrastructure/hosts/importers/claude-history.js';
+import { claudeCodeHostAdapter } from '../../src/infrastructure/hosts/adapters/claude-code.js';
 
 describe('Claude history importer', () => {
   it('parses a Claude session file into an imported session record', async () => {

@@ -26,11 +26,12 @@ describe('module boundaries baseline', () => {
     expect(content).toContain('domain -> cli');
     expect(content).toContain('application -> runtime');
     expect(content).toContain('engine/');
-    expect(content).toContain('service/');
     expect(content).toContain('storage/');
-    expect(content).toContain('hosts/');
-    expect(content).toContain('models/');
-    expect(content).toContain('type/');
+    expect(content).toContain('`service/`');
+    expect(content).toContain('`hosts/`');
+    expect(content).toContain('`models/`');
+    expect(content).toContain('`type/`');
+    expect(content).toContain('已经清空并移除');
     expect(content).toContain('memory-pipeline/');
     expect(content).toContain('packages/plugins/*/hooks/scripts/*.sh');
   });

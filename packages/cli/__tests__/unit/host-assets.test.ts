@@ -10,7 +10,7 @@ import {
   resolveHostAssetRoot,
   resolveHostRawAssetPath,
   readHostTemplateText,
-} from '../../src/hosts/installers/host-assets.js';
+} from '../../src/infrastructure/hosts/installers/host-assets.js';
 
 describe('host assets loader', () => {
   afterEach(() => {

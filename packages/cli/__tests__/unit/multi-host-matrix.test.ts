@@ -7,7 +7,7 @@ import {
   getHostAdapterOutputFormat,
 } from '../../src/runtime/host-adapter.js';
 import type { HostAdapterCapability } from '../../src/runtime/types.js';
-import { getHostAdapter } from '../../src/hosts/registry.js';
+import { getHostAdapter } from '../../src/infrastructure/hosts/registry.js';
 import { resolveHostBridgeCommand } from '../../src/runtime/host-bridge-policy.js';
 import { createBridgeHostEventUseCase } from '../../src/application/hosts/bridge-host-event.js';
 

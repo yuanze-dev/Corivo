@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getHostAdapter } from '../../src/hosts/registry.js';
+import { getHostAdapter } from '../../src/infrastructure/hosts/registry.js';
 
 describe('host registry contract (real helpers)', () => {
   it('does not expose the removed project-claude adapter', async () => {

@@ -2,8 +2,8 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { codexHostAdapter } from '../../src/hosts/adapters/codex.js';
-import { importCodexHistory } from '../../src/hosts/importers/codex-history.js';
+import { codexHostAdapter } from '../../src/infrastructure/hosts/adapters/codex.js';
+import { importCodexHistory } from '../../src/infrastructure/hosts/importers/codex-history.js';
 
 describe('Codex history importer', () => {
   it('imports only user event messages and assistant final answers', async () => {

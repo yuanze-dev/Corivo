@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createHostInstallUseCase } from '../../src/application/hosts/install-host.js';
-import type { HostAdapter, HostId, HostImportResult, HostInstallResult } from '../../src/hosts/types.js';
+import type { HostAdapter, HostId, HostImportResult, HostInstallResult } from '../../src/domain/host/contracts/types.js';
 
 describe('install host use case', () => {
   function createLogger() {

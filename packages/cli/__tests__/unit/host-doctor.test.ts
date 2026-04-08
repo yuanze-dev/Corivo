@@ -6,22 +6,22 @@ import {
   installCodexHost,
   isCodexInstalled,
   uninstallCodexHost,
-} from '../../src/hosts/installers/codex-rules.js';
+} from '../../src/infrastructure/hosts/installers/codex-rules.js';
 import {
   installCursorHost,
   isCursorInstalled,
   uninstallCursorHost,
-} from '../../src/hosts/installers/cursor-rules.js';
+} from '../../src/infrastructure/hosts/installers/cursor-rules.js';
 import {
   installOpencodeHost,
   isOpencodeInstalled,
   uninstallOpencodeHost,
-} from '../../src/hosts/installers/opencode-plugin.js';
+} from '../../src/infrastructure/hosts/installers/opencode-plugin.js';
 import {
   installClaudeCodeHost,
   isClaudeCodeInstalled,
   uninstallClaudeCodeHost,
-} from '../../src/hosts/installers/claude-host.js';
+} from '../../src/infrastructure/hosts/installers/claude-host.js';
 
 function toCheckMap(checks: Array<{ label: string; ok: boolean }>): Record<string, boolean> {
   return Object.fromEntries(checks.map((item) => [item.label, item.ok]));

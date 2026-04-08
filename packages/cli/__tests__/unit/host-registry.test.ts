@@ -40,7 +40,7 @@ vi.mock('../../src/infrastructure/hosts/installers/opencode-plugin.js', () => ({
   uninstallOpencodeHost,
 }));
 
-const { getAllHostAdapters, getHostAdapter } = await import('../../src/hosts/registry.js');
+const { getAllHostAdapters, getHostAdapter } = await import('../../src/infrastructure/hosts/registry.js');
 
 beforeEach(() => {
   vi.clearAllMocks();

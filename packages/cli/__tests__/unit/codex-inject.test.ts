@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const CODEX_TEMPLATE_PATH = path.resolve('../plugins/codex/templates/AGENTS.codex.md');
 const CODEX_REVIEW_ADAPTER_PATH = path.resolve('../plugins/codex/adapters/notify-review.sh');
-const CODEX_RULES_MODULE_PATH = '../../src/hosts/installers/codex-rules.js';
+const CODEX_RULES_MODULE_PATH = '../../src/infrastructure/hosts/installers/codex-rules.js';
 
 describe('Codex Corivo integration', () => {
   let tempDir: string;

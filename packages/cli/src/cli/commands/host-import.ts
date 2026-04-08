@@ -6,7 +6,7 @@ import {
   persistImportedSessions,
 } from '@/application/hosts/import-host';
 import { createEnqueueSessionExtractionUseCase } from '@/application/memory-ingest/enqueue-session-extraction';
-import type { HostId, HostImportResult } from '@/hosts';
+import type { HostId, HostImportResult } from '@/domain/host/contracts/types.js';
 import type { HostImportRequest } from '@/application/hosts/import-host';
 import { HostImportCursorStore } from '@/infrastructure/storage/repositories/host-import-cursor-store';
 import { MemoryProcessingJobQueue } from '@/infrastructure/storage/repositories/memory-processing-job-queue';

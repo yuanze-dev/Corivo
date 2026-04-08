@@ -32,11 +32,13 @@ domain -> no outer-layer dependencies
 以下目录已进入 freeze：
 
 - `engine/`
-- `service/`
 - `storage/`
-- `hosts/`
-- `models/`
-- `type/`
+
+补充说明：
+
+- `service/` 和 `hosts/` 已经完成迁移并删除；后续不应重新创建这些顶层兼容目录
+- `models/` 和 `type/` 已经清空并移除；后续不应重新创建这类顶层桶目录
+- 新的模型与类型必须就近落在 `domain/*`、`application/*` 或具体 adapter 模块中
 
 freeze 的含义：
 

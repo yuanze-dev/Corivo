@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { applyPulledChangesets, post } from '../../src/runtime/sync-client.js';
-import type { Logger } from '../../src/utils/logging.js';
+import type { Logger } from '../../src/infrastructure/logging.js';
 
 function createMockLogger(logs: string[], errors: string[]): Logger {
   return {
@@ -21,7 +21,7 @@ describe('sync logging', () => {
     const logger = createMockLogger(logs, errors);
     const db = {
       upsertBlock: vi.fn(),
-    } as unknown as import('@/storage/database').CorivoDatabase;
+    } as unknown as import('@/infrastructure/storage/facade/database').CorivoDatabase;
 
     const applied = applyPulledChangesets(
       db,
@@ -62,7 +62,7 @@ describe('sync logging', () => {
       upsertBlock: vi.fn(() => {
         throw new Error('SQLITE_CONSTRAINT');
       }),
-    } as unknown as import('@/storage/database').CorivoDatabase;
+    } as unknown as import('@/infrastructure/storage/facade/database').CorivoDatabase;
 
     expect(() =>
       applyPulledChangesets(

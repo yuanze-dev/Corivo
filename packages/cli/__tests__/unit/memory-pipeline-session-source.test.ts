@@ -1,10 +1,10 @@
 import fs from 'node:fs/promises';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { KeyManager } from '../../src/crypto/keys.js';
+import { KeyManager } from '../../src/infrastructure/crypto/keys.js';
 import { DatabaseClaudeSessionSource } from '../../src/memory-pipeline/sources/claude-session-source.js';
 import { DatabaseSessionRecordSource } from '../../src/memory-pipeline/sources/session-record-source.js';
-import { CorivoDatabase } from '@/storage/database';
+import { CorivoDatabase } from '@/infrastructure/storage/facade/database';
 
 describe('DatabaseSessionRecordSource', () => {
   let db: CorivoDatabase;

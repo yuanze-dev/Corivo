@@ -9,7 +9,7 @@ import { runReviewCommand } from '../../src/cli/commands/review.js';
 import { runSuggestCommand } from '../../src/cli/commands/suggest.js';
 import { createLocalMemoryProvider } from '../../src/domain/memory/providers/local-memory-provider.js';
 import { MemoryProviderUnavailableError } from '../../src/domain/memory/providers/types.js';
-import { ConfigError } from '../../src/errors/index.js';
+import { ConfigError } from '../../src/domain/errors/index.js';
 
 const { loadRuntimeDb, resolveMemoryProvider } = vi.hoisted(() => ({
   loadRuntimeDb: vi.fn(),

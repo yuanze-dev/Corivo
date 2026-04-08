@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createConfiguredCliLogger } from '../../src/cli/runtime.js';
 import type { CorivoConfig } from '../../src/config.js';
-import type { Logger } from '../../src/utils/logging.js';
+import type { Logger } from '../../src/infrastructure/logging.js';
 
 function createMockLogger(): Logger {
   return {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Heartbeat } from '../../src/engine/heartbeat.js';
-import type { Logger } from '../../src/utils/logging.js';
+import { Heartbeat } from '../../src/runtime/daemon/heartbeat.js';
+import type { Logger } from '../../src/infrastructure/logging.js';
 
 function createMockLogger(): Logger {
   return {

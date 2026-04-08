@@ -10,7 +10,7 @@ vi.mock('node:fs/promises', () => ({
   },
 }));
 
-import { ConfigError } from '../../src/errors/index.js';
+import { ConfigError } from '../../src/domain/errors/index.js';
 import { readMemoryPipelineConfig } from '../../src/application/memory/config.js';
 
 describe('readMemoryPipelineConfig', () => {

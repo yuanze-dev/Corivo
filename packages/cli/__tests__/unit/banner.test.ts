@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderBanner } from '../../src/utils/banner.js';
+import { renderBanner } from '../../src/cli/presenters/banner.js';
 
 describe('renderBanner', () => {
   it('renders a centered banner with subtitle', () => {

@@ -14,8 +14,8 @@ import {
   DOMAIN_TYPES,
 } from '../../src/domain/memory/models/block.js';
 import { Pattern, validatePattern, DECISION_TYPES } from '../../src/domain/memory/models/pattern.js';
-import { isCorivoError, wrapError, ERROR_CODES } from '../../src/errors/index.js';
-import { KeyManager } from '../../src/crypto/keys.js';
+import { isCorivoError, wrapError, ERROR_CODES } from '../../src/domain/errors/index.js';
+import { KeyManager } from '../../src/infrastructure/crypto/keys.js';
 
 // Mock BIP39 wordlist for testing
 const TEST_WORDLIST = [

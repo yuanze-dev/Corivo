@@ -6,8 +6,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { CorivoDatabase } from '@/storage/database';
-import { KeyManager } from '../../src/crypto/keys.js';
+import { CorivoDatabase } from '@/infrastructure/storage/facade/database';
+import { KeyManager } from '../../src/infrastructure/crypto/keys.js';
 import { validateAnnotation } from '../../src/domain/memory/models/block.js';
 
 describe('Edge Cases', () => {

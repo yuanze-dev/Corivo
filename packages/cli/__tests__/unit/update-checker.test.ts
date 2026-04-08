@@ -45,13 +45,13 @@ describe('update checker', () => {
   });
 
   it('returns the current package version', async () => {
-    const { getCurrentVersion } = await import('../../src/update/checker');
+    const { getCurrentVersion } = await import('../../src/infrastructure/update/checker');
 
     expect(getCurrentVersion()).toBe(packageJson.version);
   });
 
   it('checks the latest version from npm registry metadata', async () => {
-    const { checkForUpdate } = await import('../../src/update/checker');
+    const { checkForUpdate } = await import('../../src/infrastructure/update/checker');
 
     mockRegistryResponse(200, {
       'dist-tags': { latest: packageJson.version },
@@ -70,7 +70,7 @@ describe('update checker', () => {
 
   it('reports an available update from npm registry metadata', async () => {
     vi.stubEnv('CORIVO_CURRENT_VERSION', '0.11.0');
-    const { checkForUpdate } = await import('../../src/update/checker');
+    const { checkForUpdate } = await import('../../src/infrastructure/update/checker');
 
     mockRegistryResponse(200, {
       'dist-tags': { latest: '0.12.1' },
@@ -87,7 +87,7 @@ describe('update checker', () => {
   });
 
   it('runs npm global install for the requested version', async () => {
-    const { performUpdate } = await import('../../src/update/checker');
+    const { performUpdate } = await import('../../src/infrastructure/update/checker');
 
     const result = await performUpdate({
       version: '0.12.1',
@@ -112,7 +112,7 @@ describe('update checker', () => {
   });
 
   it('returns a graceful status when npm registry is unavailable', async () => {
-    const { checkForUpdate } = await import('../../src/update/checker');
+    const { checkForUpdate } = await import('../../src/infrastructure/update/checker');
 
     httpsGetMock.mockImplementationOnce((url: string, callback: (res: EventEmitter & { statusCode?: number }) => void) => {
       const response = new EventEmitter() as EventEmitter & { statusCode?: number };

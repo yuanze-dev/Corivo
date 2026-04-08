@@ -3,7 +3,7 @@ import { APIConnectionError } from 'supermemory';
 import { MemoryProviderUnavailableError } from '../../src/domain/memory/providers/types.js';
 import { createSupermemoryMemoryProvider } from '../../src/domain/memory/providers/supermemory-provider.js';
 import { resolveMemoryProvider } from '../../src/domain/memory/providers/resolve-memory-provider.js';
-import { ConfigError } from '../../src/errors/index.js';
+import { ConfigError } from '../../src/domain/errors/index.js';
 
 const {
   SupermemoryCtor,

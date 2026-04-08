@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CorivoDatabase } from '@/storage/database';
+import { CorivoDatabase } from '@/infrastructure/storage/facade/database';
 import type { Block } from '../../src/domain/memory/models/block.js';
 import type { MemoryProvider } from '../../src/domain/memory/providers/types.js';
 

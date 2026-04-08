@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CorivoConfig } from '../../src/config.js';
 import { loadConfig } from '../../src/config.js';
-import { ConfigError } from '../../src/errors/index.js';
+import { ConfigError } from '../../src/domain/errors/index.js';
 import { resolveMemoryProvider } from '../../src/domain/memory/providers/resolve-memory-provider.js';
 import { createLocalMemoryProvider } from '../../src/domain/memory/providers/local-memory-provider.js';
 

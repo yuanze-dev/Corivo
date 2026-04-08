@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ValidationError } from '../../src/errors/index.js';
+import { ValidationError } from '../../src/domain/errors/index.js';
 import { createSaveMemoryUseCase } from '../../src/application/memory/save-memory.js';
 import type { MemoryProvider } from '../../src/domain/memory/providers/types.js';
 import { createSaveCommand } from '../../src/cli/commands/save.js';

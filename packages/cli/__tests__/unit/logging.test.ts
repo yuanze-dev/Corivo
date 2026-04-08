@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createLogger, resolveRuntimeLogLevel } from '../../src/utils/logging.js';
+import { createLogger, resolveRuntimeLogLevel } from '../../src/infrastructure/logging.js';
 
 describe('createLogger', () => {
   it('debug 级别会输出 debug 日志', () => {

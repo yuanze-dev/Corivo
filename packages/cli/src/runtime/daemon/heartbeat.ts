@@ -9,23 +9,23 @@
 import fs from 'node:fs/promises';
 import { getConfigDir } from '@/infrastructure/storage/lifecycle/database-paths.js';
 import { CorivoDatabase, openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
-import { RuleEngine } from './rules/index.js';
-import { TechChoiceRule } from './rules/tech-choice.js';
+import { RuleEngine } from '@/domain/memory/rules/index.js';
+import { TechChoiceRule } from '@/domain/memory/rules/tech-choice.js';
 import { AssociationEngine } from '@/domain/memory/services/associations.js';
 import { ConsolidationEngine } from '@/domain/memory/services/consolidation.js';
 import { WeeklySummary } from '@/domain/memory/services/weekly-summary.js';
 import { FollowUpManager } from '@/domain/memory/services/follow-up.js';
 import { TriggerDecision } from '@/domain/memory/services/trigger-decision.js';
 import { PushQueue } from '@/infrastructure/output/push-queue.js';
-import { AutoSync } from './auto-sync.js';
-import type { RealtimeCollector, CorivoPlugin } from '../ingestors/types.js';
-import { DatabaseError } from '../errors/index.js';
+import { AutoSync } from '@/runtime/scheduling/auto-sync.js';
+import type { RealtimeCollector, CorivoPlugin } from '@/infrastructure/ingestors/types.js';
+import { DatabaseError } from '@/domain/errors/index.js';
 import type { BlockStatus, Pattern } from '@/domain/memory/models/index.js';
 import { vitalityToStatus } from '@/domain/memory/models/block.js';
-import { loadConfig } from '../config.js';
+import { loadConfig } from '@/config.js';
 import { getCliNow, loadCliConfig, loadCliSolver, saveCliSolver } from '@/cli/runtime';
-import { createLogger, type Logger } from '../utils/logging.js';
-import { runMemoryPipeline } from '../application/memory/run-memory-pipeline.js';
+import { createLogger, type Logger } from '@/infrastructure/logging.js';
+import { runMemoryPipeline } from '@/application/memory/run-memory-pipeline.js';
 
 const HEARTBEAT_INTERVAL = 5000; // 5 seconds
 const PENDING_BATCH_SIZE = 10; // Number of pending blocks processed per cycle

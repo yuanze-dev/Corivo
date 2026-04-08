@@ -27,42 +27,18 @@ domain -> no outer-layer dependencies
 
 当前仓库仍有少量历史例外；这些例外必须出现在测试 allowlist 中，不能继续静默增长。
 
-## Freeze Directories
+## Final Top Level Layout
 
-以下目录已进入 freeze：
+`packages/cli/src` 现在只保留以下一级目录：
 
-- `engine/`
-- `storage/`
-
-补充说明：
-
-- `service/` 和 `hosts/` 已经完成迁移并删除；后续不应重新创建这些顶层兼容目录
-- `models/` 和 `type/` 已经清空并移除；后续不应重新创建这类顶层桶目录
-- 新的模型与类型必须就近落在 `domain/*`、`application/*` 或具体 adapter 模块中
-
-freeze 的含义：
-
-- 允许 bugfix
-- 允许纯迁移修改
-- 不允许新增功能代码
-- 不允许继续把新的职责放进去
-
-## Controlled Exceptions
-
-以下一级目录暂时保留，但不应长期继续增长为新的杂项桶：
-
+- `cli/`
+- `application/`
+- `domain/`
+- `infrastructure/`
+- `runtime/`
 - `memory-pipeline/`
-- `cold-scan/`
-- `raw-memory/`
-- `update/`
-- `identity/`
-- `push/`
-- `first-push/`
-- `ingestors/`
-- `crypto/`
-- `errors/`
-- `tui/`
-- `utils/`
+
+其余历史一级目录，包括 `engine/`、`storage/`、`hosts/`、`service/`、`identity/`、`ingestors/`、`cold-scan/`、`push/`、`raw-memory/`、`tui/`、`errors/`、`crypto/`、`utils/`、`first-push/`、`update/`、`models/`、`type/`，都不应在顶层重新出现。
 
 ## Layer Ownership Snapshot
 
@@ -77,8 +53,7 @@ freeze 的含义：
 
 当前单测与 lint 至少要直接覆盖以下规则：
 
-- `packages/cli/src/cli/commands/* -> engine/*` 禁止
-- `packages/cli/src/engine/* -> cli/commands/*` 禁止
+- 顶层目录只允许 `cli/`、`application/`、`domain/`、`infrastructure/`、`runtime/`、`memory-pipeline/`
 - `application/* -> cli/runtime.ts` 禁止，唯一例外：`application/bootstrap/create-cli-app.ts`
 - `memory-pipeline/* -> cli/*` 禁止
 - `domain/* -> runtime|cli|infrastructure` 新增违规必须被测试拦下

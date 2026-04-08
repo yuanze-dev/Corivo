@@ -6,7 +6,7 @@ import {
   type MemoryPipelineArtifactStore,
 } from '@/memory-pipeline';
 import { CorivoDatabase, openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
-import type { Logger } from '@/utils/logging';
+import type { Logger } from '@/infrastructure/logging';
 
 export function getMemoryPipelineRunRoot(configDir: string): string {
   return path.join(configDir, 'memory-pipeline');

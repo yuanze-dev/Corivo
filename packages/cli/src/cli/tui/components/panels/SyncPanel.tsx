@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { SolverConfig } from '../../../config.js';
+import type { SolverConfig } from '@/config.js';
 
 interface SyncPanelProps {
   solver: SolverConfig | null;

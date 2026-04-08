@@ -18,7 +18,7 @@ import {
   FingerprintCollector,
   FingerprintMatcher,
 } from './fingerprint.js';
-import { IdentityError } from '../errors/index.js';
+import { IdentityError } from '@/domain/errors/index.js';
 
 /**
  * Supported platform type

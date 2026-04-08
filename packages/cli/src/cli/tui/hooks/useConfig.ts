@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { CorivoConfig, CorivoFeatures, CorivoSettings } from '../../config.js';
+import type { CorivoConfig, CorivoFeatures, CorivoSettings } from '@/config.js';
 
 export interface UseConfigResult {
   config: CorivoConfig | null;

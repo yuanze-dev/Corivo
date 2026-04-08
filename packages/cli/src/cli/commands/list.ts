@@ -10,7 +10,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
 import { openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
-import { ConfigError } from '../../errors/index.js';
+import { ConfigError } from '@/domain/errors/index.js';
 import type { BlockFilter, BlockStatus } from '@/domain/memory/models/block.js';
 import { getCliOutput } from '@/cli/runtime';
 

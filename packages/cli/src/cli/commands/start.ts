@@ -7,7 +7,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js'
-import { ConfigError } from '../../errors/index.js'
+import { ConfigError } from '@/domain/errors/index.js'
 import { getServiceManager, resolveCorivoBin } from '@/infrastructure/platform/index.js'
 import { getCliOutput } from '@/cli/runtime'
 
@@ -50,6 +50,6 @@ export async function startCommand(): Promise<void> {
     output.error(`❌ Start failed: ${result.error}`)
     output.info('')
     output.info('You can start heartbeat manually:')
-    output.info('  node ./dist/engine/heartbeat.js')
+    output.info('  node ./dist/runtime/daemon/heartbeat.js')
   }
 }

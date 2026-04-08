@@ -1,5 +1,5 @@
 import type { HostId } from '@/domain/host/contracts/types.js';
-import type { RawMessageRole } from '../../raw-memory/types.js';
+import type { RawMessageRole } from '@/infrastructure/storage/types/raw-memory.js';
 import type { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-memory-repository.js';
 import type {
   EnqueueSessionExtractionRequest,

@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { ConfigError } from '@/errors';
+import { ConfigError } from '@/domain/errors/index.js';
 
 export async function readMemoryPipelineConfig(
   configDir: string,

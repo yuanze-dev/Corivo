@@ -7,8 +7,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { getConfigDir } from '@/infrastructure/storage/lifecycle/database-paths.js';
-import { printBanner } from '@/utils/banner';
-import { IdentityManager, FingerprintCollector } from '../../identity/index.js';
+import { printBanner } from '@/cli/presenters/banner.js';
+import { IdentityManager, FingerprintCollector } from '@/infrastructure/identity/index.js';
 import { getCliOutput } from '@/cli/runtime';
 
 /**

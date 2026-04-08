@@ -15,9 +15,9 @@ import {
   type PipelineTrigger,
   type RawSessionJobSource,
 } from '@/memory-pipeline';
-import type { Logger } from '@/utils/logging';
+import type { Logger } from '@/infrastructure/logging';
 import type { ExtractionProvider } from '@/infrastructure/llm/types';
-import { createLogger } from '@/utils/logging';
+import { createLogger } from '@/infrastructure/logging';
 import { MemoryProcessingJobQueue } from '@/infrastructure/storage/repositories/memory-processing-job-queue';
 import { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-memory-repository';
 import { readMemoryPipelineConfig } from './config.js';

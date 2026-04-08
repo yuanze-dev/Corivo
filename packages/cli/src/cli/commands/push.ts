@@ -7,7 +7,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { generateFirstPush, getWelcomeMessage } from '../../first-push/index.js';
+import { generateFirstPush, getWelcomeMessage } from '../first-push/index.js';
 import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
 import { openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import { getCliOutput } from '@/cli/runtime';

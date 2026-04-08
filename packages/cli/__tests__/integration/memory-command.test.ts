@@ -3,8 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { Command } from 'commander';
 import { describe, expect, it, beforeAll, beforeEach, vi } from 'vitest';
-import type { CorivoDatabase } from '@/storage/database';
-import type { Logger } from '../../src/utils/logging.js';
+import type { CorivoDatabase } from '@/infrastructure/storage/facade/database';
+import type { Logger } from '../../src/infrastructure/logging.js';
 import {
   createMemoryCommand,
 } from '../../src/cli/commands/memory.js';

@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Box, useInput, useApp, useStdout } from 'ink';
-import type { CorivoDatabase } from '../infrastructure/storage/lifecycle/database.js';
+import type { CorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 
 import { Header } from './components/Header.js';
 import { TabBar, TABS, type TabId } from './components/TabBar.js';

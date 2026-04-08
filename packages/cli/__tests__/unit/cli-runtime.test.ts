@@ -20,7 +20,7 @@ vi.mock('node:fs/promises', () => ({
   },
 }));
 
-vi.mock('@/storage/database', () => ({
+vi.mock('@/infrastructure/storage/facade/database', () => ({
   CorivoDatabase: {
     getInstance: vi.fn(),
   },

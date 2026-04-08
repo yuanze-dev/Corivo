@@ -1,9 +1,9 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import Database from 'better-sqlite3';
-import { CorivoDatabase } from '@/storage/database';
-import { KeyManager } from '../../src/crypto/keys.js';
-import { Heartbeat } from '../../src/engine/heartbeat.js';
+import { CorivoDatabase } from '@/infrastructure/storage/facade/database';
+import { KeyManager } from '../../src/infrastructure/crypto/keys.js';
+import { Heartbeat } from '../../src/runtime/daemon/heartbeat.js';
 import * as memoryPipeline from '../../src/application/memory/run-memory-pipeline.js';
 
 interface HeartbeatInternals {

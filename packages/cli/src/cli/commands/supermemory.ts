@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
-import { ConfigError } from '@/errors';
+import { ConfigError } from '@/domain/errors/index.js';
 import { getConfigDir } from '@/infrastructure/storage/lifecycle/database-paths.js';
 import { resolveMemoryProvider } from '@/domain/memory/providers/resolve-memory-provider.js';
 

@@ -6,7 +6,7 @@
 
 import crypto from 'node:crypto';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { CryptoError, ValidationError } from '../errors/index.js';
+import { CryptoError, ValidationError } from '@/domain/errors/index.js';
 
 /**
  * BIP39 English vocabulary list (full version 2048 words)

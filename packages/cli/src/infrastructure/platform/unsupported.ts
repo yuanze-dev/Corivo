@@ -8,7 +8,7 @@ export class UnsupportedServiceManager implements ServiceManager {
   async install(_config: ServiceConfig): Promise<ServiceResult> {
     return {
       success: false,
-      error: `此平台不支持 service manager（当前：${process.platform}）\n请手动运行: node ./dist/engine/heartbeat.js`,
+      error: `此平台不支持 service manager（当前：${process.platform}）\n请手动运行: node ./dist/runtime/daemon/heartbeat.js`,
     }
   }
 

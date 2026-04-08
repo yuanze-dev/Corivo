@@ -15,21 +15,21 @@ import fsSync from 'node:fs';
 import path from 'node:path';
 import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
 import { openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
-import { FileSystemError } from '../../errors/index.js';
+import { FileSystemError } from '@/domain/errors/index.js';
 import {
   initializeIdentity,
   initializeIdentityWithId,
   getIdentityId,
   type Fingerprint,
-} from '../../identity/index.js';
-import { saveConfig, saveSolverConfig, loadConfig, type CorivoConfig, type SolverConfig } from '../../config.js';
+} from '@/infrastructure/identity/index.js';
+import { saveConfig, saveSolverConfig, loadConfig, type CorivoConfig, type SolverConfig } from '@/config.js';
 import os from 'node:os';
 import { startCommand } from './start.js';
 import { registerWithSolver } from './sync.js';
 import { post } from '../../runtime/sync-client.js';
 import { createCliLogger, createCliOutput } from '@/cli/runtime';
 import { readConfirm } from '../utils/password.js';
-import { printBanner } from '@/utils/banner';
+import { printBanner } from '@/cli/presenters/banner.js';
 
 /**
  * Exit the process with the given code.

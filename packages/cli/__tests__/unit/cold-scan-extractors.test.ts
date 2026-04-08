@@ -9,8 +9,8 @@ import fs from 'node:fs/promises';
 vi.mock('node:fs/promises');
 
 // Import after mocking
-import { source as gitConfigSource } from '../../src/cold-scan/extractors/git-config.js';
-import { source as packageJsonSource } from '../../src/cold-scan/extractors/package-json.js';
+import { source as gitConfigSource } from '../../src/infrastructure/cold-scan/extractors/git-config.js';
+import { source as packageJsonSource } from '../../src/infrastructure/cold-scan/extractors/package-json.js';
 
 describe('Cold Scan Extractors', () => {
   beforeEach(() => {

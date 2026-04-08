@@ -33,7 +33,7 @@ import type { Database as SQLiteDatabase } from 'better-sqlite3';
 const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
 
-import { DatabaseError } from '../errors/index.js';
+import { DatabaseError } from '@/domain/errors/index.js';
 import type { SessionMessage, SessionRecord } from '../memory-pipeline/contracts/session-record.js';
 import type {
   SessionRecordQuery,
@@ -73,7 +73,7 @@ import type {
   RawSessionInput,
   RawSessionRecord,
   RawTranscript,
-} from '../raw-memory/types.js';
+} from '@/infrastructure/storage/types/raw-memory.js';
 
 /**
  * Database configuration

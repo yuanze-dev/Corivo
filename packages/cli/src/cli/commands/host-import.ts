@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { ConfigError } from '@/errors';
+import { ConfigError } from '@/domain/errors/index.js';
 import {
   createHostImportUseCase,
   persistImportedSessions,

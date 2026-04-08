@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import type { Logger } from '@/utils/logging';
+import type { Logger } from '@/infrastructure/logging';
 import type { ExtractionProvider } from '@/infrastructure/llm/types';
 import {
   DEFAULT_MEMORY_PROVIDER,

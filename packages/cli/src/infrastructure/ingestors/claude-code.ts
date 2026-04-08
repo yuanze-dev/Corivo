@@ -6,7 +6,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'path';
-import { FileSystemError } from '../errors/index.js';
+import { FileSystemError } from '@/domain/errors/index.js';
 
 export class ClaudeCodeIngestor {
   /**

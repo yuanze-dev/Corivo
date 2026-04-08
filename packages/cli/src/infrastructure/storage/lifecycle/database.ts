@@ -1,4 +1,4 @@
-import { CorivoDatabase } from '@/storage/database';
+import { CorivoDatabase } from '@/infrastructure/storage/facade/database';
 
 export interface OpenCorivoDatabaseOptions {
   path: string;

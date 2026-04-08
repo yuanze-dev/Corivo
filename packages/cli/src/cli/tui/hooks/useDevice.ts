@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import type { IdentityConfig } from '../../identity/identity.js';
+import type { IdentityConfig } from '@/infrastructure/identity/identity.js';
 
 export interface DeviceInfo {
   identity: IdentityConfig | null;

@@ -18,10 +18,13 @@ import {
 import {
   type QueryHistoryStore,
 } from '@/runtime/query-history-store.js';
-import type { Logger } from '@/utils/logging.js';
+
+interface QueryHistoryLogger {
+  debug(message: string): void;
+}
 
 interface QueryHistoryRuntime {
-  logger: Pick<Logger, 'debug'>;
+  logger: QueryHistoryLogger;
   clock: { now(): number };
 }
 
@@ -49,7 +52,7 @@ export interface SimilarQueryReminder {
  * Query history tracker
  */
 export class QueryHistoryTracker {
-  private static readonly NOOP_DEBUG_LOGGER: Pick<Logger, 'debug'> = {
+  private static readonly NOOP_DEBUG_LOGGER: QueryHistoryLogger = {
     debug: () => undefined,
   };
 

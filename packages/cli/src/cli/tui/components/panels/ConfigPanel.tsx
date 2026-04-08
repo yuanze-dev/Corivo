@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { UseConfigResult } from '../../hooks/useConfig.js';
-import type { CorivoFeatures } from '../../../config.js';
+import type { CorivoFeatures } from '@/config.js';
 
 export interface FeatureItem {
   key: keyof CorivoFeatures;

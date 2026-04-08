@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { SolverConfig } from '../../config.js';
+import type { SolverConfig } from '@/config.js';
 
 export function useSync(configDir: string): { solver: SolverConfig | null } {
   const [solver, setSolver] = useState<SolverConfig | null>(null);

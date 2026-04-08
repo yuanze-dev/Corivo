@@ -10,7 +10,7 @@ import {
   type Logger,
   type LogLevel,
   type LogTarget,
-} from '@/utils/logging';
+} from '@/infrastructure/logging';
 
 export interface CliRuntimeOptions {
   logger?: Logger;

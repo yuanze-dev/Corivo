@@ -7,7 +7,7 @@ import type { QueryOptions, PromptQueryCommandOptions, SearchQueryCommandInput }
 import type { MemoryPipelineMode } from '@/application/memory/run-memory-pipeline';
 import type { ExtractionProvider } from '@/infrastructure/llm/types';
 import type { MemoryPipelineRunResult } from '@/memory-pipeline';
-import type { Logger } from '@/utils/logging';
+import type { Logger } from '@/infrastructure/logging';
 
 export interface CliAppCommands {
   memory: Command;

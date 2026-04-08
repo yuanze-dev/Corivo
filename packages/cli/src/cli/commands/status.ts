@@ -7,11 +7,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { loadSolverConfig } from '@/config';
-import { ContextPusher } from '@/push/context.js';
+import { ContextPusher } from '@/application/push/context.js';
 import { getServiceManager } from '@/infrastructure/platform/index.js';
 import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
 import { openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
-import { ConfigError } from '@/errors';
+import { ConfigError } from '@/domain/errors/index.js';
 import { resolveMemoryProvider } from '@/domain/memory/providers/resolve-memory-provider.js';
 import type { CliOutput } from '@/cli/runtime';
 import { getCliOutput } from '@/cli/runtime';
@@ -25,7 +25,7 @@ export const statusCommand = async (options: StatusCommandOptions) => {
     await jsonStatus();
     return;
   }
-  const { renderTui } = await import('@/tui/index.js');
+  const { renderTui } = await import('@/cli/tui/index.js');
   await renderTui();
 };
 

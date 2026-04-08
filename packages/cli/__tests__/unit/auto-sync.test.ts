@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AutoSync } from '../../src/engine/auto-sync.js';
-import type { Logger } from '../../src/utils/logging.js';
+import { AutoSync } from '../../src/runtime/scheduling/auto-sync.js';
+import type { Logger } from '../../src/infrastructure/logging.js';
 
 // Utility functions for the mocked sync runtime seam
 vi.mock('../../src/runtime/sync-client.js', () => ({
@@ -32,7 +32,7 @@ const mockDb = {
   queryBlocks: vi.fn().mockReturnValue([]),
   getBlock: vi.fn(),
   upsertBlock: vi.fn(),
-} as unknown as import('@/storage/database').CorivoDatabase;
+} as unknown as import('@/infrastructure/storage/facade/database').CorivoDatabase;
 
 const defaultConfig = {
   version: '1',

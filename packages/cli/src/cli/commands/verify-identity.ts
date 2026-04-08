@@ -7,13 +7,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import chalk from 'chalk';
-import { KeyManager } from '../../crypto/keys.js';
-import { JointVerifier } from '../../identity/auth.js';
-import { IdentityManager } from '../../identity/identity.js';
-import { DynamicFingerprintCollector, initializeDefaultSoftwareConfigs } from '../../identity/collector.js';
+import { KeyManager } from '@/infrastructure/crypto/keys.js';
+import { JointVerifier } from '@/infrastructure/identity/auth.js';
+import { IdentityManager } from '@/infrastructure/identity/identity.js';
+import { DynamicFingerprintCollector, initializeDefaultSoftwareConfigs } from '@/infrastructure/identity/collector.js';
 import { getConfigDir } from '@/infrastructure/storage/lifecycle/database-paths.js';
-import { printBanner } from '@/utils/banner';
-import { ConfigError } from '../../errors/index.js';
+import { printBanner } from '@/cli/presenters/banner.js';
+import { ConfigError } from '@/domain/errors/index.js';
 import { readPassword } from '../utils/password.js';
 import { getCliOutput } from '@/cli/runtime';
 

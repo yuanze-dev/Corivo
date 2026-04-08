@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import type { Block } from '@/domain/memory/models/block';
-import { ConfigError } from '@/errors';
-import { ContextPusher } from '@/push/context.js';
+import { ConfigError } from '@/domain/errors/index.js';
+import { ContextPusher } from '@/application/push/context.js';
 import {
   createRuntimeQueryHistoryStore,
   createRuntimeQueryHistoryTracker,
@@ -9,7 +9,7 @@ import {
 import { formatSurfaceItem, type RuntimeOutputFormat } from '@/cli/presenters/query-renderer.js';
 import type { RuntimeCommandOptions } from '@/runtime/runtime-support';
 import { loadRuntimeDb } from '@/runtime/runtime-support';
-import type { Logger } from '@/utils/logging';
+import type { Logger } from '@/infrastructure/logging';
 import { loadConfig } from '@/config.js';
 import { createLocalMemoryProvider } from '@/domain/memory/providers/local-memory-provider.js';
 import { resolveMemoryProvider } from '@/domain/memory/providers/resolve-memory-provider.js';

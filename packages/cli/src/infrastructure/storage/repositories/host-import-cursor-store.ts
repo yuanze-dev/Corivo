@@ -1,4 +1,4 @@
-import { DatabaseError } from '@/errors';
+import { DatabaseError } from '@/domain/errors/index.js';
 import type { HostId } from '@/domain/host/contracts/types.js';
 import type { CorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 

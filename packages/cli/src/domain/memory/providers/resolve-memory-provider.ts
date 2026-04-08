@@ -1,5 +1,5 @@
 import type { CorivoConfig } from '@/config.js';
-import { ConfigError } from '@/errors/index.js';
+import { ConfigError } from '@/domain/errors/index.js';
 import { createLocalMemoryProvider } from './local-memory-provider.js';
 import { createSupermemoryMemoryProvider } from './supermemory-provider.js';
 import {

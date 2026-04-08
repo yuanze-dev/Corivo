@@ -50,7 +50,7 @@ vi.mock('supermemory', () => {
   };
 });
 
-vi.mock('@/storage/database', () => ({
+vi.mock('@/infrastructure/storage/facade/database', () => ({
   CorivoDatabase: {
     getInstance,
   },
@@ -77,7 +77,7 @@ vi.mock('@/infrastructure/platform/index.js', () => ({
   getServiceManager,
 }));
 
-vi.mock('@/push/context.js', () => ({
+vi.mock('@/application/push/context.js', () => ({
   ContextPusher: class {
     pushNeedsAttention = pushNeedsAttention;
   },

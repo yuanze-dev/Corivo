@@ -1,4 +1,4 @@
-import { DatabaseError } from '@/errors';
+import { DatabaseError } from '@/domain/errors/index.js';
 import type { SessionRecord } from '@/memory-pipeline/contracts/session-record.js';
 import type { SessionRecordQuery } from '@/memory-pipeline/sources/session-record-source.js';
 

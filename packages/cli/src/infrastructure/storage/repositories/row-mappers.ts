@@ -1,4 +1,4 @@
-import { KeyManager } from '@/crypto/keys.js';
+import { KeyManager } from '@/infrastructure/crypto/keys.js';
 import type {
   Association,
   Block,
@@ -9,7 +9,7 @@ import type {
   MemoryProcessingJobRecord,
   RawMessageRecord,
   RawSessionRecord,
-} from '@/raw-memory/types.js';
+} from '@/infrastructure/storage/types/raw-memory.js';
 import type { SessionMessage, SessionRecord } from '@/memory-pipeline/contracts/session-record.js';
 
 interface BlockRowMapperRuntime {

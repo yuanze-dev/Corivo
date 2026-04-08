@@ -5,12 +5,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import Database from 'better-sqlite3';
-import { CorivoDatabase } from '@/storage/database';
-import { KeyManager } from '../../src/crypto/keys.js';
-import { Heartbeat } from '../../src/engine/heartbeat.js';
-import { RuleEngine } from '../../src/engine/rules.js';
-import { TechChoiceRule } from '../../src/engine/rules/tech-choice.js';
-import type { CorivoPlugin } from '../../src/ingestors/types.js';
+import { CorivoDatabase } from '@/infrastructure/storage/facade/database';
+import { KeyManager } from '../../src/infrastructure/crypto/keys.js';
+import { Heartbeat } from '../../src/runtime/daemon/heartbeat.js';
+import { RuleEngine } from '../../src/domain/memory/rules.js';
+import { TechChoiceRule } from '../../src/domain/memory/rules/tech-choice.js';
+import type { CorivoPlugin } from '../../src/infrastructure/ingestors/types.js';
 
 describe('Heartbeat Integration', () => {
   let db: CorivoDatabase;

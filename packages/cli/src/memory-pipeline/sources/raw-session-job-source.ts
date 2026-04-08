@@ -4,7 +4,7 @@ import type {
   MemoryProcessingJobRecord,
   RawMessageRecord,
   RawSessionRecord,
-} from '../../raw-memory/types.js';
+} from '@/infrastructure/storage/types/raw-memory.js';
 import type { WorkItem } from '../types.js';
 
 const TRANSCRIPT_RETRY_DELAY_MS = 5_000;

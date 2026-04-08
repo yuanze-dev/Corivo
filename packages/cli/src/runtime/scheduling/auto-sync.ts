@@ -5,10 +5,10 @@
  * Prerequisite: The user has completed registration through `corivo sync --register`.
  */
 
-import { applyPulledChangesets, authenticate, post, type PulledChangeset } from '../runtime/sync-client.js';
+import { applyPulledChangesets, authenticate, post, type PulledChangeset } from '@/runtime/sync-client.js';
 import type { CorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import type { CorivoConfig, SolverConfig } from '@/config';
-import type { Logger } from '@/utils/logging.js';
+import type { Logger } from '@/infrastructure/logging.js';
 
 const TOKEN_TTL = 4 * 60 * 1000; // 4 minutes (server TTL 5 minutes)
 

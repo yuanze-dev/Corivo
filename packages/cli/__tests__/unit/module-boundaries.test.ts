@@ -31,7 +31,7 @@ describe('module boundaries baseline', () => {
     expect(content).toContain('`hosts/`');
     expect(content).toContain('`models/`');
     expect(content).toContain('`type/`');
-    expect(content).toContain('已经清空并移除');
+    expect(content).toContain('都不应在顶层重新出现');
     expect(content).toContain('memory-pipeline/');
     expect(content).toContain('packages/plugins/*/hooks/scripts/*.sh');
   });
@@ -47,14 +47,9 @@ describe('module boundaries baseline', () => {
     expect(content).toContain('domain/');
     expect(content).toContain('infrastructure/');
     expect(content).toContain('runtime/');
-    expect(content).toContain('freeze');
-    expect(content).toContain('identity/');
-    expect(content).toContain('push/');
-    expect(content).toContain('cold-scan/');
-    expect(content).toContain('raw-memory/');
-    expect(content).toContain('first-push/');
-    expect(content).toContain('ingestors/');
-    expect(content).toContain('update/');
+    expect(content).toContain('memory-pipeline/');
+    expect(content).toContain('Layer Ownership Snapshot');
+    expect(content).toContain('只保留');
   });
 
   it('keeps per-layer readmes present', () => {
@@ -73,26 +68,6 @@ describe('module boundaries baseline', () => {
       expect(content).toContain('不负责什么');
       expect(content).toContain('常见误放');
     }
-  });
-
-  it('forbids cli command imports from engine modules', () => {
-    const hits = uniqueImportHits(
-      collectImports(['packages/cli/src/cli/commands']).filter((entry) =>
-        includesPathSegment(entry.specifier, 'engine'),
-      ),
-    );
-
-    expect(hits).toEqual([]);
-  });
-
-  it('forbids engine imports from cli command modules', () => {
-    const hits = uniqueImportHits(
-      collectImports(['packages/cli/src/engine']).filter((entry) =>
-        includesPathPair(entry.specifier, 'cli', 'commands'),
-      ),
-    );
-
-    expect(hits).toEqual([]);
   });
 
   it('forbids application imports from cli runtime modules', () => {

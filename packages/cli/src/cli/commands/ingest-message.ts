@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { ConfigError } from '../../errors/index.js';
+import { ConfigError } from '@/domain/errors/index.js';
 import { createEnqueueSessionExtractionUseCase } from '../../application/memory-ingest/enqueue-session-extraction.js';
 import {
   createIngestRealtimeMessageUseCase,

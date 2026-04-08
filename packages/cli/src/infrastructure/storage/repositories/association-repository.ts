@@ -1,4 +1,4 @@
-import { DatabaseError } from '@/errors';
+import { DatabaseError } from '@/domain/errors/index.js';
 import type {
   Association,
   AssociationFilter,

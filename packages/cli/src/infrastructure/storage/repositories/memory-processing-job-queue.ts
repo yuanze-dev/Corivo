@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { DatabaseError } from '@/errors';
+import { DatabaseError } from '@/domain/errors/index.js';
 import type { CorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import type {
   EnsureExtractSessionJobInput,
   MemoryProcessingJobRecord,
-} from '@/raw-memory/types.js';
+} from '@/infrastructure/storage/types/raw-memory.js';
 
 interface StorageSqliteDb {
   prepare(sql: string): any;

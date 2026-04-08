@@ -8,7 +8,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { FingerprintError } from '../errors/index.js';
+import { FingerprintError } from '@/domain/errors/index.js';
 
 /**
  * Supported platform type

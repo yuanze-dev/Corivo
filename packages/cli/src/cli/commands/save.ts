@@ -6,14 +6,14 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { ValidationError } from '../../errors/index.js';
+import { ValidationError } from '@/domain/errors/index.js';
 import { getCliOutput } from '@/cli/runtime';
 import {
   createSaveMemoryUseCase,
   type SaveMemoryInput,
   type SaveMemoryResult,
 } from '@/application/memory/save-memory.js';
-import type { Logger } from '@/utils/logging.js';
+import type { Logger } from '@/infrastructure/logging.js';
 
 interface SaveOptions {
   content?: string;

@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { ConfigError } from '@/errors';
+import { ConfigError } from '@/domain/errors/index.js';
 import {
   createCliLogger,
   createCliOutput,
@@ -90,7 +90,7 @@ export function createCliApp(): CliApp {
 
       const heartbeatPath = path.resolve(
         path.dirname(fileURLToPath(import.meta.url)),
-        '../../engine/heartbeat.js',
+        '../@/runtime/daemon/heartbeat.js',
       );
 
       logger.log('[corivo] Starting heartbeat background worker...');

@@ -10,7 +10,7 @@ import os from 'node:os';
 import https from 'node:https';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { compareSemVer } from '../utils/semver.js';
+import { compareSemVer } from './semver.js';
 import type { VersionInfo, UpdateStatus, UpdateConfig, Platform } from './types.js';
 
 const NPM_REGISTRY_URL = 'https://registry.npmjs.org/corivo';

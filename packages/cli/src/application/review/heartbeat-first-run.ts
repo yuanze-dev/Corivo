@@ -1,4 +1,4 @@
-import { Heartbeat, type FirstRunConfig } from '@/engine/heartbeat.js';
+import { Heartbeat, type FirstRunConfig } from '@/runtime/daemon/heartbeat.js';
 
 export async function runHeartbeatFirstRun(
   dbPath: string,

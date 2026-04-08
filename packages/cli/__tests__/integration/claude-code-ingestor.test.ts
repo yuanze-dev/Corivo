@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { ClaudeCodeIngestor } from '../../src/ingestors/claude-code.js';
+import { ClaudeCodeIngestor } from '../../src/infrastructure/ingestors/claude-code.js';
 
 describe('ClaudeCodeIngestor (Integration)', () => {
   let ingestor: ClaudeCodeIngestor;

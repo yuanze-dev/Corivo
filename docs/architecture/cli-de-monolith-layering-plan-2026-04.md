@@ -49,6 +49,7 @@ Draft
 其中：
 
 - `service/` 与 `hosts/` 已经迁移完并删除
+- `first-push/` 与 `update/` 已经迁移完并删除
 - `models/` 与 `type/` 作为历史桶目录已经清空并移除
 - 后续若再出现同类顶层目录，应视为新增架构回退
 - `utils/`
@@ -180,6 +181,28 @@ src/
 ```
 
 其中 `memory-pipeline/` 暂时保留为一级子系统目录，但它不能成为新的杂项容器，后续也必须遵守清晰边界。
+
+## Final Top Level Layout
+
+当前执行目标已经收敛为：`packages/cli/src` 只保留以下一级目录：
+
+- `cli/`
+- `application/`
+- `domain/`
+- `infrastructure/`
+- `runtime/`
+- `memory-pipeline/`
+
+其它历史一级目录一律视为迁移完成后的已删除目录，不应重新引入。
+
+## Layer Ownership Snapshot
+
+- `cli/`: 命令定义、参数解析、presenter、exit code 映射
+- `application/`: 单次动作的编排、输入输出 DTO、调用顺序控制
+- `domain/`: 核心业务模型、规则、纯逻辑服务、稳定契约
+- `infrastructure/`: SQLite、filesystem、platform、host adapter、provider adapter
+- `runtime/`: daemon lifecycle、scheduler、heartbeat orchestration、runtime policy glue
+- `memory-pipeline/`: 暂时保留的一级子系统，但不能成为新的兜底目录
 
 ---
 

@@ -20,7 +20,7 @@ import {
   saveCliSolver,
   writeCliJson,
 } from '@/cli/runtime';
-import type { Logger as SyncLogger } from '../../utils/logging.js';
+import type { Logger as SyncLogger } from '@/infrastructure/logging.js';
 import {
   applyPulledChangesets,
   authenticate,

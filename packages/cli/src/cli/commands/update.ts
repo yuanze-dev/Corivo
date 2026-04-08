@@ -4,7 +4,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { printBanner } from '@/utils/banner';
+import { printBanner } from '@/cli/presenters/banner.js';
 import {
   checkForUpdate,
   performUpdate,
@@ -12,8 +12,8 @@ import {
   getUpdateRecord,
   getCurrentVersion,
   fetchVersionInfo,
-} from '../../update/checker.js';
-import type { UpdateConfig } from '../../update/types.js';
+} from '@/infrastructure/update/checker.js';
+import type { UpdateConfig } from '@/infrastructure/update/types.js';
 import { getCliOutput } from '@/cli/runtime';
 
 export const updateCommand = new Command('update');

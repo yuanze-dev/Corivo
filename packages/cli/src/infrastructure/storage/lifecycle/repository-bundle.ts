@@ -13,7 +13,7 @@ import type {
   MemoryProcessingJobRecord,
   RawMessageRecord,
   RawSessionRecord,
-} from '@/raw-memory/types.js';
+} from '@/infrastructure/storage/types/raw-memory.js';
 import type { SessionRecord } from '@/memory-pipeline/contracts/session-record.js';
 
 interface RepositoryBundleSqliteDb {

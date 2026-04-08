@@ -1,4 +1,4 @@
-import { KeyManager } from '@/crypto/keys.js';
+import { KeyManager } from '@/infrastructure/crypto/keys.js';
 import type { Block } from '@/domain/memory/models';
 
 interface StatsSqliteDb {

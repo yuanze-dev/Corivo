@@ -9,7 +9,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { runHeartbeatFirstRun } from '@/application/review/heartbeat-first-run.js';
 import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
-import { printBanner } from '@/utils/banner';
+import { printBanner } from '@/cli/presenters/banner.js';
 import { getCliOutput } from '@/cli/runtime';
 
 export const firstRunCommand = new Command('first-run');

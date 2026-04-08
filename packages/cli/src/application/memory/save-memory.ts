@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { CorivoConfig } from '@/config.js';
 import { loadConfig } from '@/config.js';
-import { ConfigError, ValidationError } from '@/errors/index.js';
+import { ConfigError, ValidationError } from '@/domain/errors/index.js';
 import { validateAnnotation, type Block } from '@/domain/memory/models/block.js';
 import { resolveMemoryProvider } from '@/domain/memory/providers/resolve-memory-provider.js';
 import type { MemoryProvider, MemoryProviderName } from '@/domain/memory/providers/types.js';

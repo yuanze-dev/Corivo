@@ -14,7 +14,7 @@ type ImportHit = {
 };
 
 const ALLOWED_STORAGE_HELPER_FACADE_IMPORTS = new Set<string>([
-  'packages/cli/src/domain/memory/providers/local-memory-provider.ts:@/storage/database',
+  'packages/cli/src/domain/memory/providers/local-memory-provider.ts:@/infrastructure/storage/facade/database',
 ]);
 
 const ALLOWED_DIRECT_DATABASE_SINGLETON_CALLERS = new Set<string>([
@@ -25,29 +25,17 @@ const ALLOWED_DIRECT_DATABASE_SINGLETON_CALLERS = new Set<string>([
 const APPROVED_TOP_LEVEL_DIRECTORIES = [
   'application',
   'cli',
-  'cold-scan',
-  'crypto',
   'domain',
-  'engine',
-  'errors',
-  'first-push',
-  'identity',
   'infrastructure',
-  'ingestors',
   'memory-pipeline',
-  'push',
-  'raw-memory',
   'runtime',
-  'storage',
-  'tui',
-  'update',
-  'utils',
 ] as const;
 
-const FROZEN_DIRECTORIES = ['engine', 'storage'] as const;
+const FROZEN_DIRECTORIES: string[] = [];
 
 const ALLOWED_CROSS_LAYER_IMPORTS = new Set<string>([
   'packages/cli/src/domain/memory/models/index.ts:@/runtime/types.js',
+  'packages/cli/src/domain/memory/providers/local-memory-provider.ts:@/infrastructure/storage/facade/database',
   'packages/cli/src/domain/memory/providers/local-memory-provider.ts:@/runtime/memory-index.js',
   'packages/cli/src/domain/memory/providers/local-memory-provider.ts:@/runtime/runtime-support.js',
   'packages/cli/src/domain/memory/providers/local-memory-provider.ts:@/runtime/conflict-detection.js',
@@ -72,6 +60,7 @@ const ALLOWED_CROSS_LAYER_IMPORTS = new Set<string>([
   'packages/cli/src/application/query/generate-recall.ts:@/runtime/types.js',
   'packages/cli/src/application/query/generate-recall.ts:@/runtime/scoring.js',
   'packages/cli/src/application/query/provider-recall.ts:@/runtime/types.js',
+  'packages/cli/src/application/review/heartbeat-first-run.ts:@/runtime/daemon/heartbeat.js',
   'packages/cli/src/application/review/run-review.ts:@/runtime/types.js',
   'packages/cli/src/application/review/run-review.ts:@/runtime/scoring.js',
 ]);
@@ -114,7 +103,7 @@ describe('cli layering freeze baseline', () => {
 
     const helperImports = sourceFiles.flatMap((filePath) =>
       scanImports(filePath).filter((entry) => {
-        if (!entry.specifier.includes('storage/database')) {
+        if (!entry.specifier.includes('storage/facade/database')) {
           return false;
         }
 

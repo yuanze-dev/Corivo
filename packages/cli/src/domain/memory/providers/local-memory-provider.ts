@@ -6,7 +6,7 @@ import { loadRuntimeDb } from '@/runtime/runtime-support.js';
 import { MemoryProviderUnavailableError, type MemoryProvider } from './types.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/storage/database';
+import { CorivoDatabase, getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/facade/database';
 import { detectConflictReminder } from '@/runtime/conflict-detection.js';
 
 function isNonEmptyString(value: unknown): value is string {

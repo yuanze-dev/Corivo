@@ -3,7 +3,7 @@ import type {
   RawMessageRecord,
   RawSessionRecord,
   RawTranscript,
-} from '../../raw-memory/types.js';
+} from '@/infrastructure/storage/types/raw-memory.js';
 import type { SessionRecord } from '../contracts/session-record.js';
 import type { WorkItem } from '../types.js';
 

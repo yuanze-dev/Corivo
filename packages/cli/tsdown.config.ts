@@ -6,10 +6,10 @@ export default defineConfig({
   entry: {
     index: 'src/index.ts',
     'cli/index': 'src/cli/index.ts',
-    'engine/heartbeat': 'src/engine/heartbeat.ts',
+    'runtime/daemon/heartbeat': 'src/runtime/daemon/heartbeat.ts',
     'service/index': 'src/infrastructure/platform/index.ts',
-    'cold-scan/index': 'src/cold-scan/index.ts',
-    'cold-scan/extractors/openclaw': 'src/cold-scan/extractors/openclaw.ts',
+    'infrastructure/cold-scan/index': 'src/infrastructure/cold-scan/index.ts',
+    'infrastructure/cold-scan/extractors/openclaw': 'src/infrastructure/cold-scan/extractors/openclaw.ts',
   },
   format: 'esm',
   target: 'node18',

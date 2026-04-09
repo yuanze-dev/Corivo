@@ -34,10 +34,10 @@ const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
 
 import { DatabaseError } from '@/domain/errors/index.js';
-import type { SessionMessage, SessionRecord } from '../memory-pipeline/contracts/session-record.js';
+import type { SessionMessage, SessionRecord } from '@/memory-pipeline/contracts/session-record.js';
 import type {
   SessionRecordQuery,
-} from '../memory-pipeline/sources/session-record-source.js';
+} from '@/memory-pipeline/sources/session-record-source.js';
 import type {
   Block,
   CreateBlockInput,

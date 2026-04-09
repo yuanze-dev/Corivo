@@ -47,11 +47,6 @@ type CliProgramOptions = {
   memoryCommand?: Command;
 };
 
-type CommandSpec = {
-  route: string;
-  build: () => Command;
-};
-
 function resolvePackagePath(currentDir: string): string {
   const candidates = [
     join(currentDir, '../../package.json'),
@@ -70,42 +65,42 @@ function resolvePackagePath(currentDir: string): string {
 export function createProgram({ app = createCliApp(), memoryCommand }: CliProgramOptions = {}) {
   const program = new Command();
   const resolvedMemoryCommand = memoryCommand ?? app.commands.memory;
-  const commandSpecs: CommandSpec[] = [
-    { route: 'init', build: () => initCliCommand },
-    { route: 'status', build: () => statusCliCommand },
-    { route: 'start', build: () => startCliCommand },
-    { route: 'stop', build: () => stopCliCommand },
-    { route: 'doctor', build: () => doctorCliCommand },
-    { route: 'recover', build: () => recoverCliCommand },
-    { route: 'identity', build: () => identityCliCommand },
-    { route: 'setup-password', build: () => setupPasswordCliCommand },
-    { route: 'unlock', build: () => unlockCliCommand },
-    { route: 'verify-identity', build: () => verifyIdentityCliCommand },
-    { route: 'query', build: () => app.commands.query },
-    { route: 'list', build: () => listCommand },
-    { route: 'save', build: () => app.commands.save },
-    { route: 'memory', build: () => resolvedMemoryCommand },
-    { route: 'host', build: () => app.commands.host },
-    { route: 'cold-scan', build: () => coldScanCommand },
-    { route: 'push', build: () => pushCommand },
-    { route: 'push-queue', build: () => pushQueueCommand },
-    { route: 'reminders', build: () => remindersCommand },
-    { route: 'carry-over', build: () => carryOverCommand },
-    { route: 'review', build: () => reviewCommand },
-    { route: 'suggest', build: () => suggestCommand },
-    { route: 'first-run', build: () => firstRunCommand },
-    { route: 'daemon', build: () => app.commands.daemon },
-    { route: 'sync', build: () => createSyncCommand() },
-    { route: 'ingest-message', build: () => ingestMessageCommand },
-    { route: 'supermemory', build: () => app.commands.supermemory },
-    { route: 'update', build: () => updateCommand },
+  const commands = [
+    initCliCommand,
+    statusCliCommand,
+    startCliCommand,
+    stopCliCommand,
+    doctorCliCommand,
+    recoverCliCommand,
+    identityCliCommand,
+    setupPasswordCliCommand,
+    unlockCliCommand,
+    verifyIdentityCliCommand,
+    app.commands.query,
+    listCommand,
+    app.commands.save,
+    resolvedMemoryCommand,
+    app.commands.host,
+    coldScanCommand,
+    pushCommand,
+    pushQueueCommand,
+    remindersCommand,
+    carryOverCommand,
+    reviewCommand,
+    suggestCommand,
+    firstRunCommand,
+    app.commands.daemon,
+    createSyncCommand(),
+    ingestMessageCommand,
+    app.commands.supermemory,
+    updateCommand,
   ];
 
   program.name('corivo').description('Your silicon teammate, alive only for you').version(VERSION);
 
-  for (const { build } of commandSpecs) {
-    program.addCommand(build());
-  }
+  commands.forEach((command) => {
+    program.addCommand(command);
+  });
 
   // Error handling
   program.configureOutput({

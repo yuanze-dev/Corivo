@@ -7,13 +7,12 @@ import chalk from 'chalk';
 import { printBanner } from '@/cli/presenters/banner.js';
 import {
   checkForUpdate,
-  performUpdate,
+  fetchVersionInfo,
+  getCurrentVersion,
   getPlatform,
   getUpdateRecord,
-  getCurrentVersion,
-  fetchVersionInfo,
+  performUpdate,
 } from '@/infrastructure/update/checker.js';
-import type { UpdateConfig } from '@/infrastructure/update/types.js';
 import { getCliOutput } from '@/cli/runtime';
 
 export const updateCommand = new Command('update');

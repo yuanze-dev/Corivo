@@ -14,7 +14,6 @@ import {
   removeCliFile,
   writeCliText,
 } from '@/cli/runtime';
-import { createMemoryCommand } from '@/cli/commands/memory';
 import { createHostCommand } from '@/cli/commands/host';
 import { createDaemonCommand } from '@/cli/commands/daemon';
 import { createQueryCommand } from '@/cli/commands/query';
@@ -22,7 +21,6 @@ import { createSaveCommand } from '@/cli/commands/save';
 import { createSupermemoryCommand } from '@/cli/commands/supermemory';
 import { hostImportCommand } from '@/cli/commands/host-import';
 import { isInteractiveTTY, readConfirmIfTTY } from '@/cli/utils/password';
-import { runMemoryPipeline } from '@/application/memory/run-memory-pipeline';
 import { createHostInstallUseCase } from '@/application/hosts/install-host';
 import { createHostDoctorUseCase } from '@/application/hosts/doctor-host';
 import { createHostUninstallUseCase } from '@/application/hosts/uninstall-host';
@@ -33,7 +31,6 @@ import type {
   CliApp,
   DaemonCommandCapabilities,
   HostCommandCapabilities,
-  MemoryCommandCapabilities,
   QueryCommandCapabilities,
 } from './types.js';
 
@@ -43,18 +40,6 @@ const LEGACY_CONFIG_ERROR =
 export function createCliApp(): CliApp {
   const logger = createCliLogger();
   const output = createCliOutput(logger);
-
-  const memoryCapabilities: MemoryCommandCapabilities = {
-    executor: (mode, provider) => runMemoryPipeline({ mode, provider }),
-    printer: (result) => {
-      const stageIds = result.stages.map((stage) => stage.stageId);
-      const stageSuffix = stageIds.length > 0 ? ` [stages: ${stageIds.join(', ')}]` : '';
-      output.info(
-        `Memory pipeline ${result.pipelineId} finished with status ${result.status} (run ${result.runId})${stageSuffix}`
-      );
-    },
-    logger,
-  };
 
   const hostCapabilities: HostCommandCapabilities = {
     listHosts: () => getAllHostAdapters(),
@@ -152,7 +137,6 @@ export function createCliApp(): CliApp {
 
   return {
     commands: {
-      memory: createMemoryCommand(memoryCapabilities),
       host: createHostCommand(hostCapabilities),
       daemon: createDaemonCommand(daemonCapabilities),
       query: createQueryCommand(queryCapabilities),

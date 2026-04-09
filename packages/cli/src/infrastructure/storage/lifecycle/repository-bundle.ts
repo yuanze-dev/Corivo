@@ -4,7 +4,6 @@ import { DatabaseStatsRepository } from '@/infrastructure/storage/repositories/d
 import { HostImportCursorStore } from '@/infrastructure/storage/repositories/host-import-cursor-store.js';
 import { MemoryProcessingJobQueue } from '@/infrastructure/storage/repositories/memory-processing-job-queue.js';
 import { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-memory-repository.js';
-import { SessionRecordRepository } from '@/infrastructure/storage/repositories/session-record-repository.js';
 import type {
   Association,
   Block,
@@ -14,7 +13,6 @@ import type {
   RawMessageRecord,
   RawSessionRecord,
 } from '@/infrastructure/storage/types/raw-memory.js';
-import type { SessionRecord } from '@/memory-pipeline/contracts/session-record.js';
 
 interface RepositoryBundleSqliteDb {
   prepare(sql: string): any;
@@ -33,7 +31,6 @@ export interface CreateCorivoRepositoryBundleOptions {
   rowToRawSession: (row: unknown) => RawSessionRecord;
   rowToRawMessage: (row: unknown) => RawMessageRecord;
   rowToMemoryProcessingJob: (row: unknown) => MemoryProcessingJobRecord;
-  rowToSessionRecord: (row: unknown, messages: unknown[]) => SessionRecord;
 }
 
 export function createCorivoRepositoryBundle(options: CreateCorivoRepositoryBundleOptions) {
@@ -66,10 +63,6 @@ export function createCorivoRepositoryBundle(options: CreateCorivoRepositoryBund
       useSQLCipher: options.useSQLCipher,
       getContentKey: options.getContentKey,
       rowToBlock: options.rowToBlock,
-    }),
-    sessionRecordRepository: new SessionRecordRepository({
-      db: options.db,
-      rowToSessionRecord: options.rowToSessionRecord,
     }),
   };
 }

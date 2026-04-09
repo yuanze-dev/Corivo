@@ -10,7 +10,6 @@ import type {
   RawMessageRecord,
   RawSessionRecord,
 } from '@/infrastructure/storage/types/raw-memory.js';
-import type { SessionMessage, SessionRecord } from '@/memory-pipeline/contracts/session-record.js';
 
 interface BlockRowMapperRuntime {
   enableEncryption: boolean;
@@ -122,48 +121,4 @@ export function parseJsonObject(value: string | null | undefined): Record<string
   }
 
   return undefined;
-}
-
-export function deriveSessionHost(kind: string, sourceRef: string): string {
-  if (kind.endsWith('-session')) {
-    return kind.slice(0, -'-session'.length);
-  }
-
-  const protocolSeparator = sourceRef.indexOf('://');
-  if (protocolSeparator > 0) {
-    return sourceRef.slice(0, protocolSeparator);
-  }
-
-  return 'unknown';
-}
-
-export function mapRowToSessionMessage(row: any): SessionMessage {
-  const metadata = parseJsonObject(row.metadata);
-
-  return {
-    id: row.id,
-    role: row.role,
-    content: row.content,
-    sequence: row.sequence,
-    createdAt: row.created_at ?? undefined,
-    ...(metadata ? { metadata } : {}),
-  };
-}
-
-export function mapRowToSessionRecord(row: any, messages: any[]): SessionRecord {
-  const metadata = parseJsonObject(row.metadata);
-
-  return {
-    id: row.id,
-    sessionId: row.id,
-    kind: row.kind,
-    host: deriveSessionHost(row.kind, row.source_ref),
-    sourceRef: row.source_ref,
-    createdAt: row.created_at ?? undefined,
-    updatedAt: row.updated_at ?? undefined,
-    startedAt: row.started_at ?? undefined,
-    endedAt: row.ended_at ?? undefined,
-    messages: messages.map((message) => mapRowToSessionMessage(message)),
-    ...(metadata ? { metadata } : {}),
-  };
 }

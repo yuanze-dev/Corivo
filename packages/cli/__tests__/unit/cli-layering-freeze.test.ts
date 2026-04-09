@@ -27,7 +27,6 @@ const APPROVED_TOP_LEVEL_DIRECTORIES = [
   'cli',
   'domain',
   'infrastructure',
-  'memory-pipeline',
   'runtime',
 ] as const;
 

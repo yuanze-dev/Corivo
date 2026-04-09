@@ -44,7 +44,6 @@ const VERSION = packageJson.version;
 
 type CliProgramOptions = {
   app?: CliApp;
-  memoryCommand?: Command;
 };
 
 function resolvePackagePath(currentDir: string): string {
@@ -62,9 +61,8 @@ function resolvePackagePath(currentDir: string): string {
   return candidates[0];
 }
 
-export function createProgram({ app = createCliApp(), memoryCommand }: CliProgramOptions = {}) {
+export function createProgram({ app = createCliApp() }: CliProgramOptions = {}) {
   const program = new Command();
-  const resolvedMemoryCommand = memoryCommand ?? app.commands.memory;
   const commands = [
     initCliCommand,
     statusCliCommand,
@@ -79,7 +77,6 @@ export function createProgram({ app = createCliApp(), memoryCommand }: CliProgra
     app.commands.query,
     listCommand,
     app.commands.save,
-    resolvedMemoryCommand,
     app.commands.host,
     coldScanCommand,
     pushCommand,

@@ -4,13 +4,9 @@ import type { HostDoctorRequest } from '@/application/hosts/doctor-host';
 import type { HostInstallRequest } from '@/application/hosts/install-host';
 import type { HostUninstallRequest } from '@/application/hosts/uninstall-host';
 import type { QueryOptions, PromptQueryCommandOptions, SearchQueryCommandInput } from '@/application/bootstrap/query-execution';
-import type { MemoryPipelineMode } from '@/application/memory/run-memory-pipeline';
-import type { ExtractionProvider } from '@/infrastructure/llm/types';
-import type { MemoryPipelineRunResult } from '@/memory-pipeline';
 import type { Logger } from '@/infrastructure/logging';
 
 export interface CliAppCommands {
-  memory: Command;
   host: Command;
   daemon: Command;
   query: Command;
@@ -25,15 +21,6 @@ export interface CliAppCapabilities {
 export interface CliApp {
   commands: CliAppCommands;
   capabilities: CliAppCapabilities;
-}
-
-export interface MemoryCommandCapabilities {
-  executor: (
-    mode: MemoryPipelineMode,
-    provider: ExtractionProvider,
-  ) => Promise<MemoryPipelineRunResult>;
-  printer: (result: MemoryPipelineRunResult) => void;
-  logger: Pick<Logger, 'debug'>;
 }
 
 export interface HostCommandCapabilities {

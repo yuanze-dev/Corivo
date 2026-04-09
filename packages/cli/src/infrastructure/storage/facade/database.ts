@@ -34,10 +34,6 @@ const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
 
 import { DatabaseError } from '@/domain/errors/index.js';
-import type { SessionMessage, SessionRecord } from '@/memory-pipeline/contracts/session-record.js';
-import type {
-  SessionRecordQuery,
-} from '@/memory-pipeline/sources/session-record-source.js';
 import type {
   Block,
   CreateBlockInput,
@@ -63,7 +59,6 @@ import {
   mapRowToMemoryProcessingJob,
   mapRowToRawMessage,
   mapRowToRawSession,
-  mapRowToSessionRecord,
 } from '@/infrastructure/storage/repositories/row-mappers.js';
 import type {
   EnsureExtractSessionJobInput,
@@ -143,7 +138,6 @@ export class CorivoDatabase {
   private readonly hostImportCursorStore: HostImportCursorStore;
   private readonly memoryProcessingJobQueue: MemoryProcessingJobQueue;
   private readonly databaseStatsRepository: DatabaseStatsRepository;
-  private readonly sessionRecordRepository: SessionRecordRepository;
 
   private constructor(private config: DatabaseConfig) {
     // Save encryption configuration
@@ -168,8 +162,6 @@ export class CorivoDatabase {
       rowToRawSession: (row: unknown) => this.rowToRawSession(row),
       rowToRawMessage: (row: unknown) => this.rowToRawMessage(row),
       rowToMemoryProcessingJob: (row: unknown) => this.rowToMemoryProcessingJob(row),
-      rowToSessionRecord: (row: unknown, messages: unknown[]) =>
-        this.rowToSessionRecord(row, messages as any[]),
     });
 
     this.blockRepository = repositoryBundle.blockRepository;
@@ -178,7 +170,6 @@ export class CorivoDatabase {
     this.hostImportCursorStore = repositoryBundle.hostImportCursorStore;
     this.memoryProcessingJobQueue = repositoryBundle.memoryProcessingJobQueue;
     this.databaseStatsRepository = repositoryBundle.databaseStatsRepository;
-    this.sessionRecordRepository = repositoryBundle.sessionRecordRepository;
   }
 
   /**
@@ -379,10 +370,6 @@ export class CorivoDatabase {
     return this.blockRepository.query(filter);
   }
 
-  querySessionRecords(query: SessionRecordQuery = {}): SessionRecord[] {
-    return this.sessionRecordRepository.query(query);
-  }
-
   /**
    * Search blocks with FTS5 full-text search
    *
@@ -536,10 +523,6 @@ export class CorivoDatabase {
       useSQLCipher: this.useSQLCipher,
       getContentKey: () => this.getContentKey(),
     }, row);
-  }
-
-  private rowToSessionRecord(row: unknown, messages: unknown[]): SessionRecord {
-    return mapRowToSessionRecord(row as any, messages as any[]);
   }
 
   /**

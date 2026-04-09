@@ -25,14 +25,11 @@ import { vitalityToStatus } from '@/domain/memory/models/block.js';
 import { loadConfig } from '@/config.js';
 import { getCliNow, loadCliConfig, loadCliSolver, saveCliSolver } from '@/cli/runtime';
 import { createLogger, type Logger } from '@/infrastructure/logging.js';
-import { runMemoryPipeline } from '@/application/memory/run-memory-pipeline.js';
 
 const HEARTBEAT_INTERVAL = 5000; // 5 seconds
 const PENDING_BATCH_SIZE = 10; // Number of pending blocks processed per cycle
 const HEALTH_CHECK_FILE = '.heartbeat-health'; // Health status file name
 const HEALTH_CHECK_INTERVAL = 30000; // Write health status every 30 seconds
-const DEFAULT_MEMORY_PIPELINE_CYCLES = 2016; // 7-day cadence (1,2,3,...)
-
 /**
  * Heartbeat engine configuration
  */
@@ -43,8 +40,6 @@ export interface HeartbeatConfig {
   dbPath?: string;
   /** Sync interval in seconds (optional; for testing; production reads from config.json) */
   syncIntervalSeconds?: number;
-  /** Override that controls heartbeat cycles between scheduled memory pipeline runs */
-  memoryPipelineCycles?: number;
   /** Logger facade (optional; defaults to the process logger) */
   logger?: Logger;
 }
@@ -86,9 +81,6 @@ export class Heartbeat {
   private syncCycles = 60; // Default 5 minutes (60 × 5s)
   private lastWeeklySummary = 0;
   private lastTriggerDecision = 0;
-  private memoryPipelineCycles = DEFAULT_MEMORY_PIPELINE_CYCLES;
-  private memoryPipelineRunning = false;
-  private memoryPipelinePromise: Promise<void> | null = null;
   private healthFilePath: string;
 
   constructor(config?: HeartbeatConfig) {
@@ -114,11 +106,6 @@ export class Heartbeat {
     // Resolve health file path
     const configDir = process.env.CORIVO_CONFIG_DIR || getConfigDir();
     this.healthFilePath = `${configDir}/${HEALTH_CHECK_FILE}`;
-
-    if (config?.memoryPipelineCycles !== undefined) {
-      const cycles = Math.round(config.memoryPipelineCycles);
-      this.memoryPipelineCycles = Math.max(1, cycles);
-    }
 
     // Test mode: inject syncIntervalSeconds directly via constructor config
     if (config?.syncIntervalSeconds !== undefined) {
@@ -234,9 +221,6 @@ export class Heartbeat {
           await this.updateHealthCheck();
         }
 
-        if (this.shouldTriggerMemoryPipeline()) {
-          this.triggerScheduledMemoryPipeline();
-        }
       } catch (error) {
         if (error instanceof DatabaseError) {
           this.logger.error('[心跳] 数据库错误:', error.message);
@@ -304,10 +288,6 @@ export class Heartbeat {
     if (this.timeoutRef) {
       clearTimeout(this.timeoutRef);
       this.timeoutRef = null;
-    }
-
-    if (this.memoryPipelinePromise) {
-      await this.memoryPipelinePromise;
     }
 
     // Stop all active plugins
@@ -871,60 +851,6 @@ export class Heartbeat {
    */
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  private shouldTriggerMemoryPipeline(): boolean {
-    if (!this.running) {
-      return false;
-    }
-    if (!Number.isFinite(this.memoryPipelineCycles) || this.memoryPipelineCycles <= 0) {
-      return false;
-    }
-    if (this.cycleCount === 0) {
-      return false;
-    }
-    if (this.memoryPipelineRunning) {
-      return false;
-    }
-
-    return this.cycleCount % this.memoryPipelineCycles === 0;
-  }
-
-  private triggerScheduledMemoryPipeline(): void {
-    if (this.memoryPipelineRunning) {
-      return;
-    }
-
-    const configDir = process.env.CORIVO_CONFIG_DIR || getConfigDir();
-    const dbPath = process.env.CORIVO_DB_PATH || this.config?.dbPath;
-    if (!dbPath) {
-      this.logger.error('[心跳] scheduled memory pipeline 跳过: 缺少数据库路径');
-      return;
-    }
-
-    this.memoryPipelineRunning = true;
-    this.memoryPipelinePromise = runMemoryPipeline({
-      mode: 'incremental',
-      dependencies: {
-        runtime: {
-          resolveConfigDir: () => configDir,
-          resolveDatabasePath: () => dbPath,
-        },
-        createTrigger: () => ({
-          type: 'scheduled',
-          runAt: Date.now(),
-          requestedBy: 'heartbeat',
-        }),
-      },
-    })
-      .then(() => {})
-      .catch((error) => {
-        this.logger.error('[心跳] scheduled memory pipeline 触发失败:', error);
-      })
-      .finally(() => {
-        this.memoryPipelineRunning = false;
-        this.memoryPipelinePromise = null;
-      });
   }
 }
 

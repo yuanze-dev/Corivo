@@ -32,7 +32,6 @@ describe('module boundaries baseline', () => {
     expect(content).toContain('`models/`');
     expect(content).toContain('`type/`');
     expect(content).toContain('都不应在顶层重新出现');
-    expect(content).toContain('memory-pipeline/');
     expect(content).toContain('packages/plugins/*/hooks/scripts/*.sh');
   });
 
@@ -47,7 +46,6 @@ describe('module boundaries baseline', () => {
     expect(content).toContain('domain/');
     expect(content).toContain('infrastructure/');
     expect(content).toContain('runtime/');
-    expect(content).toContain('memory-pipeline/');
     expect(content).toContain('Layer Ownership Snapshot');
     expect(content).toContain('只保留');
   });
@@ -77,14 +75,6 @@ describe('module boundaries baseline', () => {
     const hits = collectImports(['packages/cli/src/application'])
       .filter((entry) => includesPathPair(entry.specifier, 'cli', 'runtime'))
       .filter((entry) => !allowedCompositionRoots.has(entry.file));
-
-    expect(hits).toEqual([]);
-  });
-
-  it('forbids memory-pipeline imports from cli modules', () => {
-    const hits = collectImports(['packages/cli/src/memory-pipeline']).filter((entry) =>
-      includesPathSegment(entry.specifier, 'cli'),
-    );
 
     expect(hits).toEqual([]);
   });

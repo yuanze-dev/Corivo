@@ -220,6 +220,21 @@ describe('supermemory config command', () => {
 
     log.mockRestore();
   });
+
+  it('corivo supermemory status reports malformed config when config.json is broken JSON', async () => {
+    await fs.writeFile(
+      path.join(tempHome, '.corivo', 'config.json'),
+      '{"version":"1","created_at":"2026-01-01","identity_id":"sm-test"',
+    );
+
+    const { createProgram } = await import('../../src/cli/index.js');
+    const program = createProgram();
+    program.exitOverride();
+
+    await expect(
+      program.parseAsync(['supermemory', 'status'], { from: 'user' }),
+    ).rejects.toThrow('Corivo config is malformed. Please fix ~/.corivo/config.json');
+  });
 });
 
 describe('createProgram wiring', () => {

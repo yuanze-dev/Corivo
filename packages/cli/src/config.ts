@@ -132,7 +132,10 @@ export async function loadConfig(configDir?: string): Promise<CorivoConfig | nul
       return null;
     }
 
-    if (typeof config.memoryEngine !== 'undefined' && !isValidMemoryEngineConfig(config.memoryEngine)) {
+    if (
+      typeof config.memoryEngine !== 'undefined' &&
+      !isValidMemoryEngineConfig(config.memoryEngine)
+    ) {
       return null;
     }
 
@@ -162,7 +165,7 @@ export async function saveConfig(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     };
   }
 }
@@ -210,10 +213,7 @@ export async function loadSolverConfig(configDir?: string): Promise<SolverConfig
 /**
  * Save solver configuration
  */
-export async function saveSolverConfig(
-  config: SolverConfig,
-  configDir?: string
-): Promise<void> {
+export async function saveSolverConfig(config: SolverConfig, configDir?: string): Promise<void> {
   const dir = configDir || getConfigDir();
   await fs.mkdir(dir, { recursive: true });
   const solverPath = path.join(dir, 'solver.json');
@@ -223,5 +223,5 @@ export async function saveSolverConfig(
 export default {
   loadConfig,
   saveConfig,
-  isInitialized
+  isInitialized,
 };

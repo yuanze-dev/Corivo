@@ -60,7 +60,14 @@ async function readRawConfigOrThrow(configDir: string): Promise<any> {
     if (error instanceof ConfigError) {
       throw error;
     }
-    throw new ConfigError('Corivo is not initialized. Please run: corivo init');
+    const nodeError = error as NodeJS.ErrnoException;
+    if (nodeError?.code === 'ENOENT') {
+      throw new ConfigError('Corivo is not initialized. Please run: corivo init');
+    }
+    if (error instanceof SyntaxError) {
+      throw new ConfigError('Corivo config is malformed. Please fix ~/.corivo/config.json');
+    }
+    throw new ConfigError('Corivo config is invalid. Please fix ~/.corivo/config.json');
   }
 }
 

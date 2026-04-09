@@ -6,6 +6,7 @@
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { Command } from 'commander';
 import { loadSolverConfig } from '@/config';
 import { ContextPusher } from '@/application/push/context.js';
 import { getServiceManager } from '@/infrastructure/platform/index.js';
@@ -189,3 +190,8 @@ const jsonStatus = async (output: CliOutput = getCliOutput()) => {
     ),
   );
 };
+
+export const statusCliCommand = new Command('status')
+  .description('View status')
+  .option('--json', 'Output JSON formate')
+  .action(statusCommand);

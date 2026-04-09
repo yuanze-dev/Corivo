@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CLI = path.join(__dirname, '../../dist/cli/index.js');
+const CLI = path.join(__dirname, '../../dist/cli/run.js');
 const TEST_DIR = `/tmp/corivo-e2e-${Date.now()}`;
 
 describe('E2E: CLI Basic Workflow', () => {

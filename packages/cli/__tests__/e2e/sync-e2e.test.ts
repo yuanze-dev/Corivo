@@ -18,7 +18,7 @@ import { createRequire } from 'node:module';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '../../../..'); // monorepo root
-const CLI = path.join(ROOT, 'packages/cli/dist/cli/index.js');
+const CLI = path.join(ROOT, 'packages/cli/dist/cli/run.js');
 const SOLVER_DIST = path.join(ROOT, 'packages/solver/dist/index.js');
 const TEST_PORT = 13141;
 const SOLVER_URL = `http://localhost:${TEST_PORT}`;

@@ -13,6 +13,7 @@
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
+import { Command } from 'commander';
 import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
 import { openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import { FileSystemError } from '@/domain/errors/index.js';
@@ -285,3 +286,9 @@ export async function initCommand(options: { join?: string; server?: string } = 
 
   exit(0);
 }
+
+export const initCliCommand = new Command('init')
+  .description('Initialize Corivo')
+  .option('--join <code>', 'Join an existing identity using a pairing code (multi-device sync)')
+  .option('--server <url>', 'Solver server URL (used with --join)')
+  .action(initCommand);

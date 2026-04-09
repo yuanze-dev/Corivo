@@ -930,8 +930,8 @@ export class Heartbeat {
 
 // Direct-run entry point (when this file is executed as the daemon process).
 // Detection: both the current file path and argv[1] must end with 'heartbeat.js'.
-// Note: cannot compare currentFilePath === argv1 because tsup bundles everything
-// into dist/cli/index.js, making both paths identical after bundling.
+// Note: cannot compare currentFilePath === argv1 because bundling can collapse
+// source locations in ways that make simple path equality unreliable.
 const isDirectRun = () => {
   try {
     const currentFilePath = new URL(import.meta.url).pathname;

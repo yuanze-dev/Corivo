@@ -6,6 +6,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { Command } from 'commander';
 import chalk from 'chalk';
 import { KeyManager } from '@/infrastructure/crypto/keys.js';
 import { getConfigDir } from '@/infrastructure/storage/lifecycle/database-paths.js';
@@ -95,3 +96,8 @@ export async function setupPasswordCommand(options: SetupPasswordOptions = {}): 
   output.info(chalk.gray('From now on, you will need to enter the password when using Corivo.'));
   output.info(chalk.gray('Database contents are now encrypted.\\n'));
 }
+
+export const setupPasswordCliCommand = new Command('setup-password')
+  .description('Set the master password (for database encryption and cross-device verification)')
+  .option('-f, --force', 'Force-change the existing password')
+  .action(setupPasswordCommand);

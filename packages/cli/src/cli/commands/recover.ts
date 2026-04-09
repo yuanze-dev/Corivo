@@ -6,6 +6,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { Command } from 'commander';
 import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
 import { openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import { printBanner } from '@/cli/presenters/banner.js';
@@ -137,3 +138,7 @@ export async function recoverCommand(): Promise<void> {
   output.info('\nNext steps:');
   output.info('  Re-authorize on other devices (the device list has been reset)');
 }
+
+export const recoverCliCommand = new Command('recover')
+  .description('Recover keys')
+  .action(recoverCommand);

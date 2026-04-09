@@ -41,9 +41,9 @@ export async function resolveCorivoBin(): Promise<string> {
     }
   }
 
-  // fallback: Use import.meta.url to locate the current file and deduce the absolute path of cli/index.js
-  // dist/service/index.js → ../../dist/cli/index.js (not related to cwd)
+  // fallback: Use import.meta.url to locate the current file and deduce the absolute path of cli/run.js
+  // dist/service/index.js → ../../dist/cli/run.js (not related to cwd)
   const thisFile = fileURLToPath(import.meta.url)
-  const cliPath = path.resolve(path.dirname(thisFile), '..', 'cli', 'index.js')
+  const cliPath = path.resolve(path.dirname(thisFile), '..', 'cli', 'run.js')
   return `${process.execPath} ${cliPath}`
 }

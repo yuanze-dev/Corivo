@@ -6,6 +6,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { Command } from 'commander';
 import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
 import { openCorivoDatabase } from '@/infrastructure/storage/lifecycle/database.js';
 import { KeyManager } from '@/infrastructure/crypto/keys.js';
@@ -87,3 +88,7 @@ export async function doctorCommand(): Promise<void> {
 
   output.info('\nHealth check complete');
 }
+
+export const doctorCliCommand = new Command('doctor')
+  .description('Run health checks')
+  .action(doctorCommand);

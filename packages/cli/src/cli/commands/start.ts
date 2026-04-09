@@ -4,6 +4,7 @@
  * Starts the heartbeat daemon process via the system service manager.
  */
 
+import { Command } from 'commander'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js'
@@ -53,3 +54,7 @@ export async function startCommand(): Promise<void> {
     output.info('  node ./dist/runtime/daemon/heartbeat.js')
   }
 }
+
+export const startCliCommand = new Command('start')
+  .description('Start the daemon')
+  .action(startCommand)

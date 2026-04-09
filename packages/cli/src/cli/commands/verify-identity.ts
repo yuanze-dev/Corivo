@@ -6,6 +6,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { Command } from 'commander';
 import chalk from 'chalk';
 import { KeyManager } from '@/infrastructure/crypto/keys.js';
 import { JointVerifier } from '@/infrastructure/identity/auth.js';
@@ -123,3 +124,8 @@ export async function verifyIdentityCommand(options: VerifyIdentityOptions = {})
     output.info(chalk.gray('Identity has been verified through fingerprint recognition.'));
   }
 }
+
+export const verifyIdentityCliCommand = new Command('verify-identity')
+  .description('Cross-device identity verification (fingerprints + password)')
+  .option('-v, --verbose', 'Show detailed information')
+  .action(verifyIdentityCommand);

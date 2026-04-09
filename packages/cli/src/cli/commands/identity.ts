@@ -6,6 +6,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { Command } from 'commander';
 import { getConfigDir } from '@/infrastructure/storage/lifecycle/database-paths.js';
 import { printBanner } from '@/cli/presenters/banner.js';
 import { IdentityManager, FingerprintCollector } from '@/infrastructure/identity/index.js';
@@ -105,3 +106,8 @@ export async function identityCommand(options: {
     process.exit(1);
   }
 }
+
+export const identityCliCommand = new Command('identity')
+  .description('View identity information')
+  .option('-v, --verbose', 'Show detailed information')
+  .action(identityCommand);

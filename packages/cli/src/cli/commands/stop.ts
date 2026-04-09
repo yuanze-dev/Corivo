@@ -4,6 +4,7 @@
  * Stops the heartbeat daemon process.
  */
 
+import { Command } from 'commander'
 import { getServiceManager } from '@/infrastructure/platform/index.js'
 import { getCliOutput } from '@/cli/runtime'
 
@@ -21,3 +22,7 @@ export async function stopCommand(): Promise<void> {
     output.error(`❌ Stop failed: ${result.error}`)
   }
 }
+
+export const stopCliCommand = new Command('stop')
+  .description('Stop the daemon')
+  .action(stopCommand)

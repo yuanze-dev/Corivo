@@ -6,6 +6,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { Command } from 'commander';
 import chalk from 'chalk';
 import { KeyManager } from '@/infrastructure/crypto/keys.js';
 import { getConfigDir, getDefaultDatabasePath } from '@/infrastructure/storage/lifecycle/database-paths.js';
@@ -118,3 +119,9 @@ export async function unlockCommand(options: UnlockOptions = {}): Promise<void> 
     output.info('');
   }
 }
+
+export const unlockCliCommand = new Command('unlock')
+  .description('Unlock and inspect database contents')
+  .option('-r, --raw', 'Output in raw format')
+  .option('-l, --limit <number>', 'Result limit', '100')
+  .action(unlockCommand);

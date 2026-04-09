@@ -5,11 +5,9 @@ import {
   createHostImportUseCase,
   persistImportedSessions,
 } from '@/application/hosts/import-host';
-import { createEnqueueSessionExtractionUseCase } from '@/application/memory-ingest/enqueue-session-extraction';
 import type { HostId, HostImportResult } from '@/domain/host/contracts/types.js';
 import type { HostImportRequest } from '@/application/hosts/import-host';
 import { HostImportCursorStore } from '@/infrastructure/storage/repositories/host-import-cursor-store';
-import { MemoryProcessingJobQueue } from '@/infrastructure/storage/repositories/memory-processing-job-queue';
 import { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-memory-repository';
 import { loadRuntimeDb } from '@/runtime/runtime-support.js';
 import {
@@ -99,9 +97,7 @@ async function createDefaultExecuteImport() {
   }
 
   const repository = new RawMemoryRepository(db);
-  const queue = new MemoryProcessingJobQueue(db);
   const cursors = new HostImportCursorStore(db);
-  const enqueueSessionExtraction = createEnqueueSessionExtractionUseCase({ queue });
   const tracker = createFileSessionSyncTracker(getCliConfigDir());
   const syncSessionTranscript =
     config?.memoryEngine?.provider === 'supermemory'
@@ -119,7 +115,6 @@ async function createDefaultExecuteImport() {
     persistImportResult: async (result) => {
       await persistImportedSessions(result, {
         repository,
-        enqueueSessionExtraction,
         syncSessionTranscript,
       });
     },

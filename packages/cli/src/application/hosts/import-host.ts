@@ -7,7 +7,6 @@ import type {
 } from '@/domain/host/contracts/types.js';
 import type { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-memory-repository.js';
 import type { RawMessageRole } from '@/infrastructure/storage/types/raw-memory.js';
-import type { EnqueueSessionExtractionRequest } from '../memory-ingest/enqueue-session-extraction.js';
 import type { Logger } from '@/infrastructure/logging.js';
 
 export type HostImportRequest = HostImportOptions & { host: HostId };
@@ -35,9 +34,6 @@ interface ImportedSessionLike {
 
 export interface PersistImportedSessionsDeps {
   repository: Pick<RawMemoryRepository, 'upsertMessage' | 'upsertSession'>;
-  enqueueSessionExtraction?: (
-    input: EnqueueSessionExtractionRequest,
-  ) => unknown;
   syncSessionTranscript?: (input: {
     sessionKey: string;
   }) => unknown;
@@ -169,10 +165,6 @@ export async function persistImportedSessions(
       sessionKey,
     });
 
-    deps.enqueueSessionExtraction?.({
-      host: session.host,
-      sessionKey,
-    });
   }
 }
 

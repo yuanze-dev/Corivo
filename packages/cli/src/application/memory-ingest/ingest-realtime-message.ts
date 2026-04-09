@@ -29,7 +29,7 @@ export interface IngestRealtimeMessageDeps {
     RawMemoryRepository,
     'getTranscript' | 'listMessages' | 'upsertMessage' | 'upsertSession'
   >;
-  enqueueSessionExtraction: (
+  enqueueSessionExtraction?: (
     input: EnqueueSessionExtractionRequest,
   ) => unknown;
   syncSessionTranscript?: (
@@ -85,7 +85,7 @@ export function createIngestRealtimeMessageUseCase(
       ingestEventId: input.ingestEventId,
     });
 
-    deps.enqueueSessionExtraction({
+    deps.enqueueSessionExtraction?.({
       host: input.host,
       sessionKey,
       priority: input.priority,

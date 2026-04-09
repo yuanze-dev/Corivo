@@ -5,7 +5,6 @@ import { KeyManager } from '../../src/infrastructure/crypto/keys.js';
 import { CorivoDatabase } from '@/infrastructure/storage/facade/database';
 import { RawMemoryRepository } from '../../src/infrastructure/storage/repositories/raw-memory-repository.js';
 import { MemoryProcessingJobQueue } from '../../src/infrastructure/storage/repositories/memory-processing-job-queue.js';
-import { createEnqueueSessionExtractionUseCase } from '../../src/application/memory-ingest/enqueue-session-extraction.js';
 
 describe('host import use case', () => {
   const dbPaths = new Set<string>();
@@ -212,7 +211,7 @@ describe('host import use case', () => {
     expect(saveLastCursor).not.toHaveBeenCalled();
   });
 
-  it('writes imported sessions into raw storage and enqueues extraction jobs', async () => {
+  it('writes imported sessions into raw storage without enqueuing extraction jobs', async () => {
     const dbPath = `/tmp/corivo-host-import-${Math.random().toString(36).slice(2, 10)}.db`;
     dbPaths.add(dbPath);
     const db = CorivoDatabase.getInstance({
@@ -221,8 +220,6 @@ describe('host import use case', () => {
     });
     const repository = new RawMemoryRepository(db);
     const queue = new MemoryProcessingJobQueue(db);
-    const enqueueSessionExtraction = createEnqueueSessionExtractionUseCase({ queue });
-
     const run = createHostImportUseCase({
       getAdapter: () =>
         ({
@@ -266,7 +263,6 @@ describe('host import use case', () => {
       persistImportResult: async (result) => {
         await persistImportedSessions(result, {
           repository,
-          enqueueSessionExtraction,
         });
       },
     });
@@ -297,13 +293,7 @@ describe('host import use case', () => {
         },
       ],
     });
-    expect(queue.listPending()).toEqual([
-      expect.objectContaining({
-        host: 'claude-code',
-        sessionKey: 'claude-code:claude-session-1',
-        status: 'pending',
-      }),
-    ]);
+    expect(queue.listPending()).toEqual([]);
   });
 
   it('syncs imported session transcript to Supermemory once per session', async () => {

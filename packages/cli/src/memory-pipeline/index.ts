@@ -28,7 +28,6 @@ export * from './stages/collect-stale-blocks.js';
 export * from './stages/collect-raw-session-jobs.js';
 export * from './stages/complete-raw-session-jobs.js';
 export * from './stages/summarize-block-batch.js';
-export * from './stages/sync-provider-memories.js';
 export * from './stages/append-detail-records.js';
 export * from './stages/rebuild-memory-index.js';
 export * from './stages/refresh-memory-index.js';

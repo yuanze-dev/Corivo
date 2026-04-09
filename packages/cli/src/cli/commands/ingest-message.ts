@@ -1,11 +1,9 @@
 import { Command } from 'commander';
 import { ConfigError } from '@/domain/errors/index.js';
-import { createEnqueueSessionExtractionUseCase } from '../../application/memory-ingest/enqueue-session-extraction.js';
 import {
   createIngestRealtimeMessageUseCase,
   type IngestRealtimeMessageRequest,
 } from '../../application/memory-ingest/ingest-realtime-message.js';
-import { MemoryProcessingJobQueue } from '@/infrastructure/storage/repositories/memory-processing-job-queue.js';
 import { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-memory-repository.js';
 import { loadRuntimeDb } from '@/runtime/runtime-support.js';
 import { getCliConfigDir, loadCliConfig } from '@/cli/runtime';
@@ -60,8 +58,6 @@ async function createDefaultExecutor() {
   const config = await loadCliConfig();
 
   const repository = new RawMemoryRepository(db);
-  const queue = new MemoryProcessingJobQueue(db);
-  const enqueueSessionExtraction = createEnqueueSessionExtractionUseCase({ queue });
   const tracker = createFileSessionSyncTracker(getCliConfigDir());
   const syncSessionTranscript =
     config?.memoryEngine?.provider === 'supermemory'
@@ -74,7 +70,6 @@ async function createDefaultExecutor() {
       : undefined;
   const ingestRealtimeMessage = createIngestRealtimeMessageUseCase({
     repository,
-    enqueueSessionExtraction,
     syncSessionTranscript,
   });
 

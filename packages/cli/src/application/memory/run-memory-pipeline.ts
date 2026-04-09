@@ -24,8 +24,6 @@ import { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-m
 import { readMemoryPipelineConfig } from './config.js';
 import { createMemoryPipelineArtifactStore, getMemoryPipelineRunRoot } from './runtime.js';
 import { createDatabaseRawSessionJobSource, createDatabaseSessionSource } from './sources.js';
-import { resolveMemoryProvider } from '@/domain/memory/providers/resolve-memory-provider.js';
-import type { MemoryProvider } from '@/domain/memory/providers/types.js';
 
 export type MemoryPipelineMode = 'full' | 'incremental';
 export const DEFAULT_MEMORY_PROVIDER: ExtractionProvider = 'claude';
@@ -46,8 +44,6 @@ export interface MemoryPipelineExecutionDependencies {
     provider: ExtractionProvider;
     db: CorivoDatabase;
     config: CorivoConfig & { encrypted_db_key?: string };
-    memoryProvider?: MemoryProvider;
-    projectTag?: string;
   }) => MemoryPipelineDefinition;
   createTrigger?: (mode: MemoryPipelineMode) => PipelineTrigger;
   runPipeline?: (input: {
@@ -111,14 +107,6 @@ export async function runMemoryPipeline(
       provider,
       db,
       config,
-      memoryProvider:
-        config.memoryEngine?.provider === 'supermemory'
-          ? resolveMemoryProvider(config)
-          : undefined,
-      projectTag:
-        config.memoryEngine?.provider === 'supermemory'
-          ? config.memoryEngine.supermemory.containerTag
-          : undefined,
     });
     logger.debug(
       `[memory:pipeline] built pipeline id=${pipeline.id} provider=${provider} stageCount=${pipeline.stages.length}`
@@ -149,8 +137,6 @@ function defaultBuildPipeline(input: {
   provider: ExtractionProvider;
   db: CorivoDatabase;
   config: CorivoConfig & { encrypted_db_key?: string };
-  memoryProvider?: MemoryProvider;
-  projectTag?: string;
 }): MemoryPipelineDefinition {
   if (input.mode === 'full') {
     return createInitMemoryPipeline({
@@ -162,8 +148,6 @@ function defaultBuildPipeline(input: {
   return createScheduledMemoryPipeline({
     rawSessionJobSource: createDatabaseRawSessionJobSource(input.db) as RawSessionJobSource,
     provider: input.provider,
-    memoryProvider: input.memoryProvider,
-    projectTag: input.projectTag,
   });
 }
 

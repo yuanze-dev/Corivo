@@ -4,7 +4,6 @@ import { KeyManager } from '../../src/infrastructure/crypto/keys.js';
 import { CorivoDatabase } from '@/infrastructure/storage/facade/database';
 import { RawMemoryRepository } from '../../src/infrastructure/storage/repositories/raw-memory-repository.js';
 import { MemoryProcessingJobQueue } from '../../src/infrastructure/storage/repositories/memory-processing-job-queue.js';
-import { createEnqueueSessionExtractionUseCase } from '../../src/application/memory-ingest/enqueue-session-extraction.js';
 import { createIngestRealtimeMessageUseCase } from '../../src/application/memory-ingest/ingest-realtime-message.js';
 
 describe('realtime memory ingest', () => {
@@ -38,11 +37,9 @@ describe('realtime memory ingest', () => {
     ]);
   });
 
-  it('stores user prompt submit and assistant stop in raw memory while keeping one pending extraction job', async () => {
-    const enqueueSessionExtraction = createEnqueueSessionExtractionUseCase({ queue });
+  it('stores user prompt submit and assistant stop in raw memory without creating extraction jobs', async () => {
     const ingestRealtimeMessage = createIngestRealtimeMessageUseCase({
       repository,
-      enqueueSessionExtraction,
       now: () => 1_710_000_000_000,
     });
 
@@ -76,13 +73,7 @@ describe('realtime memory ingest', () => {
         },
       ],
     });
-    expect(queue.listPending()).toHaveLength(1);
-    expect(queue.listPending()[0]).toMatchObject({
-      host: 'codex',
-      sessionKey: 'codex:session-123',
-      status: 'pending',
-      dedupeKey: 'extract-session:codex:session-123',
-    });
+    expect(queue.listPending()).toHaveLength(0);
 
     await ingestRealtimeMessage({
       host: 'codex',
@@ -116,19 +107,12 @@ describe('realtime memory ingest', () => {
         },
       ],
     });
-    expect(queue.listPending()).toHaveLength(1);
-    expect(queue.listPending()[0]).toMatchObject({
-      host: 'codex',
-      sessionKey: 'codex:session-123',
-      status: 'pending',
-    });
+    expect(queue.listPending()).toHaveLength(0);
   });
 
   it('uses the same fallback timestamp for raw messages and session lastMessageAt when createdAt is absent', async () => {
-    const enqueueSessionExtraction = createEnqueueSessionExtractionUseCase({ queue });
     const ingestRealtimeMessage = createIngestRealtimeMessageUseCase({
       repository,
-      enqueueSessionExtraction,
       now: () => 1_710_000_123_456,
     });
 
@@ -161,11 +145,9 @@ describe('realtime memory ingest', () => {
   });
 
   it('syncs the session transcript only after an assistant reply completes a turn', async () => {
-    const enqueueSessionExtraction = createEnqueueSessionExtractionUseCase({ queue });
     const syncSessionTranscript = vi.fn(async () => {});
     const ingestRealtimeMessage = createIngestRealtimeMessageUseCase({
       repository,
-      enqueueSessionExtraction,
       syncSessionTranscript,
       now: () => 1_710_000_123_456,
     });

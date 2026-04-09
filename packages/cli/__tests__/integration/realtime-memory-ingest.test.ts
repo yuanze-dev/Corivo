@@ -159,4 +159,38 @@ describe('realtime memory ingest', () => {
       ],
     });
   });
+
+  it('syncs the session transcript only after an assistant reply completes a turn', async () => {
+    const enqueueSessionExtraction = createEnqueueSessionExtractionUseCase({ queue });
+    const syncSessionTranscript = vi.fn(async () => {});
+    const ingestRealtimeMessage = createIngestRealtimeMessageUseCase({
+      repository,
+      enqueueSessionExtraction,
+      syncSessionTranscript,
+      now: () => 1_710_000_123_456,
+    });
+
+    await ingestRealtimeMessage({
+      host: 'codex',
+      externalSessionId: 'session-remote-sync',
+      externalMessageId: 'msg-user-1',
+      role: 'user',
+      content: 'Remember that I prefer short PRs.',
+      ingestedFrom: 'codex-user-prompt-submit',
+    });
+
+    await ingestRealtimeMessage({
+      host: 'codex',
+      externalSessionId: 'session-remote-sync',
+      externalMessageId: 'msg-assistant-1',
+      role: 'assistant',
+      content: 'I will remember that.',
+      ingestedFrom: 'codex-stop',
+    });
+
+    expect(syncSessionTranscript).toHaveBeenCalledTimes(1);
+    expect(syncSessionTranscript).toHaveBeenCalledWith({
+      sessionKey: 'codex:session-remote-sync',
+    });
+  });
 });

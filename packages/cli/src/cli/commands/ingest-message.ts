@@ -8,6 +8,10 @@ import {
 import { MemoryProcessingJobQueue } from '@/infrastructure/storage/repositories/memory-processing-job-queue.js';
 import { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-memory-repository.js';
 import { loadRuntimeDb } from '@/runtime/runtime-support.js';
+import { getCliConfigDir, loadCliConfig } from '@/cli/runtime';
+import { resolveMemoryProvider } from '@/domain/memory/providers/resolve-memory-provider.js';
+import { createSyncSessionTranscriptToProviderUseCase } from '@/application/memory-ingest/sync-session-transcript-to-provider.js';
+import { createFileSessionSyncTracker } from '@/application/memory-ingest/session-sync-tracker.js';
 
 const VALID_HOSTS = new Set([
   'claude-code',
@@ -53,13 +57,25 @@ async function createDefaultExecutor() {
   if (!db) {
     throw new ConfigError('Corivo is not initialized. Please run: corivo init');
   }
+  const config = await loadCliConfig();
 
   const repository = new RawMemoryRepository(db);
   const queue = new MemoryProcessingJobQueue(db);
   const enqueueSessionExtraction = createEnqueueSessionExtractionUseCase({ queue });
+  const tracker = createFileSessionSyncTracker(getCliConfigDir());
+  const syncSessionTranscript =
+    config?.memoryEngine?.provider === 'supermemory'
+      ? createSyncSessionTranscriptToProviderUseCase({
+          repository,
+          provider: resolveMemoryProvider(config),
+          readCheckpoint: tracker.readCheckpoint,
+          writeCheckpoint: tracker.writeCheckpoint,
+        })
+      : undefined;
   const ingestRealtimeMessage = createIngestRealtimeMessageUseCase({
     repository,
     enqueueSessionExtraction,
+    syncSessionTranscript,
   });
 
   return async (input: IngestRealtimeMessageRequest) => {

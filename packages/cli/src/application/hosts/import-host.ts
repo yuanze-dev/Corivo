@@ -38,6 +38,9 @@ export interface PersistImportedSessionsDeps {
   enqueueSessionExtraction?: (
     input: EnqueueSessionExtractionRequest,
   ) => unknown;
+  syncSessionTranscript?: (input: {
+    sessionKey: string;
+  }) => unknown;
 }
 
 export interface HostImportUseCaseDependencies {
@@ -149,15 +152,21 @@ export async function persistImportedSessions(
     });
 
     session.messages.forEach((message, index) => {
+      const ordinal = index + 1;
       deps.repository.upsertMessage({
         sessionKey,
         externalMessageId: message.externalMessageId,
         role: message.role,
         content: message.content,
-        ordinal: index + 1,
+        ordinal,
         createdAt: message.createdAt,
         ingestedFrom: 'host-import',
       });
+
+    });
+
+    deps.syncSessionTranscript?.({
+      sessionKey,
     });
 
     deps.enqueueSessionExtraction?.({

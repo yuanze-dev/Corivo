@@ -32,6 +32,9 @@ export interface IngestRealtimeMessageDeps {
   enqueueSessionExtraction: (
     input: EnqueueSessionExtractionRequest,
   ) => unknown;
+  syncSessionTranscript?: (
+    input: { sessionKey: string },
+  ) => unknown;
   now?: () => number;
 }
 
@@ -87,6 +90,12 @@ export function createIngestRealtimeMessageUseCase(
       sessionKey,
       priority: input.priority,
     });
+
+    if (input.role === 'assistant') {
+      await deps.syncSessionTranscript?.({
+        sessionKey,
+      });
+    }
 
     return {
       sessionKey,

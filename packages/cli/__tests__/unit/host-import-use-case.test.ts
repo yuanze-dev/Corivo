@@ -305,4 +305,50 @@ describe('host import use case', () => {
       }),
     ]);
   });
+
+  it('syncs imported session transcript to Supermemory once per session', async () => {
+    const repository = {
+      upsertSession: vi.fn(),
+      upsertMessage: vi.fn(),
+    };
+    const syncSessionTranscript = vi.fn(async () => {});
+
+    await persistImportedSessions({
+      success: true,
+      host: 'claude-code',
+      mode: 'incremental',
+      importedSessionCount: 1,
+      importedMessageCount: 2,
+      summary: 'ok',
+      sessions: [
+        {
+          host: 'claude-code',
+          externalSessionId: 'claude-session-1',
+          cursor: 'cursor-9',
+          messages: [
+            {
+              externalMessageId: 'msg-user-1',
+              role: 'user',
+              content: 'Remember the Postgres decision.',
+              createdAt: 1_710_000_100_050,
+            },
+            {
+              externalMessageId: 'msg-assistant-1',
+              role: 'assistant',
+              content: 'We kept PostgreSQL because of JSON support.',
+              createdAt: 1_710_000_100_150,
+            },
+          ],
+        },
+      ],
+    } as any, {
+      repository: repository as any,
+      syncSessionTranscript,
+    });
+
+    expect(syncSessionTranscript).toHaveBeenCalledTimes(1);
+    expect(syncSessionTranscript).toHaveBeenCalledWith({
+      sessionKey: 'claude-code:claude-session-1',
+    });
+  });
 });

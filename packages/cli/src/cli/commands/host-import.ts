@@ -16,8 +16,12 @@ import {
   createCliLogger,
   createCliOutput,
   createConfiguredCliLogger,
+  getCliConfigDir,
   loadCliConfig,
 } from '@/cli/runtime';
+import { resolveMemoryProvider } from '@/domain/memory/providers/resolve-memory-provider.js';
+import { createSyncSessionTranscriptToProviderUseCase } from '@/application/memory-ingest/sync-session-transcript-to-provider.js';
+import { createFileSessionSyncTracker } from '@/application/memory-ingest/session-sync-tracker.js';
 
 interface HostImportCommandOptions {
   all?: boolean;
@@ -98,6 +102,16 @@ async function createDefaultExecuteImport() {
   const queue = new MemoryProcessingJobQueue(db);
   const cursors = new HostImportCursorStore(db);
   const enqueueSessionExtraction = createEnqueueSessionExtractionUseCase({ queue });
+  const tracker = createFileSessionSyncTracker(getCliConfigDir());
+  const syncSessionTranscript =
+    config?.memoryEngine?.provider === 'supermemory'
+      ? createSyncSessionTranscriptToProviderUseCase({
+          repository,
+          provider: resolveMemoryProvider(config),
+          readCheckpoint: tracker.readCheckpoint,
+          writeCheckpoint: tracker.writeCheckpoint,
+        })
+      : undefined;
 
   return createHostImportUseCase({
     getLastCursor: (host) => cursors.get(host) ?? undefined,
@@ -106,6 +120,7 @@ async function createDefaultExecuteImport() {
       await persistImportedSessions(result, {
         repository,
         enqueueSessionExtraction,
+        syncSessionTranscript,
       });
     },
     logger,

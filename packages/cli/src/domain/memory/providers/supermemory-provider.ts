@@ -185,6 +185,7 @@ export function createSupermemoryMemoryProvider(config: SupermemoryProviderConfi
 
         const response: DocumentAddResponse = await client.documents.add({
           content: input.content,
+          customId: toStringOrUndefined(input.customId),
           containerTag,
           metadata: Object.keys(metadata).length ? metadata : undefined,
         });

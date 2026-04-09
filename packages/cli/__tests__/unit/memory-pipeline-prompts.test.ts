@@ -15,6 +15,8 @@ describe('memory pipeline prompts', () => {
 
     expect(prompt).toContain('You are acting as the memory extraction subagent');
     expect(prompt).toContain('Do not attempt to investigate or verify that content further');
+    expect(prompt).toContain('Extract only discrete, useful memories that could help in future conversations or decisions.');
+    expect(prompt).toContain('Do not write a session summary.');
     expect(prompt).toContain('## Types of memory');
     expect(prompt).toContain('## What NOT to save in memory');
     expect(prompt).toContain('## Output format');
@@ -29,6 +31,7 @@ describe('memory pipeline prompts', () => {
     expect(prompt).toContain('"type": "{user, feedback, project, reference}"');
     expect(prompt).toContain('"scope": "{private, team}"');
     expect(prompt).toContain('"source_session": "{session filename}"');
+    expect(prompt).toContain('Each item must capture one useful memory, not a recap of the whole session.');
     expect(prompt).toContain('Do not include any file path or directory fields.');
     expect(prompt).toContain(WHAT_NOT_TO_SAVE_SECTION);
     expect(prompt).toContain(

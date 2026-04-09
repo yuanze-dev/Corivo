@@ -15,6 +15,7 @@ export interface MemoryProviderSaveInput {
   content: string;
   annotation: string;
   source?: string;
+  customId?: string;
 }
 
 export interface MemoryProviderSaveResult {

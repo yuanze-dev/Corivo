@@ -18,11 +18,14 @@ import {
 import type { Logger } from '@/infrastructure/logging';
 import type { ExtractionProvider } from '@/infrastructure/llm/types';
 import { createLogger } from '@/infrastructure/logging';
+import type { CorivoConfig } from '@/config.js';
 import { MemoryProcessingJobQueue } from '@/infrastructure/storage/repositories/memory-processing-job-queue';
 import { RawMemoryRepository } from '@/infrastructure/storage/repositories/raw-memory-repository';
 import { readMemoryPipelineConfig } from './config.js';
 import { createMemoryPipelineArtifactStore, getMemoryPipelineRunRoot } from './runtime.js';
 import { createDatabaseRawSessionJobSource, createDatabaseSessionSource } from './sources.js';
+import { resolveMemoryProvider } from '@/domain/memory/providers/resolve-memory-provider.js';
+import type { MemoryProvider } from '@/domain/memory/providers/types.js';
 
 export type MemoryPipelineMode = 'full' | 'incremental';
 export const DEFAULT_MEMORY_PROVIDER: ExtractionProvider = 'claude';
@@ -31,7 +34,7 @@ export interface MemoryPipelineRuntimeDependencies {
   resolveConfigDir: () => string;
   resolveDatabasePath: () => string;
   createLogger: () => Logger;
-  readConfig: (configDir: string) => Promise<{ encrypted_db_key?: string }>;
+  readConfig: (configDir: string) => Promise<(CorivoConfig & { encrypted_db_key?: string })>;
   openDatabase: (dbPath: string) => CorivoDatabase;
   closeDatabase: (db: CorivoDatabase, dbPath: string) => void;
 }
@@ -42,6 +45,9 @@ export interface MemoryPipelineExecutionDependencies {
     mode: MemoryPipelineMode;
     provider: ExtractionProvider;
     db: CorivoDatabase;
+    config: CorivoConfig & { encrypted_db_key?: string };
+    memoryProvider?: MemoryProvider;
+    projectTag?: string;
   }) => MemoryPipelineDefinition;
   createTrigger?: (mode: MemoryPipelineMode) => PipelineTrigger;
   runPipeline?: (input: {
@@ -84,7 +90,7 @@ export async function runMemoryPipeline(
   const logger = runtime.createLogger();
   const configDir = runtime.resolveConfigDir();
   logger.debug(`[memory:pipeline] starting mode=${mode} provider=${provider} configDir=${configDir}`);
-  await runtime.readConfig(configDir);
+  const config = await runtime.readConfig(configDir);
   logger.debug(`[memory:pipeline] config loaded configDir=${configDir}`);
 
   const runRoot = getMemoryPipelineRunRoot(configDir);
@@ -104,6 +110,15 @@ export async function runMemoryPipeline(
       mode,
       provider,
       db,
+      config,
+      memoryProvider:
+        config.memoryEngine?.provider === 'supermemory'
+          ? resolveMemoryProvider(config)
+          : undefined,
+      projectTag:
+        config.memoryEngine?.provider === 'supermemory'
+          ? config.memoryEngine.supermemory.containerTag
+          : undefined,
     });
     logger.debug(
       `[memory:pipeline] built pipeline id=${pipeline.id} provider=${provider} stageCount=${pipeline.stages.length}`
@@ -133,6 +148,9 @@ function defaultBuildPipeline(input: {
   mode: MemoryPipelineMode;
   provider: ExtractionProvider;
   db: CorivoDatabase;
+  config: CorivoConfig & { encrypted_db_key?: string };
+  memoryProvider?: MemoryProvider;
+  projectTag?: string;
 }): MemoryPipelineDefinition {
   if (input.mode === 'full') {
     return createInitMemoryPipeline({
@@ -144,6 +162,8 @@ function defaultBuildPipeline(input: {
   return createScheduledMemoryPipeline({
     rawSessionJobSource: createDatabaseRawSessionJobSource(input.db) as RawSessionJobSource,
     provider: input.provider,
+    memoryProvider: input.memoryProvider,
+    projectTag: input.projectTag,
   });
 }
 

@@ -50,6 +50,7 @@ describe('Supermemory provider', () => {
     const provider = createSupermemoryMemoryProvider({ apiKey: 'sm_test', containerTag: 'project.test' });
     await provider.save({
       content: 'hello world',
+      customId: 'corivo:project.test:abc123',
       annotation: '事实 · project · general',
       source: 'test',
       host: 'codex',
@@ -61,6 +62,7 @@ describe('Supermemory provider', () => {
 
     expect(documentsAdd).toHaveBeenCalledWith(expect.objectContaining({
       content: 'hello world',
+      customId: 'corivo:project.test:abc123',
       containerTag: 'project.test',
       metadata: expect.objectContaining({
         annotation: '事实 · project · general',

@@ -28,6 +28,7 @@ import {
   createExtractRawMemoriesStage,
   createRebuildMemoryIndexStage,
   createRefreshMemoryIndexStage,
+  createSyncProviderMemoriesStage,
   createSummarizeBlockBatchStage,
   createSummarizeSessionBatchStage,
   createInitMemoryPipeline,
@@ -385,6 +386,34 @@ describe('memory pipeline extension points', () => {
       'merge-final-memories',
       'append-detail-records',
       'refresh-memory-index',
+      'complete-raw-session-jobs',
+    ]);
+  });
+
+  it('configures scheduled pipeline with provider sync when a remote memory provider is injected', () => {
+    const pipeline = createScheduledMemoryPipeline({
+      rawSessionJobSource: {
+        collect: async () => [],
+        markSucceeded: async () => {},
+        markFailed: async () => {},
+      },
+      memoryProvider: {
+        provider: 'supermemory',
+        save: vi.fn(),
+        search: vi.fn(),
+        recall: vi.fn(),
+        healthcheck: vi.fn(),
+      } as any,
+      projectTag: 'project.test',
+    });
+
+    expect(pipeline.stages.map((stage) => stage.id)).toEqual([
+      'collect-raw-session-jobs',
+      'summarize-block-batch',
+      'merge-final-memories',
+      'append-detail-records',
+      'refresh-memory-index',
+      'sync-provider-memories',
       'complete-raw-session-jobs',
     ]);
   });
@@ -2309,7 +2338,7 @@ Always verify the deployment with a focused smoke test.
     );
     expect(vi.mocked(processor.process).mock.calls[0]?.[0]?.[0]).toContain('session-001.memories.md');
     expect(vi.mocked(processor.process).mock.calls[0]?.[0]?.[0]).toContain('session-002.memories.md');
-    expect(vi.mocked(processor.process).mock.calls[0]?.[1]).toEqual({ timeoutMs: 180000 });
+    expect(vi.mocked(processor.process).mock.calls[0]?.[1]).toEqual({ timeoutMs: 600000 });
 
     await expect(
       readFile(path.join(tempRoot, 'memory', 'raw', 'session-001.memories.md'), 'utf8'),
@@ -2521,6 +2550,111 @@ Keep pull requests narrowly scoped and easy to review.
       inputCount: 2,
       outputCount: 0,
       artifactIds: [],
+    });
+  });
+
+  it('syncs final detail memory files to the provider with stable customIds', async () => {
+    const store = new RecordingArtifactStore();
+    await store.writeMemoryFile(
+      'final/private/short-prs.md',
+      `---
+name: User prefers short PRs
+description: Canonical preference
+type: user
+scope: private
+merged_from: [session-001]
+---
+
+Prefer small, reviewable pull requests by default.
+`,
+    );
+    await store.writeMemoryFile(
+      'final/private/MEMORY.md',
+      '- [User prefers short PRs](short-prs.md) — Canonical preference.',
+    );
+
+    const save = vi.fn(async () => ({ ok: true, provider: 'supermemory' as const, id: 'doc_1' }));
+    const stage = createSyncProviderMemoriesStage({
+      provider: {
+        provider: 'supermemory',
+        save,
+        search: vi.fn(),
+        recall: vi.fn(),
+        healthcheck: vi.fn(),
+      },
+      projectTag: 'project.test',
+    });
+
+    const result = await stage.run(createContext(store, 'run-sync-provider'));
+
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({
+      content: 'Prefer small, reviewable pull requests by default.',
+      customId: expect.stringMatching(/^corivo:project\.test:[a-f0-9]+$/),
+      annotation: 'pending',
+      source: 'memory-pipeline',
+    }));
+    expect(result).toMatchObject({
+      stageId: 'sync-provider-memories',
+      status: 'success',
+      inputCount: 1,
+      outputCount: 1,
+    });
+  });
+
+  it('returns partial when some provider sync writes fail', async () => {
+    const store = new RecordingArtifactStore();
+    await store.writeMemoryFile(
+      'final/private/a.md',
+      `---
+name: A
+description: A
+type: user
+scope: private
+merged_from: [session-001]
+---
+
+First durable memory.
+`,
+    );
+    await store.writeMemoryFile(
+      'final/team/b.md',
+      `---
+name: B
+description: B
+type: project
+scope: team
+merged_from: [session-002]
+---
+
+Second durable memory.
+`,
+    );
+
+    const save = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, provider: 'supermemory', id: 'doc_1' })
+      .mockRejectedValueOnce(new Error('network down'));
+    const stage = createSyncProviderMemoriesStage({
+      provider: {
+        provider: 'supermemory',
+        save,
+        search: vi.fn(),
+        recall: vi.fn(),
+        healthcheck: vi.fn(),
+      },
+      projectTag: 'project.test',
+    });
+
+    const result = await stage.run(createContext(store, 'run-sync-provider-partial'));
+
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      stageId: 'sync-provider-memories',
+      status: 'partial',
+      inputCount: 2,
+      outputCount: 1,
+      error: expect.stringContaining('network down'),
     });
   });
 

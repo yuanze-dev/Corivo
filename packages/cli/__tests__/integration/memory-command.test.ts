@@ -250,6 +250,54 @@ describe('memory pipeline cleanup', () => {
     expect(seenProvider).toBe('codex');
   });
 
+  it('passes resolved remote memory provider context into buildPipeline', async () => {
+    let seenProjectTag: string | undefined;
+    let seenMemoryProvider: string | undefined;
+
+    await expect(
+      runMemoryPipeline({
+        mode: 'incremental',
+        dependencies: {
+          runtime: {
+            resolveConfigDir: () => '/tmp/corivo',
+            resolveDatabasePath: () => '/tmp/corivo/corivo.db',
+            readConfig: async () => ({
+              memoryEngine: {
+                provider: 'supermemory',
+                supermemory: {
+                  apiKey: 'sm_test',
+                  containerTag: 'project.test',
+                },
+              },
+            }),
+            openDatabase: () =>
+              ({
+                close: () => {},
+              } as CorivoDatabase),
+            closeDatabase: () => {},
+          },
+          buildPipeline: ({ memoryProvider, projectTag }) => {
+            seenMemoryProvider = memoryProvider?.provider;
+            seenProjectTag = projectTag;
+            return { id: 'scheduled-memory-pipeline', stages: [] };
+          },
+          runPipeline: async () => ({
+            runId: 'run',
+            pipelineId: 'scheduled-memory-pipeline',
+            status: 'success',
+            stages: [],
+          }),
+        },
+      }),
+    ).resolves.toMatchObject({
+      pipelineId: 'scheduled-memory-pipeline',
+      status: 'success',
+    });
+
+    expect(seenMemoryProvider).toBe('supermemory');
+    expect(seenProjectTag).toBe('project.test');
+  });
+
   it('emits detailed debug logs across pipeline setup and stage execution', async () => {
     const logger = createMockLogger();
     const configDir = await mkdtemp(path.join(os.tmpdir(), 'corivo-memory-debug-'));

@@ -1,10 +1,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import type { CorivoConfig } from '@/config.js';
 import { ConfigError } from '@/domain/errors/index.js';
 
 export async function readMemoryPipelineConfig(
   configDir: string,
-): Promise<{ encrypted_db_key?: string }> {
+): Promise<CorivoConfig & { encrypted_db_key?: string }> {
   const configPath = path.join(configDir, 'config.json');
   let payload: string;
 
@@ -17,9 +18,9 @@ export async function readMemoryPipelineConfig(
     throw error;
   }
 
-  let config: { encrypted_db_key?: string };
+  let config: CorivoConfig & { encrypted_db_key?: string };
   try {
-    config = JSON.parse(payload) as { encrypted_db_key?: string };
+    config = JSON.parse(payload) as CorivoConfig & { encrypted_db_key?: string };
   } catch (error) {
     throw new ConfigError(
       `Unable to parse Corivo config: ${error instanceof Error ? error.message : String(error)}`
